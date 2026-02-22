@@ -1,0 +1,90 @@
+import { create } from "zustand";
+import { API } from "../api/axios";
+import toast from "react-hot-toast";
+
+const useAuth = create((set) => ({
+  authUser: null,
+  role: null, // <-- Added role explicitly to top-level state
+  isCheckingAuth: true,
+  isSigningUp: false,
+  isLoggingIn: false,
+  onlineUsers: [],
+
+  checkAuth: async () => {
+    try {
+      const res = await API.get("/auth/check");
+      set({ 
+        authUser: res.data, 
+        role: res.data?.role || null // Extract role
+      });
+    } catch (error) {
+      set({ authUser: null, role: null }); // Clear on fail
+    } finally {
+      set({ isCheckingAuth: false });
+    }
+  },
+
+  signup: async (data) => {
+    set({ isSigningUp: true });
+    try {
+      const res = await API.post("/auth/signup", data);
+      
+      set({ 
+        authUser: res.data.user,
+        role: res.data.user?.role || null // Extract role
+      }); 
+
+      toast.success("Account created successfully!");
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to create account");
+    } finally {
+      set({ isSigningUp: false });
+    }
+  },
+
+  login: async (data) => {
+    set({ isLoggingIn: true });
+    try {
+      const res = await API.post("/auth/login", data);
+      
+      set({ 
+        authUser: res.data.user,
+        role: res.data.user?.role || null // Extract role
+      });
+
+      toast.success("Logged in successfully");
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Invalid credentials");
+    } finally {
+      set({ isLoggingIn: false });
+    }
+  },
+
+  logout: async () => {
+    try {
+      await API.post("/auth/logout");
+      set({ authUser: null, role: null }); // Clear role on logout
+      toast.success("Logged out successfully");
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Error logging out");
+    }
+  },
+
+  updateProfile: async (data) => {
+    try {
+      const res = await API.put("/auth/update-profile", data);
+      const updatedUser = res.data.user || res.data;
+      
+      set({ 
+        authUser: updatedUser,
+        role: updatedUser?.role || null // Maintain role in case of updates
+      }); 
+      
+      toast.success("Profile updated successfully");
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to update profile");
+    }
+  },
+}));
+
+export default useAuth;
