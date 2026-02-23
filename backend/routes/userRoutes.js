@@ -53,6 +53,6 @@ router.patch("/toggle-role/:id", protectRoute, authorize("admin"), toggleAdminRo
 // ==========================================
 
 // Get a single user by ID 
-router.get("/:id", protectRoute, authorize("admin"), getUserById);
+router.get("/:id",   getUserById);
 
 export default router;

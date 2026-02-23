@@ -22,118 +22,164 @@ export const downloadCertificatePDF = async (req, res) => {
       margin: 0,
     });
 
-    // 2. Set response headers to trigger file download in the browser
+    // 2. Set response headers to trigger file download
     const safeName = student.student_name.replace(/[^a-zA-Z0-9]/g, "_");
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename=CIB_Certificate_${safeName}.pdf`);
     
-    // Pipe the PDF directly to the HTTP response
     doc.pipe(res);
 
     // Asset paths
     const fontsPath = path.join(__dirname, "../assets/fonts");
     const imagesPath = path.join(__dirname, "../assets/images");
 
-    // 3. Background Layers
-    // Assuming your images are high-res, fit them to A4 Landscape (841.89 x 595.28 points)
+    // ==========================================
+    // 3. BACKGROUND LAYERS & WATERMARKS
+    // ==========================================
+    
+    // Base Waves Background (Full A4 Bleed - 842x595)
     doc.image(`${imagesPath}/WavesBackground.png`, 0, 0, { width: 842, height: 595 });
+    
+    // Corner Accents and Signatures
     doc.image(`${imagesPath}/GoldCorners.png`, 0, 0, { width: 842, height: 595 });
     doc.image(`${imagesPath}/SealSignature.png`, 0, 0, { width: 842, height: 595 });
 
-    // 4. Outer Gold Border
+    // ---------------------------------------------------------
+    // GIANT CENTER LOGO WATERMARK (Drawn BEFORE text so it sits behind)
+    // ---------------------------------------------------------
+    const logoWidth = 540; // 3x the size of 180
+    const logoX = (842 / 2) - (logoWidth / 2); // Perfectly centered horizontally (151)
+    
+    // CHANGED: Moved down by 10px (was 180, now 190)
+    const logoY = 190; 
+    
+    if (fs.existsSync(path.join(imagesPath, "logo.png"))) {
+        // Adding opacity parameter here if your logo isn't already faded
+        doc.image(`${imagesPath}/logo.png`, logoX, logoY, { width: logoWidth });
+    }
+    // ---------------------------------------------------------
+
+    // Outer Gold Border (The "Last Border")
     doc.lineWidth(2).strokeColor("#bd9b5e").rect(20, 20, 802, 555).stroke();
 
-    // 5. Typography & Text
-    // Header
+    // ==========================================
+    // 4. TYPOGRAPHY & TEXT (Layered on top)
+    // ==========================================
+
+    // Header 
     doc.font(`${fontsPath}/Cinzel-Bold.ttf`)
-       .fontSize(18)
+       .fontSize(19)
        .fillColor("#111111")
-       .text("THE CULINARY INSTITUTE OF BANGLADESH", 0, 60, { align: "center", characterSpacing: 1.5 });
+       .text("THE CULINARY INSTITUTE OF BANGLADESH", 0, 50, { align: "center", characterSpacing: 1.5 });
 
     doc.font(`${fontsPath}/Montserrat-SemiBold.ttf`)
        .fontSize(10)
        .fillColor("#555555")
-       .text(`Registration No: STP-DHA-003244`, 0, 85, { align: "center" });
+       .text(`Registration No: STP-DHA-003244`, 0, 75, { align: "center" });
 
     doc.font(`${fontsPath}/GreatVibes-Regular.ttf`)
-       .fontSize(18)
+       .fontSize(22)
        .fillColor("#444444")
-       .text("Excellence in culinary training, certified with pride", 0, 105, { align: "center" });
+       .text("Excellence in culinary training, certified with pride", 0, 90, { align: "center" });
 
-    // Main Title
+    // Main Title 
     doc.font(`${fontsPath}/Cinzel-Bold.ttf`)
-       .fontSize(55)
+       .fontSize(60)
        .fillColor("#111111")
-       .text("CERTIFICATE", 0, 140, { align: "center", characterSpacing: 8 });
+       .text("CERTIFICATE", 0, 135, { align: "center", characterSpacing: 10 });
 
-    doc.fontSize(18)
+    doc.font(`${fontsPath}/Montserrat-Regular.ttf`)
+       .fontSize(17)
        .fillColor("#c5a059")
-       .text("OF ACHIEVEMENT", 0, 195, { align: "center", characterSpacing: 6 });
+       .text("OF ACHIEVEMENT", 0, 200, { align: "center", characterSpacing: 8 });
 
-    // Awardee Name
+    // Awardee Name 
     doc.font(`${fontsPath}/Montserrat-SemiBold.ttf`)
        .fontSize(10)
        .fillColor("#333333")
        .text("THIS CERTIFICATE IS PROUDLY GIVEN TO", 0, 250, { align: "center", characterSpacing: 2 });
 
     doc.font(`${fontsPath}/GreatVibes-Regular.ttf`)
-       .fontSize(70)
+       .fontSize(85)
        .fillColor("#111111")
        .text(student.student_name, 0, 265, { align: "center" });
 
-    // Gold Divider Line
-    doc.lineWidth(1).strokeColor("#c5a059").moveTo(150, 360).lineTo(692, 360).stroke();
+    // ==========================================
+    // 5. COURSE DETAILS 
+    // ==========================================
 
-    // Course Details
+    // Gold Divider Line
+    doc.lineWidth(1.5).strokeColor("#c5a059").moveTo(180, 370).lineTo(662, 370).stroke();
+
     doc.font(`${fontsPath}/Montserrat-Regular.ttf`)
        .fontSize(12)
        .fillColor("#333333")
-       .text("In recognition of accomplishment and demonstrated excellence in the culinary arts.", 0, 380, { align: "center" });
+       .text("In recognition of accomplishment and demonstrated excellence in the culinary arts.", 0, 390, { align: "center" });
 
-    doc.font(`${fontsPath}/Montserrat-BoldItalic.ttf`)
-       .fontSize(16)
+    doc.font(`${fontsPath}/Montserrat-Bold.ttf`)
+       .fontSize(18)
        .fillColor("#111111")
-       .text(student.course_name, 0, 405, { align: "center" });
+       .text(student.course_name, 0, 415, { align: "center" });
 
     // Format Date Helper
     const d = new Date(student.issue_date || Date.now());
     const issueDate = `Awarded on ${d.getDate()} ${d.toLocaleDateString("en-GB", { month: "long" })} ${d.getFullYear()}`;
 
     doc.font(`${fontsPath}/Montserrat-MediumItalic.ttf`)
-       .fontSize(11)
+       .fontSize(12)
        .fillColor("#555555")
-       .text(issueDate, 0, 430, { align: "center" });
+       .text(issueDate, 0, 440, { align: "center" });
 
-    // 6. Generate QR Code and Insert it
+    // ==========================================
+    // 6. FOOTER (QR Code & Verification Text)
+    // ==========================================
+    
     const studentUrl = `https://verification.cibdhk.com/student/${student._id}`;
-    const qrCodeDataUrl = await QRCode.toDataURL(studentUrl, { margin: 1, width: 150 });
+    const qrCodeDataUrl = await QRCode.toDataURL(studentUrl, { margin: 0, width: 150 });
     
-    // Position QR Code at bottom left
-    doc.image(qrCodeDataUrl, 50, 480, { width: 60 });
+    // Position Settings for Left Footer
+    const qrX = 60;
+    const qrSize = 55;
+    const footerY = 485;
+    const textX = qrX + qrSize + 15;
     
-    // Outline for QR code
-    doc.lineWidth(0.5).strokeColor("#bd9b5e").rect(50, 480, 60, 60).stroke();
+    // Insert QR Code & Box
+    doc.image(qrCodeDataUrl, qrX, footerY, { width: qrSize });
+    doc.lineWidth(0.5).strokeColor("#bd9b5e").rect(qrX, footerY, qrSize, qrSize).stroke();
 
-    // 7. Footer Text next to QR Code
-    const footerTextX = 120;
-    doc.font(`${fontsPath}/Montserrat-Italic.ttf`)
-       .fontSize(7)
-       .fillColor("#333333")
-       .text("This academy is accredited by the ", footerTextX, 485, { continued: true })
-       .font(`${fontsPath}/Montserrat-BoldItalic.ttf`)
-       .text("National Skills Development Authority (NSDA)", { continued: true })
-       .font(`${fontsPath}/Montserrat-Italic.ttf`)
-       .text("\nand adheres to NSDA & international food safety & quality management standards.");
+    // Footer Text (NSDA Accreditation)
+    let textY = footerY;
 
+    doc.font(`${fontsPath}/Montserrat-Regular.ttf`).fontSize(7).fillColor("#333333")
+       .text("This academy is accredited by the ", textX, textY, { continued: true })
+       .font(`${fontsPath}/Montserrat-Bold.ttf`)
+       .text("National");
+    
+    textY += 10;
     doc.font(`${fontsPath}/Montserrat-Bold.ttf`)
-       .fontSize(7)
+       .text("Skills Development Authority (NSDA)", textX, textY);
+    
+    textY += 10;
+    doc.font(`${fontsPath}/Montserrat-Regular.ttf`)
+       .text("and adheres to NSDA & international food", textX, textY);
+    
+    textY += 10;
+    doc.font(`${fontsPath}/Montserrat-Regular.ttf`)
+       .text("safety & quality management standards.", textX, textY);
+
+    // Spacer
+    textY += 15;
+
+    // Registration & Verification Lines
+    doc.font(`${fontsPath}/Montserrat-Bold.ttf`)
        .fillColor("#111111")
-       .text(`\nStudent Reg No: `, footerTextX, 510, { continued: true })
+       .text(`Student Reg No: `, textX, textY, { continued: true })
        .font(`${fontsPath}/Montserrat-Regular.ttf`)
        .text(student.registration_number || student._id);
 
+    textY += 10;
     doc.font(`${fontsPath}/Montserrat-Bold.ttf`)
-       .text(`Manual Verification: `, footerTextX, 525, { continued: true })
+       .text(`Manual Verification: `, textX, textY, { continued: true })
        .font(`${fontsPath}/Montserrat-Regular.ttf`)
        .text("contact@cibdhk.com | www.cibdhk.com");
 
