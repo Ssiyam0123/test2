@@ -5,9 +5,11 @@ import {
   Users,
   UserPlus,
   Briefcase,
-  UserCog,
-  BookOpen,
-  Library,
+  GraduationCap, // অল কোর্সের জন্য
+  BookPlus,      // অ্যাড কোর্সের জন্য
+  CalendarDays,  // ম্যানেজ ব্যাচের জন্য
+  PlusCircle,    // অ্যাড ব্যাচের জন্য
+  Layers,        // অল ব্যাচের জন্য
   ShieldCheck,
   LogOut,
   Menu,
@@ -20,156 +22,261 @@ import { apiURL } from "../../Constant.js";
 const AdminLayout = () => {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const { logout, authUser } = useAuth();
 
   // 1. Define roles for each navigation item
-  const navigationGroups = useMemo(() => [
+const navigationGroups = useMemo(
+  () => [
     {
       label: null,
       items: [
-        // FIX: Removed "instructor" so they don't see the Dashboard link
-        { name: "Dashboard", href: "/admin", icon: LayoutDashboard, roles: ["admin", "registrar"] },
+        {
+          name: "Dashboard",
+          href: "/admin",
+          icon: LayoutDashboard,
+          roles: ["admin", "registrar"],
+        },
       ],
     },
     {
       label: "Students",
       items: [
-        { name: "All Students", href: "/admin/all-students", icon: Users, roles: ["admin", "registrar", "instructor"] },
-        // Instructors cannot add students
-        { name: "Add Student", href: "/admin/add-student", icon: UserPlus, roles: ["admin", "registrar"] },
+        {
+          name: "All Students",
+          href: "/admin/all-students",
+          icon: Users,
+          roles: ["admin", "registrar", "instructor"],
+        },
+        {
+          name: "Add Student",
+          href: "/admin/add-student",
+          icon: UserPlus,
+          roles: ["admin", "registrar"],
+        },
       ],
     },
     {
       label: "Staff & Faculty",
       items: [
-        // Only Admins can manage employees
-        { name: "All Employees", href: "/admin/all-employees", icon: Briefcase, roles: ["admin"] },
-        { name: "Add Employee", href: "/admin/add-employee", icon: UserCog, roles: ["admin"] },
+        {
+          name: "All Employees",
+          href: "/admin/all-employees",
+          icon: Briefcase,
+          roles: ["admin"],
+        },
+        {
+          name: "Add Employee",
+          href: "/admin/add-employee",
+          icon: UserPlus, // স্টুডেন্টের সাথে সামঞ্জস্য রেখে
+          roles: ["admin"],
+        },
       ],
     },
     {
       label: "Academics",
       items: [
-        { name: "All Courses", href: "/admin/all-courses", icon: Library, roles: ["admin", "registrar", "instructor"] },
-        // Only Admins (and maybe Registrars) can create new courses
-        { name: "Add Course", href: "/admin/add-course", icon: BookOpen, roles: ["admin", "registrar"] },
+        {
+          name: "All Courses",
+          href: "/admin/all-courses",
+          icon: GraduationCap, // কোর্সের জন্য বেস্ট আইকন
+          roles: ["admin", "registrar", "instructor"],
+        },
+        {
+          name: "Add Course",
+          href: "/admin/add-course",
+          icon: BookPlus, // অ্যাড করার সিম্বলসহ
+          roles: ["admin", "registrar"],
+        },
+      ],
+    },
+    {
+      label: "Batches",
+      items: [
+        {
+          name: "Manage Batches",
+          href: "/admin/batches",
+          icon: CalendarDays, // ব্যাচ যেহেতু শিডিউলের ব্যাপার
+          roles: ["admin", "registrar", "instructor"],
+        },
+        {
+          name: "Add Batch",
+          href: "/admin/add-batch",
+          icon: PlusCircle,
+          roles: ["admin", "registrar"],
+        },
+        {
+          name: "All Batches",
+          href: "/admin/all-batches",
+          icon: Layers, // অনেকগুলো ব্যাচ বা গ্রুপ বোঝাতে
+          roles: ["admin", "registrar", "instructor"],
+        },
       ],
     },
     {
       label: "System",
       items: [
-        // Strictly Admins
-        { name: "Manage Admins", href: "/admin/manage-admins", icon: ShieldCheck, roles: ["admin"] },
+        {
+          name: "Manage Admins",
+          href: "/admin/manage-admins",
+          icon: ShieldCheck,
+          roles: ["admin"],
+        },
       ],
     },
-  ], []);
+  ],
+  [],
+);
 
   // 2. Filter the navigation based on the current user's role
   const filteredNavigation = useMemo(() => {
-    const userRole = authUser?.role || "instructor"; // Fallback role for safety
-    
+    const userRole = authUser?.role || "instructor";
+
     return navigationGroups
-      .map(group => ({
+      .map((group) => ({
         ...group,
-        items: group.items.filter(item => item.roles.includes(userRole))
+        items: group.items.filter((item) => item.roles.includes(userRole)),
       }))
-      // Remove groups that have no items left after filtering
-      .filter(group => group.items.length > 0);
+      .filter((group) => group.items.length > 0);
   }, [navigationGroups, authUser]);
 
   return (
-    <div className="min-h-screen bg-gray-100 relative">
+    <div className="min-h-screen bg-[#e8f0f2] relative flex overflow-x-hidden">
       {/* Mobile top bar */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-white border-b border-gray-200 shadow-sm">
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-[#1e293b] shadow-md">
         <div className="flex items-center justify-between px-4 py-3">
-          <h1 className="text-xl font-bold text-gray-800"></h1>
+          <div className="flex items-center gap-3">
+            <div className="bg-white p-1.5 rounded-lg">
+              <img
+                src="/logo.png"
+                alt="CIB Logo"
+                className="h-8 w-auto object-contain"
+              />
+            </div>
+            {/* Show User Name on Mobile Bar */}
+            {authUser && (
+              <span className="text-white font-semibold text-sm truncate max-w-[150px] capitalize">
+                Hi,{" "}
+                {authUser.full_name?.split(" ")[0] ||
+                  authUser.username ||
+                  "Admin"}
+              </span>
+            )}
+          </div>
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+            className="p-2 rounded-md text-slate-300 hover:text-white hover:bg-white/10 transition-colors"
           >
             {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
         </div>
       </div>
 
-      {/* Sidebar */}
+      {/* Floating Modern Sidebar */}
       <div
         className={`
-          fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-gray-200 shadow-lg lg:shadow-none
-          transform transition-transform duration-300 ease-in-out flex flex-col
-          lg:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
+          fixed z-40 bg-[#1e293b] shadow-2xl flex flex-col transition-all duration-300 ease-in-out
+          inset-y-0 left-0 lg:inset-y-4 lg:left-4 lg:rounded-3xl lg:h-[calc(100vh-32px)]
+          ${sidebarOpen ? "translate-x-0 w-64" : "-translate-x-full lg:translate-x-0"}
+          ${isCollapsed ? "lg:w-20" : "lg:w-64 w-64"} 
         `}
       >
-        {/* Logo Area */}
-        <div className="p-6 border-b border-gray-200 shrink-0 flex justify-center items-center">
-          <img
-            src="/logo.png"
-            alt="CIB Logo"
-            className="logo-image object-contain"
-            width="80"
-            height="80"
-          />
+        {/* Logo Area (Clickable to minimize/maximize) */}
+        <div
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          title="Toggle Sidebar"
+          className={`p-6 border-b border-white/10 shrink-0 flex justify-center items-center mt-2 cursor-pointer hover:bg-white/5 transition-colors ${isCollapsed ? "px-2" : ""}`}
+        >
+          <div
+            className={`bg-white rounded-2xl shadow-inner flex justify-center items-center transition-all duration-300 ${isCollapsed ? "p-1.5" : "px-4 py-2"}`}
+          >
+            <img
+              src="/logo.png"
+              alt="CIB Logo"
+              className="object-contain transition-all duration-300"
+              style={{ width: isCollapsed ? "40px" : "90px" }}
+            />
+          </div>
         </div>
 
         {/* User Profile Area */}
-        <div className="p-4 border-b border-gray-100 shrink-0 bg-gray-50/50">
+        <div
+          className={`p-4 border-b border-white/5 shrink-0 bg-white/5 mt-4 rounded-2xl transition-all duration-300 ${isCollapsed ? "mx-2 flex justify-center" : "mx-4"}`}
+        >
           {authUser && (
             <div className="flex items-center space-x-3">
-              {/* Profile Image Logic */}
               {authUser.photo_url ? (
                 <img
-                  src={authUser.photo_url.startsWith("http") ? authUser.photo_url : `${apiURL.image_url}${authUser.photo_url}`}
+                  src={
+                    authUser.photo_url.startsWith("http")
+                      ? authUser.photo_url
+                      : `${apiURL.image_url}${authUser.photo_url}`
+                  }
                   alt={authUser.full_name || authUser.username}
-                  className="h-10 w-10 rounded-full object-cover border border-gray-200 shadow-sm"
+                  className="h-10 w-10 rounded-xl object-cover border border-white/20 shadow-sm shrink-0"
                 />
               ) : (
-                <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center border border-blue-200 shadow-sm">
-                  <UserCircle size={20} className="text-blue-700" />
+                <div className="h-10 w-10 rounded-xl bg-teal-500/20 flex items-center justify-center border border-teal-500/30 shrink-0">
+                  <UserCircle size={20} className="text-teal-400" />
                 </div>
               )}
-              
-              <div className="overflow-hidden">
-                <p className="text-sm font-bold text-gray-800 truncate capitalize">
-                  {authUser.full_name || authUser.username || "Administrator"}
-                </p>
-                <p className="text-xs font-medium text-gray-500 truncate capitalize">
-                  {authUser.role}
-                </p>
-              </div>
+
+              {/* Hide text when collapsed */}
+              {!isCollapsed && (
+                <div className="overflow-hidden">
+                  <p className="text-sm font-bold text-white truncate capitalize">
+                    {authUser.full_name || authUser.username || "Administrator"}
+                  </p>
+                  <p className="text-[11px] font-semibold text-teal-400 tracking-wide uppercase truncate">
+                    {authUser.role}
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </div>
 
-        {/* Navigation Area */}
-        <nav className="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-thin scrollbar-thumb-gray-200">
+        {/* Navigation Area - SCROLLBAR HIDDEN HERE */}
+        <nav
+          className={`flex-1 overflow-y-auto space-y-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] mt-2 ${isCollapsed ? "p-2" : "p-4"}`}
+        >
           {filteredNavigation.map((group, index) => (
-            <div key={index} className="space-y-1">
-              {group.label && (
-                <h3 className="px-4 text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
-                  {group.label}
-                </h3>
-              )}
+            <div key={index} className="space-y-1.5">
+              {/* Hide group headers when collapsed, show a divider instead */}
+              {!isCollapsed
+                ? group.label && (
+                    <h3 className="px-4 text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3 mt-2">
+                      {group.label}
+                    </h3>
+                  )
+                : group.label && (
+                    <div className="w-8 mx-auto h-px bg-white/10 my-3"></div>
+                  )}
+
               {group.items.map((item) => {
                 const isActive = location.pathname === item.href;
                 return (
                   <Link
                     key={item.name}
                     to={item.href}
+                    title={isCollapsed ? item.name : ""} // Show tooltip when collapsed
                     onClick={() => setSidebarOpen(false)}
                     className={`
-                      flex items-center space-x-3 px-4 py-2.5 rounded-lg transition-all duration-200 group
-                      ${
-                        isActive
-                          ? "bg-blue-50 text-blue-700 font-semibold"
-                          : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 font-medium"
-                      }
+                      flex items-center rounded-xl transition-all duration-200 group
+                      ${isCollapsed ? "justify-center py-3 px-0 mx-1" : "space-x-3 px-4 py-3"}
+                      ${isActive ? "bg-white/10 text-white shadow-sm" : "text-slate-400 hover:bg-white/5 hover:text-slate-200 font-medium"}
                     `}
                   >
                     <item.icon
                       size={20}
-                      className={`${isActive ? "text-blue-600" : "text-gray-400 group-hover:text-gray-600"} transition-colors`}
+                      className={`${isActive ? "text-[#14b8a6]" : "text-slate-500 group-hover:text-slate-300"} transition-colors shrink-0`}
                     />
-                    <span>{item.name}</span>
+                    {/* Hide span when collapsed */}
+                    {!isCollapsed && (
+                      <span className={isActive ? "font-bold" : ""}>
+                        {item.name}
+                      </span>
+                    )}
                   </Link>
                 );
               })}
@@ -178,16 +285,21 @@ const AdminLayout = () => {
         </nav>
 
         {/* Footer / Logout */}
-        <div className="p-4 border-t border-gray-200 shrink-0 bg-gray-50/50">
+        <div className={`shrink-0 mt-auto ${isCollapsed ? "p-2 mb-2" : "p-4"}`}>
           <button
             onClick={logout}
-            className="flex items-center space-x-3 px-4 py-2.5 w-full rounded-lg text-gray-600 font-medium hover:bg-red-50 hover:text-red-700 transition-colors group"
+            title={isCollapsed ? "Logout" : ""} // Tooltip
+            className={`
+              flex items-center justify-center w-full rounded-xl text-slate-400 font-bold 
+              hover:bg-red-500/10 hover:text-red-400 border border-transparent hover:border-red-500/20 transition-all group
+              ${isCollapsed ? "space-x-0 px-0 py-3" : "space-x-2 px-4 py-3"}
+            `}
           >
             <LogOut
-              size={20}
-              className="text-gray-400 group-hover:text-red-600 transition-colors"
+              size={18}
+              className="text-slate-500 group-hover:text-red-400 transition-colors shrink-0"
             />
-            <span>Logout</span>
+            {!isCollapsed && <span>Logout</span>}
           </button>
         </div>
       </div>
@@ -195,14 +307,19 @@ const AdminLayout = () => {
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-30 bg-gray-900/50 backdrop-blur-sm lg:hidden transition-opacity"
+          className="fixed inset-0 z-30 bg-slate-900/60 backdrop-blur-sm lg:hidden transition-opacity"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
       {/* Main content area */}
-      <div className="lg:ml-64 relative z-0 flex flex-col min-h-screen">
-        <div className="pt-16 lg:pt-0 flex-1">
+      <div
+        className={`
+          relative z-0 flex flex-col min-h-screen w-full transition-all duration-300 ease-in-out
+          ${isCollapsed ? "lg:pl-[112px]" : "lg:pl-[288px]"}
+        `}
+      >
+        <div className="pt-20 lg:pt-4 px-4 pb-4 lg:pr-6 lg:pb-6 flex-1">
           <Outlet />
         </div>
       </div>

@@ -1,134 +1,153 @@
-// pages/AllCourses.jsx - Updated
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCourses, useDeleteCourse, useToggleCourseStatus } from "../hooks/useCourses";
-import CourseHeader from "../components/courses/CourseHeader";
-import CourseFilters from "../components/courses/CourseFilters";
-import CoursesTable from "../components/courses/CoursesTable";
-import { useConfirmToast } from "../components/ConfirmToast";
-import toast from "react-hot-toast";
+
+// Components
+import CourseFilters from "../components/Search_filter/CourseFilters";
+import PageHeader from "../components/common/PageHeader";
+import DataErrorState from "../components/common/DataErrorState";
+import DataTable from "../components/common/DataTable";
+import ActionIconButton from "../components/common/ActionIconButton";
+
+// Icons
+import { Edit, Trash2, BookOpen, Hash, Clock, Power, PowerOff } from "lucide-react";
 
 const AllCourses = () => {
+  const navigate = useNavigate();
+  
   const [page, setPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const limit = 30;
+
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedSearch(searchTerm), 500);
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
   
-  const navigate = useNavigate();
-  const { showConfirmToast } = useConfirmToast();
+  const filters = useMemo(() => ({
+    ...(debouncedSearch && { search: debouncedSearch }),
+    ...(statusFilter !== "all" && { is_active: statusFilter === "active" })
+  }), [debouncedSearch, statusFilter]);
   
-  // Build filters
-  const filters = {};
-  if (searchTerm) filters.search = searchTerm;
-  if (statusFilter !== "all") filters.is_active = statusFilter === "active";
-  
-  const { data, isLoading, error, refetch } = useCourses(page, limit, filters);
+  const { data, isLoading, error, refetch, isRefetching } = useCourses(page, limit, filters);
   const deleteCourseMutation = useDeleteCourse();
   const toggleStatusMutation = useToggleCourseStatus();
   
   const courses = data?.data || [];
   const pagination = data?.pagination;
 
-  const handleDelete = (id, courseName) => {
-    showConfirmToast({
-      type: 'delete',
-      title: 'Delete Course',
-      message: 'Are you sure you want to delete this course? This action cannot be undone.',
-      itemName: courseName,
-      confirmText: 'Delete',
-      confirmColor: 'red',
-      onConfirm: () => {
-        const loadingToast = toast.loading('Deleting course...');
-        deleteCourseMutation.mutate(id, {
-          onSuccess: () => {
-            toast.dismiss(loadingToast);
-          },
-          onError: () => {
-            toast.dismiss(loadingToast);
-          }
-        });
-      },
-      onCancel: () => {
-        // Optional: Handle cancel action
-      }
-    });
-  };
+  useEffect(() => { setPage(1); }, [filters]);
 
-  const handleStatusToggle = (id, courseName, isActive) => {
-    showConfirmToast({
-      type: isActive ? 'deactivate' : 'verify',
-      title: isActive ? 'Deactivate Course' : 'Activate Course',
-      message: isActive 
-        ? 'Are you sure you want to deactivate this course?'
-        : 'Are you sure you want to activate this course?',
-      itemName: courseName,
-      confirmText: isActive ? 'Deactivate' : 'Activate',
-      confirmColor: isActive ? 'yellow' : 'green',
-      onConfirm: () => {
-        toggleStatusMutation.mutate(id);
-      }
-    });
-  };
+  const handleDelete = (id) => deleteCourseMutation.mutate(id);
+  const handleStatusToggle = (id) => toggleStatusMutation.mutate(id);
 
-  const handleEdit = (courseId) => {
-    navigate(`/admin/update-course/${courseId}`);
-  };
+  if (error) return <DataErrorState error={error} onRetry={refetch} isRetrying={isRefetching} />;
 
-  const handleAddCourse = () => {
-    navigate("/admin/add-course");
-  };
+  const columns = [
+    { label: "Course Details" },
+    { label: "Code" },
+    { label: "Duration" },
+    { label: "Status" },
+    { label: "Actions", align: "right" }
+  ];
 
-  const handlePageReset = () => {
-    setPage(1);
-  };
-
-  if (error) {
-    return (
-      <div className="p-6">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <p className="text-red-600">Error loading courses: {error.message}</p>
-          <button
-            onClick={() => refetch()}
-            className="mt-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-          >
-            Retry
-          </button>
+  const renderCourseRow = (course) => (
+    <tr key={course._id} className="hover:bg-gray-50 transition-colors">
+      <td className="px-5 py-4">
+        <div className="font-medium text-gray-900 flex items-center">
+          <BookOpen size={16} className="mr-2 text-blue-500" /> {course.course_name}
         </div>
-      </div>
-    );
-  }
+        {course.additional_info?.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-1.5 ml-6">
+            {course.additional_info.map((info, idx) => (
+              <span key={idx} className="px-2 py-0.5 text-[10px] bg-gray-100 text-gray-600 rounded-md font-medium uppercase tracking-wider">
+                {info}
+              </span>
+            ))}
+          </div>
+        )}
+      </td>
+
+      <td className="px-5 py-4">
+        <div className="flex items-center text-sm text-gray-900">
+          <Hash size={16} className="mr-1 text-gray-400" /> 
+          <span className="font-mono">{course.course_code}</span>
+        </div>
+      </td>
+
+      <td className="px-5 py-4">
+        <div className="flex items-center text-sm text-gray-900">
+          <Clock size={16} className="mr-1.5 text-gray-400" /> 
+          {course.duration?.value} {course.duration?.unit}
+        </div>
+      </td>
+
+      <td className="px-5 py-4">
+        <span className={`px-2.5 py-1 inline-flex items-center text-xs font-semibold rounded-full ${course.is_active ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
+          {course.is_active ? "Active" : "Inactive"}
+        </span>
+      </td>
+
+      <td className="px-5 py-4 text-right">
+        <div className="flex items-center justify-end space-x-1.5">
+          <ActionIconButton 
+            icon={course.is_active ? Power : PowerOff} 
+            variant={course.is_active ? "activeToggle" : "inactiveToggle"} 
+            onClick={() => handleStatusToggle(course._id)} 
+            disabled={toggleStatusMutation.isPending} 
+            title={course.is_active ? "Deactivate Course" : "Activate Course"} 
+          />
+          <ActionIconButton 
+            icon={Edit} 
+            variant="primary" 
+            onClick={() => navigate(`/admin/update-course/${course._id}`)} 
+            title="Edit" 
+          />
+          <ActionIconButton 
+            icon={Trash2} 
+            variant="danger" 
+            disabled={deleteCourseMutation.isPending} 
+            onClick={() => handleDelete(course._id)} 
+            title="Delete" 
+          />
+        </div>
+      </td>
+    </tr>
+  );
 
   return (
-    <div className="p-6">
-      {/* Header */}
-      <CourseHeader 
-        totalCourses={pagination?.total}
-        onAddCourse={handleAddCourse}
-        isLoading={isLoading}
+    <div className="p-6 max-w-[1600px] mx-auto min-h-screen relative">
+      <PageHeader 
+        title="Course Management"
+        subtitle={`Total active courses: ${pagination?.total || 0}`}
+        onAdd={() => navigate("/admin/add-course")}
+        addText="Add Course"
       />
 
-      {/* Filters */}
-      <CourseFilters 
-        searchTerm={searchTerm}
-        onSearchChange={setSearchTerm}
-        statusFilter={statusFilter}
-        onStatusFilterChange={setStatusFilter}
-        onPageReset={handlePageReset}
-        isLoading={isLoading}
-      />
+      <div className="mb-6">
+        <CourseFilters 
+          searchTerm={searchTerm}
+          onSearchChange={setSearchTerm}
+          statusFilter={statusFilter}
+          onStatusFilterChange={setStatusFilter}
+          onPageReset={() => setPage(1)}
+          isLoading={isLoading}
+        />
+      </div>
 
-      {/* Courses Table */}
-      <CoursesTable 
-        courses={courses}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-        onStatusToggle={(id, courseName, isActive) => handleStatusToggle(id, courseName, isActive)}
+      {/* Powered by the new Reusable DataTable */}
+      <DataTable
+        columns={columns}
+        data={courses}
+        renderRow={renderCourseRow}
+        isLoading={isLoading}
         pagination={pagination}
         page={page}
         onPageChange={setPage}
-        isLoading={isLoading}
-        isDeleting={deleteCourseMutation.isLoading}
-        isToggling={toggleStatusMutation.isLoading}
+        emptyStateIcon={BookOpen}
+        emptyStateTitle="No courses found"
       />
     </div>
   );

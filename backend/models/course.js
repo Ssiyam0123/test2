@@ -21,15 +21,14 @@ const courseSchema = new mongoose.Schema(
       },
       unit: {
         type: String,
-        enum: ["days", "months", "years"], // <-- ADDED "days"
+        enum: ["days", "months", "years"], 
         default: "months",
       },
     },
     additional_info: {
       type: [String],
       default: [],
-      // REMOVED: enum: ["haccp&hygiene", "city&guild", "nsda"] 
-      // Removing the enum allows the frontend to send custom string tags freely
+    
     },
     description: {
       type: String,

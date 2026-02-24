@@ -15,7 +15,11 @@ import {
 } from "../controllers/user.controller.js";
 
 const router = express.Router();
-
+import { 
+  validateUserRequiredFields, 
+  checkUserDuplicates, 
+  processUserPayload 
+} from "../validators/user.validator.js";
 // ==========================================
 // 1. STANDARD USER / EMPLOYEE MANAGEMENT
 // ==========================================
@@ -23,11 +27,27 @@ const router = express.Router();
 // Get all users
 router.get("/all", protectRoute, authorize("admin", "registrar", "instructor"), getAllUsers);
 
-// Add a new user (Strictly Admin - Upload fires ONLY if authorized)
-router.post("/create", protectRoute, authorize("admin"), upload.single("photo"), addUser);
+router.post(
+  "/create",
+  protectRoute,
+  authorize("admin"), 
+  upload.single("photo"), // Make sure multer path handles employees correctly
+  validateUserRequiredFields,
+  checkUserDuplicates,
+  processUserPayload,
+  addUser
+);
 
-// Update an existing user
-router.put("/update/:id", protectRoute, authorize("admin"), upload.single("photo"), updateUser);
+// Update User
+router.put(
+  "/update/:id",
+  protectRoute,
+  authorize("admin"),
+  upload.single("photo"),
+  checkUserDuplicates, // Ignored self duplicate check via excludeDbId
+  processUserPayload,
+  updateUser
+);
 
 // Update user status (Active / On Leave / Resigned)
 router.patch("/update-status/:id", protectRoute, authorize("admin"), updateUserStatus);

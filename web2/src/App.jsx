@@ -15,7 +15,6 @@ import AllStudents from "./pages/AllStudents";
 import StudentDetails from "./pages/StudentDetails";
 import UpdateStudent from "./pages/UpdateStudent";
 import SearchStudent from "./pages/SearchStudent.jsx";
-import GenerateCertificate from "./pages/GenerateCertificate.jsx";
 
 // Course Pages
 import AddCourse from "./pages/AddCourse";
@@ -27,8 +26,12 @@ import AllEmployees from "./pages/AllEmployees.jsx";
 import UpdateEmployee from "./pages/UpdateEmployee.jsx";
 import EmployeeDetails from "./pages/EmployeeDetails.jsx";
 
-// Admin Pages
+// Admin & Batch Pages
 import ManageAdmins from "./pages/ManageAdmins";
+import ManageBatches from "./pages/ManageBatches.jsx";
+import AddBatch from "./pages/AddBatch.jsx"; // <-- ADDED IMPORT
+import BatchListPage from "./pages/BatchListPage.jsx";
+import EditBatch from "./components/batches/EditBatch.jsx";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -46,12 +49,10 @@ const ProtectedRoute = ({ children }) => {
   return authUser ? children : <Navigate to="/login" replace />;
 };
 
-// FIX: Smart RoleGuard that knows where to bounce rejected users
 const RoleGuard = ({ allowedRoles }) => {
   const { role } = useAuth();
   
   if (!allowedRoles.includes(role)) {
-    // Instructors get bounced to the student list; others to the dashboard
     const fallback = role === "instructor" ? "/admin/all-students" : "/admin";
     return <Navigate to={fallback} replace />;
   }
@@ -59,10 +60,8 @@ const RoleGuard = ({ allowedRoles }) => {
   return <Outlet />;
 };
 
-// FIX: Smart Index Route to handle initial login redirects
 const AdminIndex = () => {
   const { role } = useAuth();
-  // Instructors skip the dashboard and go straight to the student list
   if (role === "instructor") {
     return <Navigate to="/admin/all-students" replace />;
   }
@@ -103,31 +102,36 @@ function App() {
               </ProtectedRoute>
             }
           >
-            {/* Base Route uses the new AdminIndex component */}
             <Route index element={<AdminIndex />} />
 
             {/* SHARED ROUTES: Admin, Registrar, Instructor */}
             <Route element={<RoleGuard allowedRoles={["admin", "registrar", "instructor"]} />}>
               <Route path="all-students" element={<AllStudents />} />
               <Route path="all-courses" element={<AllCourses />} />
+              <Route path="batches" element={<ManageBatches />} /> {/* Moved here so Instructors can view calendar */}
             </Route>
 
             {/* MID-TIER ROUTES: Admin, Registrar only */}
             <Route element={<RoleGuard allowedRoles={["admin", "registrar"]} />}>
               <Route path="add-student" element={<AddStudent />} />
               <Route path="update-student/:id" element={<UpdateStudent />} />
-              <Route path="generate-certificate/:id" element={<GenerateCertificate />} />
               <Route path="add-course" element={<AddCourse />} />
               <Route path="update-course/:id" element={<AddCourse mode="edit" />} />
+              
+              {/* FIX: Corrected component assignment */}
+              <Route path="add-batch" element={<AddBatch />} /> 
             </Route>
 
             {/* HIGH-TIER ROUTES: Admin strictly */}
             <Route element={<RoleGuard allowedRoles={["admin"]} />}>
               <Route path="all-employees" element={<AllEmployees />} />
+              <Route path="all-batches" element={<BatchListPage />} />
               <Route path="add-employee" element={<AddEmployeeForm />} />
               <Route path="update-employee/:id" element={<UpdateEmployee mode="edit" />} />
               <Route path="employee/:id" element={<EmployeeDetails />} />
               <Route path="manage-admins" element={<ManageAdmins />} />
+              <Route path="/admin/edit-batch/:id" element={<EditBatch />} />
+            
             </Route>
           </Route>
 

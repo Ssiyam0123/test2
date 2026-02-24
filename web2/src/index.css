@@ -1,1 +1,133 @@
 @import "tailwindcss";
+
+/* =========================================================
+   React Calendar -> Floating Card UI Override
+   ========================================================= */
+
+.react-calendar {
+  width: 100% !important;
+  background: transparent !important;
+  border: none !important;
+  font-family: inherit;
+}
+
+/* --- Header & Navigation --- */
+.react-calendar__navigation {
+  display: flex;
+  height: 60px;
+  margin-bottom: 1rem;
+  align-items: center;
+}
+
+/* Hide the double arrows completely */
+.react-calendar__navigation__arrow--double {
+  display: none !important;
+}
+
+/* Push label to the left, arrows to the right using flex-grow on the label */
+.react-calendar__navigation__label {
+  font-size: 1.5rem !important;
+  font-weight: 700 !important;
+  color: #1f2937;
+  text-align: left !important;
+  flex-grow: 1 !important; 
+  pointer-events: none; /* Disable clicking month to change views if not needed */
+}
+
+.react-calendar__navigation button.react-calendar__navigation__arrow {
+  min-width: 40px;
+  height: 40px;
+  background: #e2e8f0; /* bg-slate-200 */
+  border-radius: 0.5rem;
+  margin-left: 0.5rem;
+  font-size: 1.2rem;
+  color: #475569;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.react-calendar__navigation button.react-calendar__navigation__arrow:hover {
+  background: #cbd5e1;
+}
+
+/* --- Weekdays --- */
+.react-calendar__month-view__weekdays {
+  text-align: center;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #94a3b8; /* text-slate-400 */
+  padding-bottom: 1rem;
+  text-transform: capitalize !important;
+}
+
+.react-calendar__month-view__weekdays__weekday abbr {
+  text-decoration: none;
+}
+
+/* --- Grid & Tiles (The Magic) --- */
+/* Force CSS Grid on the days container to get uniform gaps */
+.react-calendar__month-view__days {
+  display: grid !important;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.75rem; /* Gap between cards */
+}
+
+.react-calendar__tile {
+  background: #f8fafc !important; /* slate-50 */
+  border-radius: 1rem !important; /* heavily rounded */
+  height: 100px;
+  padding: 0.75rem !important;
+  display: flex !important;
+  flex-direction: column;
+  align-items: flex-start !important; /* Top-left align text */
+  justify-content: flex-start !important;
+  position: relative;
+  transition: all 0.2s ease;
+  border: 1px solid transparent !important;
+  overflow: hidden;
+}
+
+/* The actual date number */
+.react-calendar__tile abbr {
+  font-weight: 600;
+  font-size: 1rem;
+  color: #334155;
+}
+
+/* Hover State */
+.react-calendar__tile:enabled:hover {
+  background: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+}
+
+/* Neighboring month days */
+.react-calendar__month-view__days__day--neighboringMonth {
+  opacity: 0.4;
+  pointer-events: none; /* Optional: disable clicking out of month */
+}
+
+/* --- Active State (Teal) --- */
+.react-calendar__tile--active,
+.react-calendar__tile--active:enabled:hover,
+.react-calendar__tile--active:enabled:focus {
+  background: #14b8a6 !important; /* teal-500 */
+  box-shadow: 0 10px 15px -3px rgba(20, 184, 166, 0.3);
+}
+
+.react-calendar__tile--active abbr {
+  color: white !important;
+}
+
+/* Override inner pill colors when tile is active */
+.react-calendar__tile--active .appointment-pill {
+  background: rgba(255, 255, 255, 0.2) !important;
+  color: white !important;
+}
+.react-calendar__tile--active .appointment-dot {
+  background: white !important;
+}
+.react-calendar__tile--active .ellipsis-icon {
+  color: rgba(255, 255, 255, 0.8) !important;
+}

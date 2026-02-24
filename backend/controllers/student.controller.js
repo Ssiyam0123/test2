@@ -1,332 +1,26 @@
-// import Student from "../models/student.js";
-// import Course from "../models/course.js";
-// import { deleteLocalFile } from "../middlewares/multer.js";
-
-// Get all students with pagination and filters
-// export const getAllStudents = async (req, res) => {
-//   try {
-//     const page = parseInt(req.query.page) || 1;
-//     const limit = parseInt(req.query.limit) || 30;
-//     const skip = (page - 1) * limit;
-
-//     const { search, status, batch, course, is_active, competency, date_from, date_to } = req.query;
-
-//     let filter = {};
-
-//     if (search) {
-//       filter.$or = [
-//         { student_name: { $regex: search, $options: "i" } },
-//         { student_id: { $regex: search, $options: "i" } },
-//         { registration_number: { $regex: search, $options: "i" } },
-//         { fathers_name: { $regex: search, $options: "i" } },
-//         { email: { $regex: search, $options: "i" } },
-//         { contact_number: { $regex: search, $options: "i" } },
-//       ];
-//     }
-
-//     if (status && status !== "all") filter.status = status;
-//     if (batch && batch !== "all") filter.batch = batch;
-//     if (course && course !== "all") filter.course = course;
-//     if (competency && competency !== "all") filter.competency = competency;
-//     if (is_active && is_active !== "all") filter.is_active = is_active === "true";
-
-//     if (date_from || date_to) {
-//       filter.issue_date = {};
-//       if (date_from) filter.issue_date.$gte = new Date(date_from);
-//       if (date_to) filter.issue_date.$lte = new Date(date_to);
-//     }
-
-//     const distinctBatches = await Student.distinct("batch");
-//     const distinctCourses = await Course.find().select("_id course_name");
-//     const distinctStatuses = await Student.distinct("status");
-//     const distinctCompetencies = await Student.distinct("competency");
-
-//     const [students, total] = await Promise.all([
-//       Student.find(filter)
-//         .populate("course", "course_name course_code duration fee")
-//         .sort({ createdAt: -1 })
-//         .skip(skip)
-//         .limit(limit),
-//       Student.countDocuments(filter),
-//     ]);
-
-//     res.status(200).json({
-//       data: students,
-//       pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
-//       filters: {
-//         batches: distinctBatches.filter(b => b).sort(),
-//         courses: distinctCourses,
-//         statuses: distinctStatuses.filter(s => s).sort(),
-//         competencies: distinctCompetencies.filter(c => c).sort(),
-//       }
-//     });
-//   } catch (error) {
-//     res.status(500).json({ message: error.message });
-//   }
-// };
-
-// export const deleteStudent = async (req, res) => {
-//   try {
-//     const student = await Student.findById(req.params.id);
-//     if (!student) {
-//       return res.status(404).json({ message: "Student not found" });
-//     }
-
-//     if (student.photo_url) {
-//       deleteLocalFile(student.photo_url);
-//     }
-
-//     await student.deleteOne();
-
-//     res.status(200).json({ message: "Student deleted permanently" });
-//   } catch (error) {
-//     res.status(500).json({ message: error.message });
-//   }
-// };
-
-// export const updateStudent = async (req, res) => {
-//   let uploadedFilePath = null;
-
-//   try {
-//     const student = await Student.findById(req.params.id);
-//     if (!student) {
-//       if (req.file) deleteLocalFile(`/uploads/students/${req.file.filename}`);
-//       return res.status(404).json({ message: "Student not found" });
-//     }
-
-//     if (req.file) {
-//       if (student.photo_url) {
-//         deleteLocalFile(student.photo_url);
-//       }
-//       uploadedFilePath = `/uploads/students/${req.file.filename}`;
-//       student.photo_url = uploadedFilePath;
-//     }
-
-//     const {
-//       student_name, fathers_name, student_id, registration_number,
-//       gender, course, competency, batch, status, issue_date, completion_date,
-//       is_active, is_verified, contact_number, email, address,
-//     } = req.body;
-
-//     if (student_id || registration_number) {
-//       const existingStudent = await Student.findOne({
-//         _id: { $ne: req.params.id },
-//         $or: [
-//           ...(student_id ? [{ student_id: student_id.trim() }] : []),
-//           ...(registration_number ? [{ registration_number: registration_number.trim() }] : []),
-//         ],
-//       });
-
-//       if (existingStudent) {
-//         if (student_id && existingStudent.student_id === student_id.trim()) {
-//           return res.status(400).json({ message: "Student ID already exists" });
-//         }
-//         if (registration_number && existingStudent.registration_number === registration_number.trim()) {
-//           return res.status(400).json({ message: "Registration Number already exists" });
-//         }
-//       }
-//     }
-
-//     if (student_name !== undefined) student.student_name = student_name.trim();
-//     if (fathers_name !== undefined) student.fathers_name = fathers_name.trim();
-//     if (student_id !== undefined) student.student_id = student_id.trim();
-//     if (registration_number !== undefined) student.registration_number = registration_number.trim();
-//     if (gender !== undefined) student.gender = gender.trim(); 
-//     if (competency !== undefined) student.competency = competency;
-//     if (batch !== undefined) student.batch = batch.trim();
-//     if (status !== undefined) student.status = status;
-//     if (issue_date !== undefined) student.issue_date = issue_date;
-//     if (completion_date !== undefined) student.completion_date = completion_date || null;
-    
-//     if (is_active !== undefined) student.is_active = is_active === "true" || is_active === true;
-//     if (is_verified !== undefined) student.is_verified = is_verified === "true" || is_verified === true;
-    
-//     if (contact_number !== undefined) student.contact_number = contact_number?.trim() || "";
-//     if (email !== undefined) student.email = email?.trim().toLowerCase() || "";
-//     if (address !== undefined) student.address = address?.trim() || "";
-
-//     const oldCourseId = student.course?.toString();
-
-//     if (course !== undefined) {
-//       student.course = course;
-//     }
-
-//     if (course && course !== oldCourseId) {
-//       const courseData = await Course.findById(course);
-//       if (!courseData) {
-//         return res.status(400).json({ message: "Invalid course selected" });
-//       }
-//       student.course_name = courseData.course_name;
-//       student.course_code = courseData.course_code;
-//       student.course_duration = {
-//         value: courseData.duration?.value ?? courseData.duration ?? 0,
-//         unit: courseData.duration?.unit ?? "months",
-//       };
-//     }
-
-//     try {
-//       await student.validate();
-//     } catch (validationError) {
-//       if (uploadedFilePath) deleteLocalFile(uploadedFilePath);
-//       return res.status(400).json({ message: validationError.message });
-//     }
-
-//     await student.save();
-
-//     res.status(200).json({
-//       message: "Student updated successfully",
-//       data: student,
-//     });
-
-//   } catch (error) {
-//     if (uploadedFilePath) deleteLocalFile(uploadedFilePath);
-
-//     if (error.code === 11000) {
-//       return res.status(400).json({
-//         message: `Duplicate key error: ${JSON.stringify(error.keyValue)}`,
-//       });
-//     }
-
-//     res.status(500).json({
-//       message: error.message,
-//       stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
-//     });
-//   }
-// };
-
-// export const addStudent = async (req, res) => {
-//   let uploadedFilePath = null;
-
-//   try {
-//     const {
-//       student_name, fathers_name, student_id, registration_number,
-//       gender, course, competency, batch, status, issue_date, completion_date,
-//       is_active, is_verified, contact_number, email, address,
-//     } = req.body;
-
-//     const existingStudent = await Student.findOne({
-//       $or: [
-//         { student_id: { $regex: new RegExp(`^${student_id.trim()}$`, "i") } },
-//         { registration_number: { $regex: new RegExp(`^${registration_number.trim()}$`, "i") } },
-//       ],
-//     });
-
-//     if (existingStudent) {
-//       if (req.file) deleteLocalFile(`/uploads/students/${req.file.filename}`);
-
-//       if (existingStudent.student_id.toLowerCase() === student_id.toLowerCase().trim()) {
-//         return res.status(400).json({ message: `Student ID "${student_id}" already exists` });
-//       }
-//       if (existingStudent.registration_number.toLowerCase() === registration_number.toLowerCase().trim()) {
-//         return res.status(400).json({ message: `Registration Number "${registration_number}" already exists` });
-//       }
-//     }
-
-//     if (!student_name || !fathers_name || !student_id || !registration_number || !gender || !course || !competency || !batch || !status || !issue_date) {
-//       if (req.file) deleteLocalFile(`/uploads/students/${req.file.filename}`);
-//       return res.status(400).json({ message: "All required fields must be filled" });
-//     }
-
-//     const courseData = await Course.findById(course);
-//     if (!courseData) {
-//       if (req.file) deleteLocalFile(`/uploads/students/${req.file.filename}`);
-//       return res.status(400).json({ message: "Invalid course selected" });
-//     }
-
-//     let photo_url = "";
-//     if (req.file) {
-//       photo_url = `/uploads/students/${req.file.filename}`;
-//       uploadedFilePath = photo_url;
-//     }
-
-//     const isActiveBool = is_active === "true" || is_active === true;
-//     const isVerifiedBool = is_verified === "true" || is_verified === true;
-
-//     const studentData = {
-//       student_name: student_name.trim(),
-//       fathers_name: fathers_name.trim(),
-//       student_id: student_id.trim(),
-//       registration_number: registration_number.trim(),
-//       gender: gender.trim(),
-//       course,
-//       course_name: courseData.course_name,
-//       course_code: courseData.course_code,
-//       course_duration: courseData.duration,
-//       competency,
-//       batch: batch.trim(),
-//       status,
-//       issue_date,
-//       completion_date: completion_date || null,
-//       is_active: isActiveBool,
-//       is_verified: isVerifiedBool,
-//       contact_number: contact_number ? contact_number.trim() : "",
-//       email: email ? email.trim().toLowerCase() : "",
-//       address: address ? address.trim() : "",
-//       photo_url,
-//     };
-
-//     const student = await Student.create(studentData);
-
-//     res.status(201).json({
-//       message: "Student created successfully",
-//       data: student,
-//     });
-//   } catch (error) {
-//     if (uploadedFilePath) deleteLocalFile(uploadedFilePath);
-
-//     if (error.code === 11000) {
-//       return res.status(400).json({
-//         message: `Duplicate key error: ${JSON.stringify(error.keyValue)}`,
-//       });
-//     }
-//     res.status(500).json({
-//       message: error.message,
-//       stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
-//     });
-//   }
-// };
-
-
-
 import Student from "../models/student.js";
 import Course from "../models/course.js";
+import Batch from "../models/batch.js"; 
 import { deleteLocalFile } from "../middlewares/multer.js";
-import { 
-  validateStudentDuplicates, 
-  validateAndFetchCourse, 
-  sanitizeStudentPayload 
-} from "../validators/student.validator.js";
-
-// Helper to clean up uploaded files if a request fails
-const cleanupFailedUpload = (file) => {
-  if (file) deleteLocalFile(`/uploads/students/${file.filename}`);
-};
-
+import mongoose from "mongoose";
 export const addStudent = async (req, res) => {
   try {
-    const requiredFields = ['student_name', 'fathers_name', 'student_id', 'registration_number', 'gender', 'course', 'competency', 'batch', 'status', 'issue_date'];
-    const missingFields = requiredFields.filter(field => !req.body[field]);
-    
-    if (missingFields.length > 0) {
-      cleanupFailedUpload(req.file);
-      return res.status(400).json({ message: `Missing required fields: ${missingFields.join(', ')}` });
+    // 1. Create the student
+    const student = await Student.create(req.body);
+
+    // 2. Automatically push the new student's ID into the Batch's students array
+    if (student.batch) {
+      await Batch.findByIdAndUpdate(
+        student.batch,
+        { $push: { students: student._id } },
+        { new: true } // returns updated document
+      );
     }
-
-    const duplicateError = await validateStudentDuplicates(req.body.student_id, req.body.registration_number);
-    if (duplicateError) {
-      cleanupFailedUpload(req.file);
-      return res.status(400).json({ message: duplicateError });
-    }
-
-    const courseData = await validateAndFetchCourse(req.body.course);
-    const studentData = sanitizeStudentPayload(req.body, courseData, req.file?.filename);
-
-    const student = await Student.create(studentData);
 
     res.status(201).json({ message: "Student created successfully", data: student });
   } catch (error) {
-    cleanupFailedUpload(req.file);
-    if (error.code === 11000) return res.status(400).json({ message: `Duplicate key error: ${JSON.stringify(error.keyValue)}` });
+    if (req.file) deleteLocalFile(`/uploads/students/${req.file.filename}`);
+    if (error.code === 11000) return res.status(400).json({ message: `Duplicate key error` });
     res.status(500).json({ message: error.message });
   }
 };
@@ -335,34 +29,61 @@ export const updateStudent = async (req, res) => {
   try {
     const student = await Student.findById(req.params.id);
     if (!student) {
-      cleanupFailedUpload(req.file);
+      if (req.file) deleteLocalFile(`/uploads/students/${req.file.filename}`);
       return res.status(404).json({ message: "Student not found" });
     }
 
-    const duplicateError = await validateStudentDuplicates(req.body.student_id, req.body.registration_number, student._id);
-    if (duplicateError) {
-      cleanupFailedUpload(req.file);
-      return res.status(400).json({ message: duplicateError });
-    }
+    // Capture the old batch ID before applying updates
+    const oldBatchId = student.batch?.toString();
+    const newBatchId = req.body.batch?.toString();
 
-    const courseData = req.body.course && req.body.course !== student.course?.toString() 
-      ? await validateAndFetchCourse(req.body.course) 
-      : null;
-
-    const updatedData = sanitizeStudentPayload(req.body, courseData, req.file?.filename);
-
-    // If a new file was uploaded and sanitized, remove the old one from the server
+    // If a new file was uploaded, delete the old one from the server
     if (req.file && student.photo_url) {
       deleteLocalFile(student.photo_url);
     }
 
-    Object.assign(student, updatedData);
+    // Apply updates and save
+    Object.assign(student, req.body);
     await student.save();
+
+    // Handle Batch Transfer Logic
+    if (newBatchId && oldBatchId !== newBatchId) {
+      // 1. Remove student ID from the old batch
+      if (oldBatchId) {
+        await Batch.findByIdAndUpdate(oldBatchId, { $pull: { students: student._id } });
+      }
+      // 2. Add student ID to the new batch
+      await Batch.findByIdAndUpdate(newBatchId, { $push: { students: student._id } });
+    }
 
     res.status(200).json({ message: "Student updated successfully", data: student });
   } catch (error) {
-    cleanupFailedUpload(req.file);
-    if (error.code === 11000) return res.status(400).json({ message: `Duplicate key error: ${JSON.stringify(error.keyValue)}` });
+    if (req.file) deleteLocalFile(`/uploads/students/${req.file.filename}`);
+    if (error.code === 11000) return res.status(400).json({ message: `Duplicate key error` });
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export const deleteStudent = async (req, res) => {
+  try {
+    const student = await Student.findById(req.params.id);
+    if (!student) return res.status(404).json({ message: "Student not found" });
+
+    const batchId = student.batch;
+
+    // 1. Delete the photo
+    if (student.photo_url) deleteLocalFile(student.photo_url);
+    
+    // 2. Delete the student document
+    await student.deleteOne();
+
+    // 3. Remove the student ID from the associated Batch
+    if (batchId) {
+      await Batch.findByIdAndUpdate(batchId, { $pull: { students: student._id } });
+    }
+
+    res.status(200).json({ message: "Student deleted permanently" });
+  } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
@@ -376,6 +97,7 @@ export const getAllStudents = async (req, res) => {
     const { search, status, batch, course, is_active, competency, date_from, date_to } = req.query;
     let filter = {};
 
+    // 1. Text Search (Ensure no ObjectIds are here)
     if (search) {
       const searchRegex = { $regex: search, $options: "i" };
       filter.$or = [
@@ -388,59 +110,69 @@ export const getAllStudents = async (req, res) => {
       ];
     }
 
+    // 2. Exact Match Filters
     if (status && status !== "all") filter.status = status;
-    if (batch && batch !== "all") filter.batch = batch;
-    if (course && course !== "all") filter.course = course;
     if (competency && competency !== "all") filter.competency = competency;
     if (is_active && is_active !== "all") filter.is_active = is_active === "true";
+    
+    // Validate ObjectIds before assigning them to the filter to prevent CastErrors
+    if (batch && batch !== "all") {
+      if (mongoose.Types.ObjectId.isValid(batch)) filter.batch = batch;
+    }
+    if (course && course !== "all") {
+      if (mongoose.Types.ObjectId.isValid(course)) filter.course = course;
+    }
 
+    // 3. Date Filters
     if (date_from || date_to) {
       filter.issue_date = {};
       if (date_from) filter.issue_date.$gte = new Date(date_from);
       if (date_to) filter.issue_date.$lte = new Date(date_to);
     }
 
-    const [students, total, distinctBatches, distinctCourses, distinctStatuses, distinctCompetencies] = await Promise.all([
-      Student.find(filter).populate("course", "course_name course_code duration fee").sort({ createdAt: -1 }).skip(skip).limit(limit),
+    // 4. Execute Queries
+    const [students, total, rawDistinctBatches, distinctCourses, distinctStatuses, distinctCompetencies] = await Promise.all([
+      Student.find(filter)
+        .populate("course", "course_name course_code duration fee")
+        .populate("batch", "batch_name batch_type time_slot")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
       Student.countDocuments(filter),
-      Student.distinct("batch"),
+      Student.distinct("batch"), // This might contain legacy strings AND ObjectIds
       Course.find().select("_id course_name"),
       Student.distinct("status"),
       Student.distinct("competency")
     ]);
 
+    // 5. Clean up legacy batch data for the filter dropdown
+    // Filter out any IDs that aren't valid ObjectIds (i.e., legacy strings)
+    const validBatchIds = rawDistinctBatches.filter(id => mongoose.Types.ObjectId.isValid(id));
+    
+    // Only query Batch model with valid ObjectIds
+    const distinctBatches = validBatchIds.length > 0 
+      ? await Batch.find({ _id: { $in: validBatchIds } }).select("_id batch_name")
+      : [];
+
     res.status(200).json({
       data: students,
       pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
       filters: {
-        batches: distinctBatches.filter(Boolean).sort(),
+        batches: distinctBatches,
         courses: distinctCourses,
         statuses: distinctStatuses.filter(Boolean).sort(),
         competencies: distinctCompetencies.filter(Boolean).sort(),
       }
     });
   } catch (error) {
+    // Log the actual error to your terminal so you can see exactly what failed
+    console.error("GET_ALL_STUDENTS ERROR:", error); 
     res.status(500).json({ message: error.message });
   }
 };
 
-export const deleteStudent = async (req, res) => {
-  try {
-    const student = await Student.findById(req.params.id);
-    if (!student) return res.status(404).json({ message: "Student not found" });
 
-    if (student.photo_url) deleteLocalFile(student.photo_url);
-    await student.deleteOne();
 
-    res.status(200).json({ message: "Student deleted permanently" });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// ... keep toggleStudentStatus, removeStudentImage, searchStudent, etc. exactly as they were.
-
-// Remove specific student image
 export const removeStudentImage = async (req, res) => {
   try {
     const student = await Student.findById(req.params.id);
@@ -464,7 +196,6 @@ export const removeStudentImage = async (req, res) => {
   }
 }
 
-// Toggle student active status
 export const toggleStudentStatus = async (req, res) => {
   try {
     const student = await Student.findById(req.params.id);
@@ -477,9 +208,7 @@ export const toggleStudentStatus = async (req, res) => {
     await student.save();
 
     res.status(200).json({
-      message: `Student ${
-        student.is_active ? "activated" : "deactivated"
-      } successfully`,
+      message: `Student ${student.is_active ? "activated" : "deactivated"} successfully`,
       data: student,
     });
   } catch (error) {
@@ -487,36 +216,6 @@ export const toggleStudentStatus = async (req, res) => {
   }
 };
 
-// // Admin search student (returns all regardless of status)
-// export const searchStudent = async (req, res) => {
-//   try {
-//     const { query } = req.query;
-
-//     if (!query || query.trim() === "") {
-//       return res.status(400).json({ message: "Search query is required" });
-//     }
-
-//     const students = await Student.find({
-//       $or: [
-//         { student_id: { $regex: query.trim(), $options: "i" } },
-//         { registration_number: { $regex: query.trim(), $options: "i" } },
-//       ],
-//     })
-//       .populate("course", "course_name course_code duration")
-//       .sort({ createdAt: -1 })
-//       .limit(20);
-
-//     res.status(200).json({
-//       message: "Search completed",
-//       data: students,
-//       count: students.length,
-//     });
-//   } catch (error) {
-//     res.status(500).json({ message: error.message });
-//   }
-// };
-
-// Public search student (returns strictly active students)
 export const publicSearchStudent = async (req, res) => {
   try {
     const { query } = req.query;
@@ -533,6 +232,7 @@ export const publicSearchStudent = async (req, res) => {
       is_active: true,
     })
       .populate("course", "course_name course_code duration additional_info")
+      .populate("batch", "batch_name batch_type time_slot schedule_days") 
       .select("-__v"); 
 
     if (!student) {
@@ -551,30 +251,11 @@ export const publicSearchStudent = async (req, res) => {
   }
 };
 
-// // Admin: Fetch student regardless of active status
-// export const getAdminStudentById = async (req, res) => {
-//   try {
-//     const student = await Student.findById(req.params.id).populate(
-//       "course",
-//       "course_name course_code duration description additional_info"
-//     );
-
-//     if (!student) {
-//       return res.status(404).json({ message: "Student not found" });
-//     }
-
-//     res.status(200).json(student);
-//   } catch (error) {
-//     res.status(500).json({ message: error.message });
-//   }
-// };
-
 export const getPublicStudentById = async (req, res) => {
   try {
-    const student = await Student.findById(req.params.id).populate(
-      "course",
-      "course_name course_code duration description additional_info"
-    );
+    const student = await Student.findById(req.params.id)
+      .populate("course", "course_name course_code duration description additional_info")
+      .populate("batch", "batch_name batch_type time_slot schedule_days");
 
     if (!student || !student.is_active) {
       return res.status(404).json({ message: "Student not found or inactive" });
@@ -586,12 +267,6 @@ export const getPublicStudentById = async (req, res) => {
   }
 };
 
-
-
-
-
-
-// Admin search student (Includes Comments)
 export const searchStudent = async (req, res) => {
   try {
     const { query } = req.query;
@@ -606,7 +281,7 @@ export const searchStudent = async (req, res) => {
       ],
     })
       .populate("course", "course_name course_code duration")
-      // NEW: Populate comments and the instructor's name inside those comments
+      .populate("batch", "batch_name batch_type time_slot") 
       .populate({
         path: "comments",
         populate: { path: "instructor", select: "full_name photo_url" }
@@ -624,15 +299,14 @@ export const searchStudent = async (req, res) => {
   }
 };
 
-// Admin: Fetch student by ID (Includes Comments)
 export const getAdminStudentById = async (req, res) => {
   try {
     const student = await Student.findById(req.params.id)
       .populate("course", "course_name course_code duration description additional_info")
-      // NEW: Deep populate instructor name inside comments
+      .populate("batch", "batch_name batch_type time_slot") 
       .populate({
         path: "comments",
-        options: { sort: { createdAt: -1 } }, // Newest comments first
+        options: { sort: { createdAt: -1 } },
         populate: { 
           path: "instructor", 
           select: "full_name photo_url designation" 

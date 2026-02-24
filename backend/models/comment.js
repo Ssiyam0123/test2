@@ -2,12 +2,11 @@ import mongoose from "mongoose";
 
 const commentSchema = new mongoose.Schema(
   {
-    // The student being commented on
     student: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Student",
       required: true,
-      index: true, // Added index because we will query "find all comments by student ID" often
+      index: true,
     },
     
     // The instructor (User) who wrote the comment
@@ -17,16 +16,16 @@ const commentSchema = new mongoose.Schema(
       required: true,
     },
     
-    // The actual comment content
+    
     text: {
       type: String,
       required: true,
       trim: true,
-      maxlength: 1000, // Good practice to prevent database bloat
+      maxlength: 1000, 
     },
   },
   {
-    timestamps: true, // Automatically handles createdAt and updatedAt
+    timestamps: true, 
   }
 );
 

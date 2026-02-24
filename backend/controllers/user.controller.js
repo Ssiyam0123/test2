@@ -111,98 +111,26 @@ export const getAllUsers = async (req, res) => {
   }
 };
 
-// Add New User / Employee
 export const addUser = async (req, res) => {
-  let uploadedFilePath = null;
-
   try {
-    const {
-      employee_id, full_name, email, phone, designation, department, 
-      joining_date, status, username, password, role,
-      facebook, linkedin, twitter, instagram
-    } = req.body;
-
-    // Check duplicates including username
-    const existingUser = await User.findOne({
-      $or: [
-        ...(employee_id ? [{ employee_id: employee_id.trim() }] : []),
-        { email: { $regex: new RegExp(`^${email?.trim()}$`, "i") } },
-        { username: { $regex: new RegExp(`^${username?.trim()}$`, "i") } },
-      ],
-    });
-
-    if (existingUser) {
-      if (req.file) deleteLocalFile(`/uploads/employees/${req.file.filename}`);
-
-      if (employee_id && existingUser.employee_id?.toLowerCase() === employee_id.toLowerCase().trim()) {
-        return res.status(400).json({ message: `Employee ID "${employee_id}" already exists` });
-      }
-      if (existingUser.email.toLowerCase() === email.toLowerCase().trim()) {
-        return res.status(400).json({ message: `Email "${email}" already exists` });
-      }
-      if (existingUser.username.toLowerCase() === username.toLowerCase().trim()) {
-        return res.status(400).json({ message: `Username "${username}" is already taken` });
-      }
-    }
-
-    // Validate strictly required fields
-    if (!username || !email || !full_name) {
-      if (req.file) deleteLocalFile(`/uploads/employees/${req.file.filename}`);
-      return res.status(400).json({ message: "Username, Email, and Full Name are strictly required" });
-    }
-
-    let photo_url = "";
-    if (req.file) {
-      photo_url = `/uploads/employees/${req.file.filename}`;
-      uploadedFilePath = photo_url;
-    }
-
-    const userData = {
-      username: username.trim(),
-      email: email.trim().toLowerCase(),
-      // Use provided password or default to "123456"
-      password: password && password.trim() !== "" ? password : "123456", 
-      full_name: full_name.trim(),
-      employee_id: employee_id ? employee_id.trim() : undefined,
-      phone: phone ? phone.trim() : undefined,
-      designation: designation ? designation.trim() : undefined,
-      department: department ? department.trim() : undefined,
-      role: role || 'staff',
-      status: status || 'Active',
-      joining_date: joining_date || Date.now(),
-      social_links: {
-        facebook: facebook || "",
-        linkedin: linkedin || "",
-        twitter: twitter || "",
-        instagram: instagram || ""
-      },
-      photo_url,
-    };
-
-    const user = await User.create(userData);
+    // req.body is already fully validated, sanitized, and structured by middlewares
+    const user = await User.create(req.body);
     
-    // Remove password before sending response
     const userResponse = user.toObject();
-    delete userResponse.password;
+    delete userResponse.password; // Don't send password back
 
     res.status(201).json({
       message: "User created successfully",
       data: userResponse,
     });
   } catch (error) {
-    if (uploadedFilePath) deleteLocalFile(uploadedFilePath);
-
-    if (error.code === 11000) {
-      return res.status(400).json({ message: `Duplicate key error: ${JSON.stringify(error.keyValue)}` });
-    }
+    if (req.file) deleteLocalFile(`/uploads/employees/${req.file.filename}`);
+    if (error.code === 11000) return res.status(400).json({ message: `Duplicate key error` });
     res.status(500).json({ message: error.message });
   }
 };
 
-// Update User
 export const updateUser = async (req, res) => {
-  let uploadedFilePath = null;
-
   try {
     const user = await User.findById(req.params.id);
     if (!user) {
@@ -210,69 +138,13 @@ export const updateUser = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // Handle new photo upload
-    if (req.file) {
-      if (user.photo_url) deleteLocalFile(user.photo_url);
-      uploadedFilePath = `/uploads/employees/${req.file.filename}`;
-      user.photo_url = uploadedFilePath;
+    // Handle photo replacement server cleanup
+    if (req.file && user.photo_url) {
+      deleteLocalFile(user.photo_url);
     }
 
-    const {
-      employee_id, full_name, email, phone, designation, department, 
-      joining_date, status, username, password, role,
-      facebook, linkedin, twitter, instagram
-    } = req.body;
-
-    // Check for duplicate ID, Email, or Username
-    if (employee_id || email || username) {
-      const existingUser = await User.findOne({
-        _id: { $ne: req.params.id },
-        $or: [
-          ...(employee_id ? [{ employee_id: employee_id.trim() }] : []),
-          ...(email ? [{ email: email.trim().toLowerCase() }] : []),
-          ...(username ? [{ username: username.trim() }] : []),
-        ],
-      });
-
-      if (existingUser) {
-        if (req.file) deleteLocalFile(uploadedFilePath);
-        if (employee_id && existingUser.employee_id === employee_id.trim()) return res.status(400).json({ message: "Employee ID already exists" });
-        if (email && existingUser.email === email.trim().toLowerCase()) return res.status(400).json({ message: "Email already exists" });
-        if (username && existingUser.username === username.trim()) return res.status(400).json({ message: "Username already taken" });
-      }
-    }
-
-    // Update fields if provided
-    if (full_name !== undefined) user.full_name = full_name.trim();
-    if (employee_id !== undefined) user.employee_id = employee_id.trim();
-    if (email !== undefined) user.email = email.trim().toLowerCase();
-    if (phone !== undefined) user.phone = phone?.trim();
-    if (designation !== undefined) user.designation = designation?.trim();
-    if (department !== undefined) user.department = department?.trim();
-    if (status !== undefined) user.status = status;
-    if (joining_date !== undefined) user.joining_date = joining_date;
-    if (username !== undefined) user.username = username.trim();
-    if (role !== undefined) user.role = role;
-    
-    // Only update password if a new one is provided
-    if (password && password.trim() !== "") {
-      user.password = password;
-    }
-
-    // Update Socials
-    if (!user.social_links) user.social_links = {};
-    if (facebook !== undefined) user.social_links.facebook = facebook.trim();
-    if (linkedin !== undefined) user.social_links.linkedin = linkedin.trim();
-    if (twitter !== undefined) user.social_links.twitter = twitter.trim();
-    if (instagram !== undefined) user.social_links.instagram = instagram.trim();
-
-    try {
-      await user.validate();
-    } catch (validationError) {
-      if (uploadedFilePath) deleteLocalFile(uploadedFilePath);
-      return res.status(400).json({ message: validationError.message });
-    }
-
+    // Update user using the perfectly structured req.body from middleware
+    Object.assign(user, req.body);
     await user.save();
     
     const userResponse = user.toObject();
@@ -282,14 +154,12 @@ export const updateUser = async (req, res) => {
       message: "User updated successfully",
       data: userResponse,
     });
-
   } catch (error) {
-    if (uploadedFilePath) deleteLocalFile(uploadedFilePath);
-    if (error.code === 11000) return res.status(400).json({ message: `Duplicate key error: ${JSON.stringify(error.keyValue)}` });
+    if (req.file) deleteLocalFile(`/uploads/employees/${req.file.filename}`);
+    if (error.code === 11000) return res.status(400).json({ message: `Duplicate key error` });
     res.status(500).json({ message: error.message });
   }
 };
-
 // Delete User
 export const deleteUser = async (req, res) => {
   try {

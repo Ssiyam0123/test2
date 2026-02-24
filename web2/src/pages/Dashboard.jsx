@@ -13,7 +13,6 @@ const CourseDistributionTable = lazy(() => import("../components/dashboard/Cours
 const RecentActivities = lazy(() => import("../components/dashboard/RecentActivities"));
 
 
-// --- SKELETON LOADERS ---
 // Reusable pulse animation block for charts
 const ChartSkeleton = ({ height = "300px" }) => (
   <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 w-full animate-pulse" style={{ height }}>

@@ -11,6 +11,9 @@ import certificateRoutes from "./routes/certificate.routes.js";
 import path from "path";
 import { fileURLToPath } from "url";
 import userRoute from "./routes/userRoutes.js";
+import batchRoutes from "./routes/batchRoutes.js";
+
+
 const app = express();
 
 // Connect to Database
@@ -49,6 +52,10 @@ app.use("/api/admin", userRoute);
 app.use("/api/courses", courseRoutes);
 app.use("/api/dashboard", dashbordRoutes);
 app.use("/api/generate-certificate", certificateRoutes);
+// Add to your imports at the top
+
+// Add to your route middlewares
+app.use("/api/batches", batchRoutes);
 
 const PORT = process.env.PORT || 3030;
 app.listen(PORT, () => {

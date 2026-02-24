@@ -3,12 +3,7 @@ import bcrypt from "bcryptjs";
 
 const userSchema = new mongoose.Schema(
   {
-    username: {
-      type: String,
-      required: true,
-      unique: true,
-      trim: true,
-    },
+    username: { type: String, required: true, unique: true, trim: true },
     email: {
       type: String,
       required: true,
@@ -16,45 +11,19 @@ const userSchema = new mongoose.Schema(
       trim: true,
       lowercase: true,
     },
-    password: {
-      type: String,
-      required: true,
-      minlength: 6,
-      select: false, // Security: Don't return password by default in queries
-    },
+    password: { type: String, required: true, minlength: 6, select: false },
     role: {
       type: String,
-      enum: ["admin", "instructor", "register", "staff"],
+      enum: ["admin", "instructor", "register", "staff", "user"],
       default: "user",
     },
-
-    employee_id: {
-      type: String,
-      unique: true,
-      sparse: true,
-      trim: true,
-    },
-    full_name: {
-      type: String,
-      default: "",
-    },
-    photo_url: {
-      type: String,
-      default: "",
-    },
-    phone: {
-      type: String,
-    },
-    designation: {
-      type: String, // e.g., "Senior Culinary Instructor"
-    },
-    department: {
-      type: String, // e.g., "Faculty", "Administration"
-    },
-    joining_date: {
-      type: Date,
-      default: Date.now,
-    },
+    employee_id: { type: String, unique: true, sparse: true, trim: true },
+    full_name: { type: String, default: "" },
+    photo_url: { type: String, default: "" },
+    phone: { type: String },
+    designation: { type: String },
+    department: { type: String },
+    joining_date: { type: Date, default: Date.now },
     status: {
       type: String,
       enum: ["Active", "On Leave", "Resigned"],
@@ -65,25 +34,14 @@ const userSchema = new mongoose.Schema(
       linkedin: { type: String, default: "" },
       twitter: { type: String, default: "" },
       instagram: { type: String, default: "" },
-      custom: {
-        type: String,
-        default: "",
-      },
+      custom: { type: String, default: "" },
     },
   },
-  {
-    timestamps: true,
-    // Add this to prevent empty objects if social_links isn't provided
-    minimize: false,
-  },
+  { timestamps: true, minimize: false },
 );
 
-/**
- * Password Hashing Middleware
- */
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
-
   try {
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
@@ -93,13 +51,9 @@ userSchema.pre("save", async function (next) {
   }
 });
 
-/**
- * Helper method for login validation
- */
 userSchema.methods.comparePassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
 const User = mongoose.models.User || mongoose.model("User", userSchema);
-
 export default User;
