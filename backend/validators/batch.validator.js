@@ -1,24 +1,6 @@
 import Batch from "../models/batch.js";
 
-// 1. Check Required Fields
-export const validateBatchRequiredFields = (req, res, next) => {
-  // Removed batch_type from required checks
-  const { batch_name, course, start_date, schedule_days, start_time, end_time } = req.body;
-  
-  if (!batch_name || !course || !start_date) {
-    return res.status(400).json({ message: "Batch name, course, and start date are required." });
-  }
 
-  if (!schedule_days || schedule_days.length === 0) {
-    return res.status(400).json({ message: "At least one class day must be selected." });
-  }
-
-  if (!start_time || !end_time) {
-    return res.status(400).json({ message: "Start time and End time are required." });
-  }
-
-  next();
-};
 
 // 2. Check for Duplicate Batch Names (Remains Unchanged)
 export const checkBatchDuplicates = async (req, res, next) => {
@@ -41,42 +23,50 @@ export const checkBatchDuplicates = async (req, res, next) => {
   }
 };
 
-// 3. Process Payload (Dynamic Days & Times)
+// 1. Check Required Fields
+export const validateBatchRequiredFields = (req, res, next) => {
+  const isUpdate = req.method === "PUT";
+  const { batch_name, course, start_date, schedule_days, start_time, end_time } = req.body;
+  
+  // During creation, everything is required. 
+  // During update, we only check fields that are actually present in the request.
+  if (!isUpdate) {
+    if (!batch_name || !course || !start_date) {
+      return res.status(400).json({ message: "Batch name, course, and start date are required." });
+    }
+    if (!schedule_days || schedule_days.length === 0) {
+      return res.status(400).json({ message: "At least one class day must be selected." });
+    }
+    if (!start_time || !end_time) {
+      return res.status(400).json({ message: "Start time and End time are required." });
+    }
+  }
+
+  next();
+};
+
+// 3. Process Payload (Fixing potential reference errors)
 export const processBatchPayload = (req, res, next) => {
   try {
-    const payload = { ...req.body };
-
-    if (payload.batch_name) payload.batch_name = payload.batch_name.trim();
-
-    // Force batch_type to Custom since we are using fully dynamic scheduling now
-    payload.batch_type = "Custom";
-
-    // Ensure schedule_days is always an array
-    if (payload.schedule_days && !Array.isArray(payload.schedule_days)) {
-      payload.schedule_days = [payload.schedule_days];
+    // Only nest if the times are actually provided (important for partial updates)
+    if (req.body.start_time || req.body.end_time) {
+      req.body.time_slot = {
+        start_time: req.body.start_time || req.body.time_slot?.start_time,
+        end_time: req.body.end_time || req.body.time_slot?.end_time
+      };
+      
+      // Don't delete them yet if you have other validators running
+      // Or simply check if they exist before deleting
+      delete req.body.start_time;
+      delete req.body.end_time;
     }
 
-    // Format the time_slot object required by the schema
-    payload.time_slot = {
-      start_time: payload.start_time,
-      end_time: payload.end_time
-    };
-
-    // Clean up temporary fields sent by the frontend
-    delete payload.start_time;
-    delete payload.end_time;
-
-    // Ensure valid Date object
-    if (payload.start_date) {
-      payload.start_date = new Date(payload.start_date);
+    if (req.body.start_date) {
+      req.body.start_date = new Date(req.body.start_date);
     }
 
-    // Remove undefined properties
-    Object.keys(payload).forEach(key => payload[key] === undefined && delete payload[key]);
-
-    req.body = payload;
     next();
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    res.status(500).json({ message: "Payload processing failed" });
   }
 };

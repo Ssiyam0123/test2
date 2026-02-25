@@ -43,19 +43,13 @@ export const updateEmployeeStatus = async ({ id, status }) => {
   return data;
 };
 
-// Admin: Delete an employee permanently
-export const deleteEmployee = async (id) => {
-  const { data } = await API.delete(`/employees/delete/${id}`);
-  return data;
-};
+
 
 // Admin: Remove an employee's photo without deleting the profile
 export const removeEmployeePhoto = async (id) => {
   const { data } = await API.delete(`/employees/remove-image/${id}`);
   return data;
 };
-
-
 
 // Add these to your existing employee service file
 
@@ -68,5 +62,22 @@ export const fetchAllUsers = async () => {
 // Admin: Toggle between 'admin' and 'staff' roles
 export const toggleAdminRole = async (id) => {
   const { data } = await API.patch(`/employees/toggle-role/${id}`);
+  return data;
+};
+
+
+// Find your toggle status API function and change the URL:
+export const updateUserStatus = async ({ id, status }) => {
+  // CHANGE FROM: `/users/update-status/${id}`
+  // TO THIS:
+  const { data } = await API.patch(`/users/${id}/status`, { status });
+  return data;
+};
+
+// Find your update role API function and change the URL:
+export const updateUserRole = async ({ id, role }) => {
+  // CHANGE FROM: `/users/update-role/${id}`
+  // TO THIS:
+  const { data } = await API.patch(`/users/${id}/role`, { role });
   return data;
 };

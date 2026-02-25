@@ -1,9 +1,9 @@
 import React, { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import EntityForm from "../components/common/EntityForm";
-import { useAddBatch } from "../hooks/useBatches";
-import { useCourses } from "../hooks/useCourses";
-import Loader from "../components/Loader";
+import EntityForm from "../../components/common/EntityForm";
+import { useAddBatch } from "../../hooks/useBatches";
+import { useCourses } from "../../hooks/useCourses";
+import Loader from "../../components/Loader";
 
 const AddBatch = () => {
   const navigate = useNavigate();
@@ -51,7 +51,7 @@ const AddBatch = () => {
     // jsonPayload already has the data perfectly formatted!
     // Example: { batch_name: "...", schedule_days: ["Saturday", "Sunday"], start_time: "10:30" }
     
-    mutate(jsonPayload, { onSuccess: () => navigate("/admin/batches") });
+    mutate(jsonPayload, { onSuccess: () => navigate("/admin/manage-batches") });
   };
 
   if (coursesLoading) return <Loader />;
@@ -65,7 +65,7 @@ const AddBatch = () => {
         onSubmit={handleSubmit} 
         isLoading={isPending} 
         buttonText="Create Batch" 
-        onCancel={() => navigate("/admin/batches")}
+        onCancel={() => navigate("/admin/manage-batches")}
       />
     </div>
   );

@@ -1,78 +1,76 @@
 import express from "express";
-import protectRoute from "../middlewares/auth.middleware.js";
-import { authorize } from "../middlewares/auth.js"; 
-import { upload } from "../middlewares/multer.js";
 import {
-  getAllUsers,
   addUser,
-  updateUser,
   deleteUser,
+  getAllUsers,
   getUserById,
+  updateUser,
   updateUserStatus,
   removeUserImage,
   searchUser,
-  toggleAdminRole
+  updateUserRole
 } from "../controllers/user.controller.js";
+import { upload } from "../middlewares/multer.js";
+import protectRoute from "../middlewares/auth.middleware.js";
+import { authorize } from "../middlewares/auth.js";
+
+// Import new validators
+import { 
+  validateUserFields, 
+  checkUserDuplicates, 
+  processUserPayload,
+  validateRoleUpdate
+} from "../validators/user.validator.js";
 
 const router = express.Router();
-import { 
-  validateUserRequiredFields, 
-  checkUserDuplicates, 
-  processUserPayload 
-} from "../validators/user.validator.js";
-// ==========================================
-// 1. STANDARD USER / EMPLOYEE MANAGEMENT
-// ==========================================
 
-// Get all users
-router.get("/all", protectRoute, authorize("admin", "registrar", "instructor"), getAllUsers);
+// Apply auth to all routes
+router.use(protectRoute);
 
+// Admin & Registrar: View and Search users
+router.get("/search", authorize("admin", "registrar"), searchUser);
+router.get("/all", authorize("admin", "registrar"), getAllUsers);
+router.get("/:id", authorize("admin", "registrar"), getUserById);
+
+// Admin only: Full CRUD operations
 router.post(
-  "/create",
-  protectRoute,
+  "/create", 
   authorize("admin"), 
-  upload.single("photo"), // Make sure multer path handles employees correctly
-  validateUserRequiredFields,
-  checkUserDuplicates,
-  processUserPayload,
+  upload.single("photo"),
+  validateUserFields, 
+  checkUserDuplicates, 
+  processUserPayload, // <--- THIS WAS MISSING! It now formats social_links and photo_url properly
   addUser
 );
 
-// Update User
 router.put(
-  "/update/:id",
-  protectRoute,
-  authorize("admin"),
+  "/:id", 
+  authorize("admin"), 
   upload.single("photo"),
-  checkUserDuplicates, // Ignored self duplicate check via excludeDbId
-  processUserPayload,
+  validateUserFields, 
+  checkUserDuplicates, 
+  processUserPayload, 
   updateUser
 );
 
-// Update user status (Active / On Leave / Resigned)
-router.patch("/update-status/:id", protectRoute, authorize("admin"), updateUserStatus);
 
-// Delete a user permanently
-router.delete("/delete/:id", protectRoute, authorize("admin"), deleteUser);
+router.delete("/:id/image", authorize("admin"), removeUserImage);
 
-// Remove only the user's photo
-router.delete("/remove-image/:id", protectRoute, authorize("admin"), removeUserImage);
 
-// Search users (Quick search by name, id, email)
-router.get("/search", protectRoute, authorize("admin"), searchUser);
 
-// ==========================================
-// 2. ROLE MANAGEMENT
-// ==========================================
+router.delete("/:id", authorize("admin"), deleteUser);
 
-// Toggle admin role (e.g., promote staff to admin, or demote admin to staff)
-router.patch("/toggle-role/:id", protectRoute, authorize("admin"), toggleAdminRole);
 
-// ==========================================
-// 3. GET SINGLE USER (Keep this at the bottom)
-// ==========================================
 
-// Get a single user by ID 
-router.get("/:id",   getUserById);
+router.patch("/update-status/:id", authorize("admin"), updateUserStatus);
+router.patch("/toggle-role/:id", authorize("admin"), validateRoleUpdate, updateUserRole);
+
+// Admin only: Role updates
+router.patch(
+  "/:id/role", 
+  authorize("admin"), 
+  validateRoleUpdate, 
+  updateUserRole
+);
 
 export default router;

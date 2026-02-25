@@ -2,11 +2,27 @@ import mongoose from "mongoose";
 
 const studentSchema = new mongoose.Schema(
   {
-    student_name: { type: String, required: true, trim: true },
+    student_name: {
+      type: String,
+      required: true,
+      trim: true,
+      match: [/^[a-zA-Z\s\-']+$/, "Invalid name format"],
+    },
     fathers_name: { type: String, required: true, trim: true },
-    student_id: { type: String, required: true, unique: true, index: true, trim: true },
-    registration_number: { type: String, unique: true, index: true, trim: true },
-    
+    student_id: {
+      type: String,
+      required: true,
+      unique: true,
+      index: true,
+      trim: true,
+    },
+    registration_number: {
+      type: String,
+      unique: true,
+      sparse: true,
+      index: true,
+      trim: true,
+    },
     course: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Course",
@@ -17,7 +33,6 @@ const studentSchema = new mongoose.Schema(
       ref: "Batch",
       required: true,
     },
-
     competency: {
       type: String,
       enum: ["competent", "incompetent", "not_assessed"],
@@ -39,23 +54,30 @@ const studentSchema = new mongoose.Schema(
     contact_number: { type: String, trim: true },
     email: { type: String, trim: true, lowercase: true },
     address: { type: String, trim: true },
+    branch: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Branch",
+      required: true,
+      index: true, // Crucial for performance as DB grows
+    },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
-// Indexes
-studentSchema.index({ student_id: 1, registration_number: 1 });
+// Performance Indexes
 studentSchema.index({ batch: 1, status: 1 });
 
-// Virtual for Comments
+// Paginated Virtual for Comments
 studentSchema.virtual("comments", {
   ref: "Comment",
   localField: "_id",
   foreignField: "student",
+  options: { limit: 20, sort: { createdAt: -1 } },
 });
 
 studentSchema.set("toObject", { virtuals: true });
 studentSchema.set("toJSON", { virtuals: true });
 
-const Student = mongoose.models.Student || mongoose.model("Student", studentSchema);
+const Student =
+  mongoose.models.Student || mongoose.model("Student", studentSchema);
 export default Student;

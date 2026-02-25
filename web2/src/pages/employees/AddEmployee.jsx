@@ -1,12 +1,14 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { useAddUser, useUpdateUser } from "../hooks/useUser.js";
-import EntityForm from "../components/common/EntityForm.jsx";
+import { useAddUser, useUpdateUser } from "../../hooks/useUser.js";
+import EntityForm from "../../components/common/EntityForm.jsx";
 
 const AddEmployeeForm = ({ mode = "add", data = null }) => {
   const navigate = useNavigate();
   const addUserMutation = useAddUser();
   const updateUserMutation = useUpdateUser();
+
+  // console.log(data)
 
   // Populate initial data safely
   const initialData = mode === "edit" && data ? {
@@ -25,12 +27,13 @@ const AddEmployeeForm = ({ mode = "add", data = null }) => {
     linkedin: data.social_links?.linkedin || "",
     twitter: data.social_links?.twitter || "",
     instagram: data.social_links?.instagram || "",
-    photo_url: data.photo_url || "" // For preview
+    others: data.social_links?.others || "", 
+    photo_url: data.photo_url || "" // Reverted back to photo_url
   } : {
     employee_id: "", full_name: "", email: "", phone: "", designation: "", department: "",
     joining_date: "", status: "Active", username: "", 
-    password: mode === "add" ? "123456" : "", // Default password for new users
-    role: "staff", facebook: "", linkedin: "", twitter: "", instagram: "",
+    password: mode === "add" ? "123456" : "", 
+    role: "staff", facebook: "", linkedin: "", twitter: "", instagram: "", others: "",
   };
 
   // Define the form structure using blocks
@@ -64,7 +67,7 @@ const AddEmployeeForm = ({ mode = "add", data = null }) => {
       required: mode === "add" 
     },
     { name: "role", label: "System Role", type: "select", required: true, options: [
-      { value: "staff", label: "General Staff" }, { value: "instructor", label: "Instructor" }, { value: "register", label: "Registrar" }, { value: "admin", label: "Administrator" }
+      { value: "staff", label: "General Staff" }, { value: "instructor", label: "Instructor" }, { value: "registrar", label: "Registrar" }, { value: "admin", label: "Administrator" }
     ]},
 
     // Block 4: Social Links
@@ -73,6 +76,7 @@ const AddEmployeeForm = ({ mode = "add", data = null }) => {
     { name: "linkedin", label: "LinkedIn URL", placeholder: "https://linkedin.com/in/..." },
     { name: "twitter", label: "Twitter (X) URL", placeholder: "https://twitter.com/..." },
     { name: "instagram", label: "Instagram URL", placeholder: "https://instagram.com/..." },
+    { name: "others", label: "Other Link (Portfolio/Website)", placeholder: "https://..." },
 
     // Photo
     { name: "photo", label: "Employee Photo", type: "file" }
@@ -96,7 +100,7 @@ const AddEmployeeForm = ({ mode = "add", data = null }) => {
   const isMutating = addUserMutation.isPending || updateUserMutation.isPending;
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
+    <div className="min-h-screen py-8 px-4">
       <EntityForm
         title={mode === "edit" ? "Edit Employee Profile" : "Register New Employee"}
         subtitle={`Fill out the information below to ${mode === "edit" ? "update" : "create"} an employee record.`}
@@ -107,7 +111,7 @@ const AddEmployeeForm = ({ mode = "add", data = null }) => {
         buttonText={mode === "edit" ? "Save Changes" : "Register Employee"}
         mode={mode}
         onCancel={() => navigate("/admin/all-employees")}
-        buttonColor="bg-[#000c1d] hover:bg-slate-800 focus:ring-slate-200" // Custom color from your original code
+        buttonColor="bg-[#000c1d] hover:bg-slate-800 focus:ring-slate-200"
       />
     </div>
   );

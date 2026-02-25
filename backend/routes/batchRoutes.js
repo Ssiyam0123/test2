@@ -3,7 +3,8 @@ import {
   createBatch, getAllBatches, getBatchClasses, addClassToSyllabus, 
   scheduleClass, autoScheduleSyllabus, deleteBatch, updateBatch,
   deleteClassContent, updateClassContent,
-  updateClassAttendance
+  updateClassAttendance,
+  getBatchById
 } from "../controllers/batch.controller.js";
 
 import { 
@@ -22,7 +23,7 @@ router.get("/:batchId/classes", getBatchClasses);
 router.post("/", validateBatchRequiredFields, checkBatchDuplicates, processBatchPayload, createBatch);
 router.put("/:id", checkBatchDuplicates, processBatchPayload, updateBatch);
 router.delete("/:id", deleteBatch);
-
+router.get("/:id", getBatchById);
 // Syllabus & Class Management
 router.post("/:batchId/syllabus", addClassToSyllabus);
 router.post("/:batchId/auto-schedule", autoScheduleSyllabus);

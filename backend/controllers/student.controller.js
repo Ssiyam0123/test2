@@ -1,8 +1,10 @@
 import Student from "../models/student.js";
 import Course from "../models/course.js";
-import Batch from "../models/batch.js"; 
+import Batch from "../models/batch.js";
 import { deleteLocalFile } from "../middlewares/multer.js";
 import mongoose from "mongoose";
+
+
 export const addStudent = async (req, res) => {
   try {
     // 1. Create the student
@@ -12,15 +14,22 @@ export const addStudent = async (req, res) => {
     if (student.batch) {
       await Batch.findByIdAndUpdate(
         student.batch,
-        { $push: { students: student._id } },
-        { new: true } // returns updated document
+        {
+          $push: {
+            students: student._id,
+          },
+        },
+        { new: true }, // returns updated document
       );
     }
 
-    res.status(201).json({ message: "Student created successfully", data: student });
+    res
+      .status(201)
+      .json({ message: "Student created successfully", data: student });
   } catch (error) {
     if (req.file) deleteLocalFile(`/uploads/students/${req.file.filename}`);
-    if (error.code === 11000) return res.status(400).json({ message: `Duplicate key error` });
+    if (error.code === 11000)
+      return res.status(400).json({ message: `Duplicate key error` });
     res.status(500).json({ message: error.message });
   }
 };
@@ -50,16 +59,23 @@ export const updateStudent = async (req, res) => {
     if (newBatchId && oldBatchId !== newBatchId) {
       // 1. Remove student ID from the old batch
       if (oldBatchId) {
-        await Batch.findByIdAndUpdate(oldBatchId, { $pull: { students: student._id } });
+        await Batch.findByIdAndUpdate(oldBatchId, {
+          $pull: { students: student._id },
+        });
       }
       // 2. Add student ID to the new batch
-      await Batch.findByIdAndUpdate(newBatchId, { $push: { students: student._id } });
+      await Batch.findByIdAndUpdate(newBatchId, {
+        $push: { students: student._id },
+      });
     }
 
-    res.status(200).json({ message: "Student updated successfully", data: student });
+    res
+      .status(200)
+      .json({ message: "Student updated successfully", data: student });
   } catch (error) {
     if (req.file) deleteLocalFile(`/uploads/students/${req.file.filename}`);
-    if (error.code === 11000) return res.status(400).json({ message: `Duplicate key error` });
+    if (error.code === 11000)
+      return res.status(400).json({ message: `Duplicate key error` });
     res.status(500).json({ message: error.message });
   }
 };
@@ -73,13 +89,15 @@ export const deleteStudent = async (req, res) => {
 
     // 1. Delete the photo
     if (student.photo_url) deleteLocalFile(student.photo_url);
-    
+
     // 2. Delete the student document
     await student.deleteOne();
 
     // 3. Remove the student ID from the associated Batch
     if (batchId) {
-      await Batch.findByIdAndUpdate(batchId, { $pull: { students: student._id } });
+      await Batch.findByIdAndUpdate(batchId, {
+        $pull: { students: student._id },
+      });
     }
 
     res.status(200).json({ message: "Student deleted permanently" });
@@ -88,88 +106,182 @@ export const deleteStudent = async (req, res) => {
   }
 };
 
+// export const getAllStudents = async (req, res) => {
+//   try {
+//     const page = parseInt(req.query.page) || 1;
+//     const limit = parseInt(req.query.limit) || 30;
+//     const skip = (page - 1) * limit;
+
+//     const {
+//       search,
+//       status,
+//       batch,
+//       course,
+//       is_active,
+//       competency,
+//       date_from,
+//       date_to,
+//     } = req.query;
+//     let filter = {};
+
+//     if (search) {
+//       const searchRegex = { $regex: search, $options: "i" };
+//       filter.$or = [
+//         { student_name: searchRegex },
+//         { student_id: searchRegex },
+//         { registration_number: searchRegex },
+//         { fathers_name: searchRegex },
+//         { email: searchRegex },
+//         { contact_number: searchRegex },
+//       ];
+//     }
+
+//     // 2. Exact Match Filters
+//     if (status && status !== "all") filter.status = status;
+//     if (competency && competency !== "all") filter.competency = competency;
+//     if (is_active && is_active !== "all")
+//       filter.is_active = is_active === "true";
+
+//     // Validate ObjectIds before assigning them to the filter to prevent CastErrors
+//     if (batch && batch !== "all") {
+//       if (mongoose.Types.ObjectId.isValid(batch)) filter.batch = batch;
+//     }
+//     if (course && course !== "all") {
+//       if (mongoose.Types.ObjectId.isValid(course)) filter.course = course;
+//     }
+
+//     // 3. Date Filters
+//     if (date_from || date_to) {
+//       filter.issue_date = {};
+//       if (date_from) filter.issue_date.$gte = new Date(date_from);
+//       if (date_to) filter.issue_date.$lte = new Date(date_to);
+//     }
+
+
+//     const [
+//       students,
+//       total,
+//       rawDistinctBatches,
+//       distinctCourses,
+//       distinctStatuses,
+//       distinctCompetencies,
+//     ] = await Promise.all([
+//       Student.find(filter)
+//         .populate("course", "course_name course_code duration fee")
+//         .populate("batch", "batch_name batch_type time_slot")
+//         .sort({ createdAt: -1 })
+//         .skip(skip)
+//         .limit(limit),
+//       Student.countDocuments(filter),
+//       Student.distinct("batch"), 
+//       Course.find().select("_id course_name"),
+//       Student.distinct("status"),
+//       Student.distinct("competency"),
+//     ]);
+
+//     const validBatchIds = rawDistinctBatches.filter((id) =>
+//       mongoose.Types.ObjectId.isValid(id),
+//     );
+
+//     // Only query Batch model with valid ObjectIds
+//     const distinctBatches =
+//       validBatchIds.length > 0
+//         ? await Batch.find({ _id: { $in: validBatchIds } }).select(
+//             "_id batch_name",
+//           )
+//         : [];
+
+//         console.log(distinctBatches)
+
+//     res.status(200).json({
+//       data: students,
+//       pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
+//       filters: {
+//         batches: distinctBatches,
+//         courses: distinctCourses,
+//         statuses: distinctStatuses.filter(Boolean).sort(),
+//         competencies: distinctCompetencies.filter(Boolean).sort(),
+//       },
+//     });
+//   } catch (error) {
+//     // Log the actual error to your terminal so you can see exactly what failed
+//     console.error("GET_ALL_STUDENTS ERROR:", error);
+//     res.status(500).json({ message: error.message });
+//   }
+// };
+
+
+
+
+
 export const getAllStudents = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 30;
     const skip = (page - 1) * limit;
 
-    const { search, status, batch, course, is_active, competency, date_from, date_to } = req.query;
-    let filter = {};
+    const { search, status, batch, course, is_active, competency } = req.query;
 
-    // 1. Text Search (Ensure no ObjectIds are here)
+    // Initialize with the branch isolation filter!
+    let filter = { ...req.branchFilter }; 
+
     if (search) {
       const searchRegex = { $regex: search, $options: "i" };
       filter.$or = [
         { student_name: searchRegex },
         { student_id: searchRegex },
         { registration_number: searchRegex },
-        { fathers_name: searchRegex },
         { email: searchRegex },
-        { contact_number: searchRegex },
       ];
     }
 
-    // 2. Exact Match Filters
     if (status && status !== "all") filter.status = status;
     if (competency && competency !== "all") filter.competency = competency;
     if (is_active && is_active !== "all") filter.is_active = is_active === "true";
-    
-    // Validate ObjectIds before assigning them to the filter to prevent CastErrors
-    if (batch && batch !== "all") {
-      if (mongoose.Types.ObjectId.isValid(batch)) filter.batch = batch;
-    }
-    if (course && course !== "all") {
-      if (mongoose.Types.ObjectId.isValid(course)) filter.course = course;
-    }
 
-    // 3. Date Filters
-    if (date_from || date_to) {
-      filter.issue_date = {};
-      if (date_from) filter.issue_date.$gte = new Date(date_from);
-      if (date_to) filter.issue_date.$lte = new Date(date_to);
-    }
+    if (batch && batch !== "all" && mongoose.Types.ObjectId.isValid(batch)) filter.batch = batch;
+    if (course && course !== "all" && mongoose.Types.ObjectId.isValid(course)) filter.course = course;
 
-    // 4. Execute Queries
-    const [students, total, rawDistinctBatches, distinctCourses, distinctStatuses, distinctCompetencies] = await Promise.all([
+    const [
+      students,
+      total,
+      rawDistinctBatches,
+      distinctCourses,
+    ] = await Promise.all([
       Student.find(filter)
         .populate("course", "course_name course_code duration fee")
         .populate("batch", "batch_name batch_type time_slot")
+        .populate("branch", "branch_name branch_code") // Pull branch data
         .sort({ createdAt: -1 })
         .skip(skip)
-        .limit(limit),
+        .limit(limit)
+        .lean(),
       Student.countDocuments(filter),
-      Student.distinct("batch"), // This might contain legacy strings AND ObjectIds
-      Course.find().select("_id course_name"),
-      Student.distinct("status"),
-      Student.distinct("competency")
+      // Ensure we only get distinct batches FOR THIS SPECIFIC BRANCH
+      Student.distinct("batch", req.branchFilter), 
+      // Courses might be global, so we don't necessarily apply branchFilter here
+      Course.find({ is_active: true }).select("_id course_name").lean(),
     ]);
 
-    // 5. Clean up legacy batch data for the filter dropdown
-    // Filter out any IDs that aren't valid ObjectIds (i.e., legacy strings)
     const validBatchIds = rawDistinctBatches.filter(id => mongoose.Types.ObjectId.isValid(id));
-    
-    // Only query Batch model with valid ObjectIds
-    const distinctBatches = validBatchIds.length > 0 
-      ? await Batch.find({ _id: { $in: validBatchIds } }).select("_id batch_name")
+    const distinctBatches = validBatchIds.length > 0
+      ? await Batch.find({ _id: { $in: validBatchIds } }).select("_id batch_name").lean()
       : [];
 
     res.status(200).json({
+      success: true,
       data: students,
       pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
       filters: {
-        batches: distinctBatches,
-        courses: distinctCourses,
-        statuses: distinctStatuses.filter(Boolean).sort(),
-        competencies: distinctCompetencies.filter(Boolean).sort(),
-      }
+        batches: distinctBatches.map(b => ({ _id: b._id.toString(), batch_name: b.batch_name })),
+        courses: distinctCourses.map(c => ({ _id: c._id.toString(), course_name: c.course_name })),
+      },
     });
   } catch (error) {
-    // Log the actual error to your terminal so you can see exactly what failed
-    console.error("GET_ALL_STUDENTS ERROR:", error); 
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
+
 
 
 
@@ -194,7 +306,7 @@ export const removeStudentImage = async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
-}
+};
 
 export const toggleStudentStatus = async (req, res) => {
   try {
@@ -232,8 +344,8 @@ export const publicSearchStudent = async (req, res) => {
       is_active: true,
     })
       .populate("course", "course_name course_code duration additional_info")
-      .populate("batch", "batch_name batch_type time_slot schedule_days") 
-      .select("-__v"); 
+      .populate("batch", "batch_name batch_type time_slot schedule_days")
+      .select("-__v");
 
     if (!student) {
       return res.status(404).json({
@@ -254,7 +366,10 @@ export const publicSearchStudent = async (req, res) => {
 export const getPublicStudentById = async (req, res) => {
   try {
     const student = await Student.findById(req.params.id)
-      .populate("course", "course_name course_code duration description additional_info")
+      .populate(
+        "course",
+        "course_name course_code duration description additional_info",
+      )
       .populate("batch", "batch_name batch_type time_slot schedule_days");
 
     if (!student || !student.is_active) {
@@ -281,10 +396,10 @@ export const searchStudent = async (req, res) => {
       ],
     })
       .populate("course", "course_name course_code duration")
-      .populate("batch", "batch_name batch_type time_slot") 
+      .populate("batch", "batch_name batch_type time_slot")
       .populate({
         path: "comments",
-        populate: { path: "instructor", select: "full_name photo_url" }
+        populate: { path: "instructor", select: "full_name photo_url" },
       })
       .sort({ createdAt: -1 })
       .limit(20);
@@ -302,15 +417,18 @@ export const searchStudent = async (req, res) => {
 export const getAdminStudentById = async (req, res) => {
   try {
     const student = await Student.findById(req.params.id)
-      .populate("course", "course_name course_code duration description additional_info")
-      .populate("batch", "batch_name batch_type time_slot") 
+      .populate(
+        "course",
+        "course_name course_code duration description additional_info",
+      )
+      .populate("batch", "batch_name batch_type time_slot")
       .populate({
         path: "comments",
         options: { sort: { createdAt: -1 } },
-        populate: { 
-          path: "instructor", 
-          select: "full_name photo_url designation" 
-        }
+        populate: {
+          path: "instructor",
+          select: "full_name photo_url designation",
+        },
       });
 
     if (!student) {
@@ -322,3 +440,5 @@ export const getAdminStudentById = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+

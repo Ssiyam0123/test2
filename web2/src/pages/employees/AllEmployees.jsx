@@ -5,18 +5,16 @@ import {
   useDeleteUser,
   useUpdateUserStatus,
   useUpdateUserRole,
-} from "../hooks/useUser.js";
-import useAuth from "../store/useAuth.js";
+} from "../../hooks/useUser.js";
+import useAuth from "../../store/useAuth.js";
 import toast from "react-hot-toast";
 
-import EmployeeQRCodeModal from "../components/modal/EmployeeQRCodeModal.jsx";
-import PageHeader from "../components/common/PageHeader";
-import TableSkeleton from "../components/common/TableSkeleton";
-import DataErrorState from "../components/common/DataErrorState";
-import EmployeeFilters from "../components/Search_filter/EmployeeFilters.jsx";
-
-// FIX: Changed from React.lazy to a standard static import
-import EmployeesTable from "../components/table/EmployeesTable.jsx";
+import EmployeeQRCodeModal from "../../components/modal/EmployeeQRCodeModal.jsx";
+import PageHeader from "../../components/common/PageHeader.jsx";
+import TableSkeleton from "../../components/common/TableSkeleton.jsx";
+import DataErrorState from "../../components/common/DataErrorState.jsx";
+import EmployeeFilters from "../../components/Search_filter/EmployeeFilters.jsx";
+import EmployeesTable from "../../components/table/EmployeesTable.jsx";
 
 const INITIAL_FILTERS = {
   status: "all",
@@ -46,12 +44,10 @@ const AllEmployees = () => {
   const queryFilters = useMemo(() => {
     const activeFilters = {};
 
-    // 1. Apply the search term if it exists
     if (debouncedSearch) {
       activeFilters.search = debouncedSearch;
     }
 
-    // 2. Loop through all filters and ONLY include them if they aren't "all" or empty
     Object.entries(filters).forEach(([key, value]) => {
       if (value !== "all" && value !== "") {
         activeFilters[key] = value;
@@ -61,11 +57,7 @@ const AllEmployees = () => {
     return activeFilters;
   }, [filters, debouncedSearch]);
 
-  const { data, isLoading, error, refetch, isRefetching } = useUsers(
-    page,
-    limit,
-    queryFilters,
-  );
+  const { data, isLoading, error, refetch, isRefetching } = useUsers(page, limit, queryFilters);
   const deleteUserMutation = useDeleteUser();
   const updateStatusMutation = useUpdateUserStatus();
   const updateRoleMutation = useUpdateUserRole();
@@ -78,21 +70,18 @@ const AllEmployees = () => {
   }, [queryFilters]);
 
   const handleDelete = (id) => {
-    if (id === currentUserId)
-      return toast.error("You cannot delete your own account.");
+    if (id === currentUserId) return toast.error("You cannot delete your own account.");
     deleteUserMutation.mutate(id);
   };
 
   const handleToggleStatus = (id, currentStatus) => {
-    if (id === currentUserId)
-      return toast.error("You cannot change your own status.");
+    if (id === currentUserId) return toast.error("You cannot change your own status.");
     const newStatus = currentStatus === "Active" ? "On Leave" : "Active";
     updateStatusMutation.mutate({ id, status: newStatus });
   };
 
   const handleUpdateRole = (id, newRole) => {
-    if (id === currentUserId)
-      return toast.error("You cannot change your own role.");
+    if (id === currentUserId) return toast.error("You cannot change your own role.");
     updateRoleMutation.mutate({ id, role: newRole });
   };
 
@@ -103,9 +92,7 @@ const AllEmployees = () => {
         subtitle="Manage and export staff records."
         showExport={true}
         disableExport={isLoading || employees.length === 0}
-        onExport={() => {
-          /* handleExport */
-        }}
+        onExport={() => { /* handleExport */ }}
         onAdd={() => navigate("/admin/add-employee")}
         addText="Add Employee"
       />
@@ -127,7 +114,6 @@ const AllEmployees = () => {
           isRetrying={isRefetching}
         />
       ) : (
-        /* FIX: Removed <Suspense> wrapper. If it's loading, show skeleton. Else, show the table. */
         <>
           {isLoading ? (
             <TableSkeleton rows={6} />
@@ -144,19 +130,10 @@ const AllEmployees = () => {
               onEdit={(id) => navigate(`/admin/update-employee/${id}`)}
               deleteLoading={deleteUserMutation.isPending}
               toggleLoading={updateStatusMutation.isPending}
-              roleLoadingId={
-                updateRoleMutation.isPending
-                  ? updateRoleMutation.variables?.id
-                  : null
-              }
+              roleLoadingId={updateRoleMutation.isPending ? updateRoleMutation.variables?.id : null}
               page={page}
               onPageChange={setPage}
               searchTerm={debouncedSearch}
-              onClearFilters={() => {
-                setFilters(INITIAL_FILTERS);
-                setSearchTerm("");
-              }}
-              filters={filters}
             />
           )}
         </>

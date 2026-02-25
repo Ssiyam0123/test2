@@ -1,25 +1,19 @@
 import React, { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAddStudent, useUpdateStudent } from "../hooks/useStudents.js";
-import { useActiveCourses } from "../hooks/useCourses";
-import { useActiveBatches } from "../hooks/useBatches"; 
-import Loader from "../components/Loader.jsx";
-import EntityForm from "../components/common/EntityForm.jsx";
+import { useAddStudent, useUpdateStudent } from "../../hooks/useStudents.js";
+import { useActiveCourses } from "../../hooks/useCourses.js";
+import { useActiveBatches } from "../../hooks/useBatches.js"; 
+import Loader from "../../components/Loader.jsx";
+import EntityForm from "../../components/common/EntityForm.jsx";
 
-// ==========================================
-// 1. HELPER: Payload Builder
-// ==========================================
 const buildStudentPayload = (baseFormData, jsonPayload, coursesData) => {
-  // Find the selected course object
+
   const selectedCourseId = jsonPayload.course;
   const courseDetails = coursesData?.data?.find(c => c._id === selectedCourseId);
 
   if (courseDetails) {
-    // Append the required string values to the FormData object before sending
     baseFormData.append("course_name", courseDetails.course_name);
     baseFormData.append("course_code", courseDetails.course_code || "N/A"); 
-    
-    // Also required by your schema: course_duration
     if (courseDetails.duration) {
        baseFormData.append("course_duration[value]", courseDetails.duration.value);
        baseFormData.append("course_duration[unit]", courseDetails.duration.unit);
@@ -33,13 +27,9 @@ const buildStudentPayload = (baseFormData, jsonPayload, coursesData) => {
   return baseFormData;
 };
 
-// ==========================================
-// 2. MAIN COMPONENT
-// ==========================================
 const AddStudentForm = ({ mode = "add", data = null }) => {
   const navigate = useNavigate();
   
-  // Data Fetching
   const { data: coursesData, isLoading: coursesLoading, error: coursesError } = useActiveCourses();
   const { data: batchesData, isLoading: batchesLoading, error: batchesError } = useActiveBatches();
   
@@ -111,11 +101,8 @@ const AddStudentForm = ({ mode = "add", data = null }) => {
     { name: "is_verified", label: "Student Verified", type: "checkbox" },
   ];
 
-  // ==========================================
-  // THE FIX: Clean Submit Handler
-  // ==========================================
+
   const handleSubmit = (formData, jsonPayload) => {
-    // Pass raw data to the builder to get the final server-ready payload
     const finalPayload = buildStudentPayload(formData, jsonPayload, coursesData);
 
     const mutationConfig = { onSuccess: () => navigate("/admin/all-students") };

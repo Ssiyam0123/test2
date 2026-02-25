@@ -1,10 +1,12 @@
 import React, { useState } from "react";
-import { Edit, Trash2, QrCode, Power, PowerOff, Eye, Loader2, MessageSquare, Shield, Award, Mail, Phone, BookOpen } from "lucide-react";
+import {
+  Edit, Trash2, QrCode, Power, PowerOff, Eye, Loader2, MessageSquare, ShieldCheck, Award, Mail, Phone,
+} from "lucide-react";
 import { API } from "../../api/axios.js";
 import toast from "react-hot-toast";
 import DataTable from "../common/DataTable.jsx";
 import ActionIconButton from "../common/ActionIconButton.jsx";
-import Avatar from "../common/Avatar.jsx"; // <-- Make sure to import Avatar!
+import Avatar from "../common/Avatar.jsx";
 
 const StudentsTable = ({
   students, currentUser, pagination, onDelete, onToggleStatus, onGenerateQR, onAddComment, onViewDetails, onEdit, deleteLoading, toggleLoading, page, onPageChange, searchTerm, isLoading = false,
@@ -31,96 +33,101 @@ const StudentsTable = ({
     }
   };
 
-  // 1. ADD RESPONSIVE CLASSES TO HIDE MIDDLE COLUMNS ON MOBILE
   const columns = [
-    { label: "Identity" }, // Always visible
-    { label: "Academic Info", className: "hidden md:table-cell" }, // Hides on mobile
-    { label: "Contact Info", className: "hidden lg:table-cell" },  // Hides on mobile & small tablets
-    { label: "Status" }, // Always visible
-    { label: "Actions", align: "right" } // Always visible
+    { label: "Student Name", className: "w-[30%]" },
+    { label: "ID", className: "hidden md:table-cell w-[15%]" },
+    { label: "Course", className: "hidden lg:table-cell w-[20%]" },
+    { label: "Contact", className: "hidden xl:table-cell w-[15%]" },
+    { label: "Status", className: "w-[10%]" },
+    { label: "Actions", align: "right", className: "w-[10%]" },
   ];
 
   const renderStudentRow = (student) => {
     const isInactive = !student.is_active;
 
     return (
-      <tr key={student._id} className={`transition-colors duration-150 ${isInactive ? "bg-gray-50/50" : "hover:bg-gray-50"}`}>
-        
-        {/* 1. Identity (Name, Image, ID, Batch) - ALWAYS VISIBLE */}
-        <td className="px-5 py-4">
-          <div className="flex items-center">
-            <Avatar 
-              src={student.photo_url} 
-              alt={student.student_name} 
-              fallbackText={student.student_name} 
-              isInactive={isInactive} 
-            />
-            <div className={`ml-3 ${isInactive ? "opacity-70" : ""}`}>
-              <div className="text-sm font-semibold text-gray-900">{student.student_name}</div>
-              <div className="flex items-center mt-1 space-x-2 text-[11px] text-gray-500 font-mono">
-                <span>ID: {student.student_id}</span>
-                <span className="h-1 w-1 bg-gray-300 rounded-full"></span>
-                <span className="h-1 w-1 bg-gray-300 rounded-full"></span>
-<span className="text-blue-600 font-medium">
-  Batch {typeof student.batch === 'object' ? student.batch?.batch_name : student.batch || "N/A"}
-</span>
+      <tr
+        key={student._id}
+        className={`group transition-colors duration-300 hover:bg-slate-50/50 ${isInactive ? "opacity-60 grayscale-[20%]" : ""}`}
+      >
+        {/* 1. Student Name & Avatar */}
+        <td className="px-6 py-4 align-middle">
+          <div className="flex items-center gap-4">
+            <Avatar src={student.photo_url} alt={student.student_name} fallbackText={student.student_name} isInactive={isInactive} size="md" className="shadow-sm" />
+            <div className="flex flex-col">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[14px] font-bold text-slate-800">
+                  {student.student_name}
+                </span>
+                {student.is_verified && <ShieldCheck size={14} className="text-teal-500" title="Verified" />}
               </div>
+              <span className="text-[12px] text-slate-400 font-medium mt-0.5 tracking-wide">
+                Batch {typeof student.batch === "object" ? student.batch?.batch_name : student.batch || "N/A"}
+              </span>
             </div>
           </div>
         </td>
 
-        {/* 2. Academic (Course & Reg Num) - HIDDEN ON MOBILE */}
-        <td className={`px-5 py-4 hidden md:table-cell ${isInactive ? "opacity-70" : ""}`}>
-           <div className="text-sm text-gray-900 font-medium flex items-center">
-             <BookOpen size={14} className="text-blue-500 mr-1.5"/> 
-             <span className="truncate max-w-[180px]" title={student.course_name}>{student.course_name}</span>
-           </div>
-           {student.registration_number && (
-             <div className="text-xs text-gray-500 mt-1 font-mono">Reg: {student.registration_number}</div>
-           )}
+        {/* 2. ID */}
+        <td className="px-6 py-4 hidden md:table-cell align-middle">
+          <span className="text-[13px] font-semibold text-slate-600 tracking-wide">
+            {student.student_id}
+          </span>
         </td>
 
-        {/* 3. Contact (Email & Number) - HIDDEN ON MOBILE & TABLET */}
-        <td className={`px-5 py-4 hidden lg:table-cell ${isInactive ? "opacity-70" : ""}`}>
-           {student.contact_number && <div className="flex items-center text-sm text-gray-700"><Phone size={14} className="text-gray-400 mr-2" />{student.contact_number}</div>}
-           {student.email && <div className="flex items-center text-sm text-gray-700 mt-1"><Mail size={14} className="text-gray-400 mr-2" />{student.email}</div>}
+        {/* 3. Course */}
+        <td className="px-6 py-4 hidden lg:table-cell align-middle">
+          <span className="text-[13px] font-medium text-slate-600 line-clamp-1" title={student.course_name}>
+            {student.course_name}
+          </span>
         </td>
 
-        {/* 4. Status (Active/Verified) - ALWAYS VISIBLE */}
-        <td className="px-5 py-4">
-           <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${student.is_active ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
-             {student.is_active ? "Active" : "Inactive"}
-           </span>
-           {/* Hide verification badge on extra small screens to save space */}
-           {student.is_verified && <div className="hidden sm:flex items-center text-blue-600 font-medium text-[10px] mt-1.5"><Shield size={10} className="mr-1"/> Verified</div>}
-        </td>
-
-        {/* 5. Actions - ALWAYS VISIBLE (Uses flex-wrap so buttons don't overflow screen) */}
-        <td className="px-5 py-4 text-right">
-          <div className="flex items-center justify-end flex-wrap gap-1.5 min-w-[100px]">
-            <ActionIconButton icon={Eye} onClick={() => onViewDetails(student._id)} title="View Profile" />
-            
-            {(currentUser?.role === "admin" || currentUser?.role === "instructor") && (
-              <ActionIconButton icon={MessageSquare} variant="purple" onClick={() => onAddComment(student)} title="Add Comment" />
+        {/* 4. Contact Info */}
+        <td className="px-6 py-4 hidden xl:table-cell align-middle">
+          <div className="flex flex-col space-y-1">
+            {student.contact_number && (
+              <span className="text-[12px] text-slate-500 font-medium flex items-center gap-1.5">
+                <Phone size={11} className="text-slate-400" /> {student.contact_number}
+              </span>
             )}
+            {student.email && (
+              <span className="text-[12px] text-slate-400 truncate max-w-[140px] flex items-center gap-1.5" title={student.email}>
+                 <Mail size={11} className="text-slate-400" /> {student.email}
+              </span>
+            )}
+          </div>
+        </td>
 
+        {/* 5. Status */}
+        <td className="px-6 py-4 align-middle">
+          <span className={`text-[13px] font-bold tracking-wide uppercase ${student.is_active ? "text-teal-500" : "text-rose-400"}`}>
+            {student.is_active ? "Active" : "Inactive"}
+          </span>
+        </td>
+
+        {/* 6. Actions (Muted until row hover) */}
+        <td className="px-6 py-4 text-right align-middle">
+          <div className="flex items-center justify-end gap-1 opacity-60 group-hover:opacity-100 transition-opacity duration-200">
+            <ActionIconButton icon={Eye} onClick={() => onViewDetails(student._id)} title="View" />
+            {(currentUser?.role === "admin" || currentUser?.role === "instructor") && (
+              <ActionIconButton icon={MessageSquare} variant="neutral" onClick={() => onAddComment(student)} title="Comment" />
+            )}
             {currentUser?.role !== "instructor" && (
               <>
-                <ActionIconButton icon={student.is_active ? Power : PowerOff} variant={student.is_active ? "activeToggle" : "inactiveToggle"} onClick={() => onToggleStatus(student._id)} disabled={toggleLoading} title="Toggle Status" />
-                <ActionIconButton icon={QrCode} variant="neutral" onClick={() => onGenerateQR(student)} title="QR Code" />
-                <ActionIconButton icon={Edit} variant="success" onClick={() => onEdit(student._id)} title="Edit" />
+                <ActionIconButton icon={Edit} variant="neutral" onClick={() => onEdit(student._id)} title="Edit" />
+                <ActionIconButton icon={student.is_active ? PowerOff : Power} variant="neutral" onClick={() => onToggleStatus(student._id)} disabled={toggleLoading} title="Toggle" />
+                <ActionIconButton icon={QrCode} variant="neutral" onClick={() => onGenerateQR(student)} title="QR" />
                 <ActionIconButton icon={Trash2} variant="danger" onClick={() => onDelete(student._id, student.student_name)} disabled={deleteLoading} title="Delete" />
               </>
             )}
-
             {currentUser && (
-              <ActionIconButton 
-                icon={downloadingId === student._id ? Loader2 : Award} 
-                variant="purple" 
-                onClick={() => handleDownloadCertificate(student)} 
-                disabled={downloadingId === student._id} 
-                loading={downloadingId === student._id} 
-                title="Certificate" 
+              <ActionIconButton
+                icon={downloadingId === student._id ? Loader2 : Award}
+                variant="purple"
+                onClick={() => handleDownloadCertificate(student)}
+                disabled={downloadingId === student._id}
+                loading={downloadingId === student._id}
+                title="Download Certificate"
               />
             )}
           </div>

@@ -1,103 +1,119 @@
 import User from "../models/user.js";
 import { deleteLocalFile } from "../middlewares/multer.js";
 
-// Helper to clean up uploaded files if a request fails
 const cleanupFailedUpload = (file) => {
   if (file) deleteLocalFile(`/uploads/employees/${file.filename}`);
 };
 
-// 1. Check Required Fields Middleware
-export const validateUserRequiredFields = (req, res, next) => {
-  const { username, email, full_name } = req.body;
-  
-  if (!username || !email || !full_name) {
+// 1. Check Required Fields & Formats
+export const validateUserFields = (req, res, next) => {
+  const { full_name, email, phone, employee_id, username, password } = req.body;
+  const isPost = req.method === "POST"; // True for creation, False for updates
+
+  const missing = [];
+  if (!full_name) missing.push("full_name");
+  if (!email) missing.push("email");
+  if (!phone) missing.push("phone");
+  if (!employee_id) missing.push("employee_id");
+  if (!username) missing.push("username");
+  if (isPost && !password) missing.push("password"); // Password only strictly required on creation
+
+  if (missing.length > 0) {
     cleanupFailedUpload(req.file);
-    return res.status(400).json({ message: "Username, Email, and Full Name are strictly required." });
+    return res.status(400).json({ message: `Missing required fields: ${missing.join(", ")}` });
   }
+
+  // Email format validation
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    cleanupFailedUpload(req.file);
+    return res.status(400).json({ message: "Invalid email format." });
+  }
+
+  // Password length validation (only if provided)
+  if (password && password.length < 6) {
+    cleanupFailedUpload(req.file);
+    return res.status(400).json({ message: "Password must be at least 6 characters long." });
+  }
+
   next();
 };
 
-// 2. Check Duplicates Middleware (Email, Username, Employee ID)
+// 2. Database Validation for Duplicates
 export const checkUserDuplicates = async (req, res, next) => {
   try {
-    const { employee_id, email, username } = req.body;
+    const { email, username, employee_id } = req.body;
     const excludeDbId = req.params.id || null;
 
-    const orConditions = [];
-    if (employee_id && employee_id.trim() !== "") orConditions.push({ employee_id: employee_id.trim() });
-    if (email) orConditions.push({ email: email.trim().toLowerCase() });
-    if (username) orConditions.push({ username: username.trim() });
+    const query = { $or: [] };
+    if (email) query.$or.push({ email: email.toLowerCase().trim() });
+    if (username) query.$or.push({ username: username.toLowerCase().trim() });
+    if (employee_id) query.$or.push({ employee_id: employee_id.trim() });
+    if (excludeDbId) query._id = { $ne: excludeDbId }; // Ignore current user if updating
 
-    if (orConditions.length === 0) return next();
+    if (query.$or.length > 0) {
+      const existingUser = await User.findOne(query).select("email username employee_id");
 
-    const query = { $or: orConditions };
-    if (excludeDbId) query._id = { $ne: excludeDbId };
-
-    const existingUser = await User.findOne(query).select('employee_id email username');
-
-    if (existingUser) {
-      cleanupFailedUpload(req.file);
-      if (employee_id && existingUser.employee_id === employee_id.trim()) {
-        return res.status(400).json({ message: `Employee ID "${employee_id}" already exists.` });
-      }
-      if (existingUser.email === email.trim().toLowerCase()) {
-        return res.status(400).json({ message: `Email "${email}" already exists.` });
-      }
-      if (existingUser.username === username.trim()) {
-        return res.status(400).json({ message: `Username "${username}" is already taken.` });
+      if (existingUser) {
+        cleanupFailedUpload(req.file);
+        if (email && existingUser.email === email.toLowerCase().trim()) {
+          return res.status(400).json({ message: "Email already exists." });
+        }
+        if (username && existingUser.username === username.toLowerCase().trim()) {
+          return res.status(400).json({ message: "Username already exists." });
+        }
+        if (employee_id && existingUser.employee_id === employee_id.trim()) {
+          return res.status(400).json({ message: "Employee ID already exists." });
+        }
       }
     }
+
     next();
   } catch (error) {
     cleanupFailedUpload(req.file);
-    res.status(500).json({ message: "Error validating user duplicates" });
+    res.status(500).json({ message: "Error validating user uniqueness." });
   }
 };
 
-// 3. Process & Sanitize Payload Middleware
+// 3. Sanitize Payload & Inject File Path
 export const processUserPayload = (req, res, next) => {
   try {
     const payload = { ...req.body };
 
-    // Trim strings and format emails
-    const stringFields = ['username', 'full_name', 'employee_id', 'phone', 'designation', 'department', 'role', 'status'];
-    stringFields.forEach(field => {
-      if (typeof payload[field] === 'string') payload[field] = payload[field].trim();
+    // Clean strings
+    const stringFields = ["full_name", "phone", "employee_id", "username", "designation", "department"];
+    stringFields.forEach((field) => {
+      if (typeof payload[field] === "string") payload[field] = payload[field].trim();
     });
-    if (payload.email) payload.email = payload.email.trim().toLowerCase();
 
-    // Handle Password Logic
-    if (req.method === 'POST') {
-      // Default password for new users if not provided
-      payload.password = (payload.password && payload.password.trim() !== "") ? payload.password : "123456";
-    } else if (req.method === 'PUT') {
-      // If updating and password is blank, remove it so we don't overwrite the existing one
-      if (!payload.password || payload.password.trim() === "") {
-        delete payload.password;
-      }
-    }
-
-    // Structure Social Links into nested object
-    payload.social_links = {
-      facebook: payload.facebook?.trim() || "",
-      linkedin: payload.linkedin?.trim() || "",
-      twitter: payload.twitter?.trim() || "",
-      instagram: payload.instagram?.trim() || ""
-    };
+    if (payload.email) payload.email = payload.email.toLowerCase().trim();
     
-    // Clean up flat keys since they are now nested
+    // Set default role if not provided
+    if (!payload.role) payload.role = "staff";
+
+    // ✅ NEW: Format the social_links object for the database
+    payload.social_links = {
+      facebook: payload.facebook || "",
+      linkedin: payload.linkedin || "",
+      twitter: payload.twitter || "",
+      instagram: payload.instagram || "",
+      others: payload.others || "",
+    };
+
+    // Clean up the flat keys so they don't clutter the main document
     delete payload.facebook;
     delete payload.linkedin;
     delete payload.twitter;
     delete payload.instagram;
+    delete payload.others;
 
-    // Inject Photo URL
+    // Inject photo path if uploaded
     if (req.file) {
       payload.photo_url = `/uploads/employees/${req.file.filename}`;
     }
 
-    // Remove undefined fields to prevent accidental overwrites
-    Object.keys(payload).forEach(key => payload[key] === undefined && delete payload[key]);
+    // Clean undefined
+    Object.keys(payload).forEach((key) => payload[key] === undefined && delete payload[key]);
 
     req.body = payload;
     next();
@@ -105,4 +121,21 @@ export const processUserPayload = (req, res, next) => {
     cleanupFailedUpload(req.file);
     res.status(400).json({ message: error.message });
   }
+};
+
+// 4. Role Update Validator
+export const validateRoleUpdate = (req, res, next) => {
+  const { role } = req.body;
+  const validRoles = ["admin", "instructor", "register", "staff"];
+  
+  if (!validRoles.includes(role)) {
+    return res.status(400).json({ message: "Invalid role selected." });
+  }
+
+  // Prevent self-modification
+  if (req.user && req.user._id.toString() === req.params.id) {
+    return res.status(400).json({ message: "You cannot change your own role." });
+  }
+
+  next();
 };

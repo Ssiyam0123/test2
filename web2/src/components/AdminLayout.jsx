@@ -5,16 +5,18 @@ import {
   Users,
   UserPlus,
   Briefcase,
-  GraduationCap, // অল কোর্সের জন্য
-  BookPlus,      // অ্যাড কোর্সের জন্য
-  CalendarDays,  // ম্যানেজ ব্যাচের জন্য
-  PlusCircle,    // অ্যাড ব্যাচের জন্য
-  Layers,        // অল ব্যাচের জন্য
+  GraduationCap, 
+  BookPlus,      
+  CalendarDays,  
+  PlusCircle,    
+  Layers,        
   ShieldCheck,
   LogOut,
   Menu,
   X,
   UserCircle,
+  Building2,
+  MapPin // Added for Branch Table View
 } from "lucide-react";
 import useAuth from "../store/useAuth";
 import { apiURL } from "../../Constant.js";
@@ -26,107 +28,133 @@ const AdminLayout = () => {
   const { logout, authUser } = useAuth();
 
   // 1. Define roles for each navigation item
-const navigationGroups = useMemo(
-  () => [
-    {
-      label: null,
-      items: [
-        {
-          name: "Dashboard",
-          href: "/admin",
-          icon: LayoutDashboard,
-          roles: ["admin", "registrar"],
-        },
-      ],
-    },
-    {
-      label: "Students",
-      items: [
-        {
-          name: "All Students",
-          href: "/admin/all-students",
-          icon: Users,
-          roles: ["admin", "registrar", "instructor"],
-        },
-        {
-          name: "Add Student",
-          href: "/admin/add-student",
-          icon: UserPlus,
-          roles: ["admin", "registrar"],
-        },
-      ],
-    },
-    {
-      label: "Staff & Faculty",
-      items: [
-        {
-          name: "All Employees",
-          href: "/admin/all-employees",
-          icon: Briefcase,
-          roles: ["admin"],
-        },
-        {
-          name: "Add Employee",
-          href: "/admin/add-employee",
-          icon: UserPlus, // স্টুডেন্টের সাথে সামঞ্জস্য রেখে
-          roles: ["admin"],
-        },
-      ],
-    },
-    {
-      label: "Academics",
-      items: [
-        {
-          name: "All Courses",
-          href: "/admin/all-courses",
-          icon: GraduationCap, // কোর্সের জন্য বেস্ট আইকন
-          roles: ["admin", "registrar", "instructor"],
-        },
-        {
-          name: "Add Course",
-          href: "/admin/add-course",
-          icon: BookPlus, // অ্যাড করার সিম্বলসহ
-          roles: ["admin", "registrar"],
-        },
-      ],
-    },
-    {
-      label: "Batches",
-      items: [
-        {
-          name: "Manage Batches",
-          href: "/admin/batches",
-          icon: CalendarDays, // ব্যাচ যেহেতু শিডিউলের ব্যাপার
-          roles: ["admin", "registrar", "instructor"],
-        },
-        {
-          name: "Add Batch",
-          href: "/admin/add-batch",
-          icon: PlusCircle,
-          roles: ["admin", "registrar"],
-        },
-        {
-          name: "All Batches",
-          href: "/admin/all-batches",
-          icon: Layers, // অনেকগুলো ব্যাচ বা গ্রুপ বোঝাতে
-          roles: ["admin", "registrar", "instructor"],
-        },
-      ],
-    },
-    {
-      label: "System",
-      items: [
-        {
-          name: "Manage Admins",
-          href: "/admin/manage-admins",
-          icon: ShieldCheck,
-          roles: ["admin"],
-        },
-      ],
-    },
-  ],
-  [],
-);
+  const navigationGroups = useMemo(
+    () => [
+      {
+        label: null,
+        items: [
+          {
+            name: "Dashboard",
+            href: "/admin",
+            icon: LayoutDashboard,
+            roles: ["admin", "registrar"],
+          },
+        ],
+      },
+      {
+        label: "Students",
+        items: [
+          {
+            name: "All Students",
+            href: "/admin/all-students",
+            icon: Users,
+            roles: ["admin", "registrar", "instructor"],
+          },
+          {
+            name: "Add Student",
+            href: "/admin/add-student",
+            icon: UserPlus,
+            roles: ["admin", "registrar"],
+          },
+        ],
+      },
+      {
+        label: "Staff & Faculty",
+        items: [
+          {
+            name: "All Employees",
+            href: "/admin/all-employees",
+            icon: Briefcase,
+            roles: ["admin"],
+          },
+          {
+            name: "Add Employee",
+            href: "/admin/add-employee",
+            icon: UserPlus, 
+            roles: ["admin"],
+          },
+        ],
+      },
+      {
+        label: "Academics",
+        items: [
+          {
+            name: "All Courses",
+            href: "/admin/all-courses",
+            icon: GraduationCap, 
+            roles: ["admin", "registrar", "instructor"],
+          },
+          {
+            name: "Add Course",
+            href: "/admin/add-course",
+            icon: BookPlus, 
+            roles: ["admin", "registrar"],
+          },
+        ],
+      },
+      // ==========================================
+      // UPDATED: Branches & Locations Module
+      // ==========================================
+      {
+        label: "Branches & Locations",
+        items: [
+          {
+            name: "Manage Branches", // The Card Grid View (Operations)
+            href: "/admin/manage-branches", 
+            icon: Building2, 
+            roles: ["admin", "registrar", "instructor"], 
+          },
+          {
+            name: "Add Branch", // Admin Only
+            href: "/admin/add-branch",
+            icon: PlusCircle, 
+            roles: ["admin"], 
+          },
+          {
+            name: "All Branches", // The Table View (Directory)
+            href: "/admin/branches", 
+            icon: MapPin, 
+            roles: ["admin", "registrar", "instructor"], 
+          },
+        ],
+      },
+      {
+        label: "Batches",
+        items: [
+          {
+            name: "Manage Batches",
+            href: "/admin/manage-batches",
+            icon: CalendarDays, 
+            roles: ["admin", "registrar", "instructor"],
+          },
+          {
+            name: "Add Batch",
+            href: "/admin/add-batch",
+            icon: PlusCircle,
+            roles: ["admin", "registrar"],
+          },
+          {
+            name: "All Batches",
+            href: "/admin/all-batches",
+            icon: Layers, 
+            roles: ["admin", "registrar", "instructor"],
+          },
+        ],
+      },
+      {
+        label: "System",
+        items: [
+          {
+            name: "Manage Admins",
+            href: "/admin/manage-admins",
+            icon: ShieldCheck,
+            roles: ["admin"],
+          },
+        ],
+      },
+    ],
+    [],
+  );
 
   // 2. Filter the navigation based on the current user's role
   const filteredNavigation = useMemo(() => {
@@ -236,7 +264,7 @@ const navigationGroups = useMemo(
           )}
         </div>
 
-        {/* Navigation Area - SCROLLBAR HIDDEN HERE */}
+        {/* Navigation Area */}
         <nav
           className={`flex-1 overflow-y-auto space-y-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] mt-2 ${isCollapsed ? "p-2" : "p-4"}`}
         >
@@ -259,7 +287,7 @@ const navigationGroups = useMemo(
                   <Link
                     key={item.name}
                     to={item.href}
-                    title={isCollapsed ? item.name : ""} // Show tooltip when collapsed
+                    title={isCollapsed ? item.name : ""} 
                     onClick={() => setSidebarOpen(false)}
                     className={`
                       flex items-center rounded-xl transition-all duration-200 group
@@ -271,7 +299,6 @@ const navigationGroups = useMemo(
                       size={20}
                       className={`${isActive ? "text-[#14b8a6]" : "text-slate-500 group-hover:text-slate-300"} transition-colors shrink-0`}
                     />
-                    {/* Hide span when collapsed */}
                     {!isCollapsed && (
                       <span className={isActive ? "font-bold" : ""}>
                         {item.name}
@@ -288,7 +315,7 @@ const navigationGroups = useMemo(
         <div className={`shrink-0 mt-auto ${isCollapsed ? "p-2 mb-2" : "p-4"}`}>
           <button
             onClick={logout}
-            title={isCollapsed ? "Logout" : ""} // Tooltip
+            title={isCollapsed ? "Logout" : ""}
             className={`
               flex items-center justify-center w-full rounded-xl text-slate-400 font-bold 
               hover:bg-red-500/10 hover:text-red-400 border border-transparent hover:border-red-500/20 transition-all group

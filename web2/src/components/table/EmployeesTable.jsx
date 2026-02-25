@@ -3,7 +3,7 @@ import {
   Edit, Trash2, Briefcase, Mail, Phone, Power, PowerOff, 
   Eye, RefreshCw, QrCode, Award, Loader2 
 } from "lucide-react";
-import { API } from "../../api/axios.js"; // Using your API instance
+import { API } from "../../api/axios.js"; 
 import toast from "react-hot-toast";
 import DataTable from "../common/DataTable.jsx";
 import ActionIconButton from "../common/ActionIconButton.jsx";
@@ -15,27 +15,21 @@ const EmployeesTable = ({
   roleLoadingId, page, onPageChange, searchTerm, isLoading = false,
 }) => {
   
-  // State to track which specific ID card is being generated/downloaded
   const [downloadingId, setDownloadingId] = useState(null);
 
   const handleDownloadIDCard = async (employee) => {
     try {
       setDownloadingId(employee._id);
-      
-      // Hits your new backend endpoint
       const response = await API.get(`/generate-certificate/employeeid/download/${employee._id}`, { 
         responseType: "blob" 
       });
 
-      // Create blob link to force download
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement("a");
       link.href = url;
       link.setAttribute("download", `ID_Card_${employee.employee_id}.pdf`);
       document.body.appendChild(link);
       link.click();
-      
-      // Cleanup
       link.remove();
       window.URL.revokeObjectURL(url);
       toast.success("ID Card generated successfully");
@@ -47,12 +41,13 @@ const EmployeesTable = ({
     }
   };
 
+  // Modern column width constraints
   const columns = [
-    { label: "Identity & Info" },
-    { label: "Position", className: "hidden md:table-cell" },
-    { label: "Contact", className: "hidden lg:table-cell" },
-    { label: "Status", className: "hidden sm:table-cell" },
-    { label: "Role & Actions", align: "right" }
+    { label: "Employee Identity", className: "w-[30%]" },
+    { label: "Position", className: "hidden md:table-cell w-[20%]" },
+    { label: "Contact", className: "hidden lg:table-cell w-[20%]" },
+    { label: "Status", className: "hidden sm:table-cell w-[10%]" },
+    { label: "Role & Actions", align: "right", className: "w-[20%]" }
   ];
 
   const renderEmployeeRow = (employee) => {
@@ -62,71 +57,89 @@ const EmployeesTable = ({
     const isDownloading = downloadingId === employee._id;
 
     return (
-      <tr key={employee._id} className={`transition-colors duration-150 ${isInactive ? "bg-gray-50/50" : "hover:bg-gray-50"}`}>
+      <tr 
+        key={employee._id} 
+        className={`group transition-colors duration-300 border-b border-slate-50 last:border-none hover:bg-slate-50/50 ${
+          isInactive ? "opacity-60 grayscale-[20%]" : ""
+        }`}
+      >
         
         {/* 1. Identity & Info */}
-        <td className="px-5 py-4">
-          <div className="flex items-center gap-3">
+        <td className="px-6 py-4 align-middle">
+          <div className="flex items-center gap-4">
             <Avatar 
               src={employee.photo_url} 
               alt={employee.username} 
               fallbackText={employee.username} 
               isInactive={isInactive} 
+              size="md"
+              className="shadow-sm"
             />
-            <div className={isInactive ? "opacity-70" : ""}>
-              <div className="text-sm font-bold text-gray-900">{employee.full_name}</div>
-              <div className="flex items-center gap-2 text-[11px] text-gray-500 font-mono mt-0.5">
+            <div className="flex flex-col">
+              <span className="text-[14px] font-bold text-slate-800">{employee.full_name}</span>
+              <div className="flex items-center gap-2 mt-0.5 text-[12px] text-slate-400 font-medium tracking-wide">
                 <span>ID: {employee.employee_id}</span>
-                <span className="h-1 w-1 bg-gray-300 rounded-full"></span>
-                <span className="text-blue-600 font-medium">@{employee.username}</span>
+                <span className="h-1 w-1 bg-slate-300 rounded-full"></span>
+                <span className="text-blue-500 font-semibold tracking-tight">@{employee.username}</span>
               </div>
             </div>
           </div>
         </td>
 
         {/* 2. Position */}
-        <td className={`px-5 py-4 hidden md:table-cell ${isInactive ? "opacity-70" : ""}`}>
-           <div className="flex items-center text-sm font-medium">
-             <Briefcase size={14} className="text-blue-500 mr-2" />{employee.designation}
-           </div>
-           <div className="text-xs text-gray-500 mt-1">
-             <span className="bg-gray-100 px-2 py-0.5 rounded-md">{employee.department}</span>
-           </div>
+        <td className="px-6 py-4 hidden md:table-cell align-middle">
+          <div className="flex flex-col">
+            <span className="text-[13px] font-medium text-slate-600 line-clamp-1 flex items-center gap-1.5">
+               <Briefcase size={12} className="text-slate-400" /> {employee.designation}
+            </span>
+            <span className="text-[11px] font-semibold tracking-wider uppercase text-slate-400 mt-1">
+               {employee.department}
+            </span>
+          </div>
         </td>
 
         {/* 3. Contact */}
-        <td className={`px-5 py-4 hidden lg:table-cell ${isInactive ? "opacity-70" : ""}`}>
-           {employee.phone && (
-             <div className="flex items-center text-sm">
-               <Phone size={14} className="text-gray-400 mr-2" />{employee.phone}
-             </div>
-           )}
-           {employee.email && (
-             <div className="flex items-center text-sm mt-1">
-               <Mail size={14} className="text-gray-400 mr-2" />
-               <span className="truncate max-w-[160px]" title={employee.email}>{employee.email}</span>
-             </div>
-           )}
+        <td className="px-6 py-4 hidden lg:table-cell align-middle">
+          <div className="flex flex-col space-y-1">
+            {employee.phone && (
+               <span className="text-[12px] text-slate-500 font-medium flex items-center gap-1.5">
+                 <Phone size={11} className="text-slate-400" /> {employee.phone}
+               </span>
+            )}
+            {employee.email && (
+               <span className="text-[12px] text-slate-400 truncate max-w-[150px] flex items-center gap-1.5" title={employee.email}>
+                  <Mail size={11} className="text-slate-400" /> {employee.email}
+               </span>
+            )}
+          </div>
         </td>
 
-        {/* 4. Status */}
-        <td className={`px-5 py-4 hidden sm:table-cell`}>
-           <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${employee.status === "Active" ? "bg-green-50 text-green-700" : employee.status === "On Leave" ? "bg-amber-50 text-amber-700" : "bg-red-50 text-red-700"}`}>
+        {/* 4. Status (Minimalist Text) */}
+        <td className="px-6 py-4 hidden sm:table-cell align-middle">
+           <span className={`text-[13px] font-bold tracking-wide uppercase ${
+             employee.status === "Active" ? "text-teal-500" : 
+             employee.status === "On Leave" ? "text-amber-500" : "text-rose-400"
+           }`}>
              {employee.status}
            </span>
         </td>
 
         {/* 5. Role & Actions */}
-        <td className="px-5 py-4 text-right">
+        <td className="px-6 py-4 text-right align-middle">
            <div className="flex flex-col items-end gap-2">
              
+             {/* Role Selector */}
              <div className="flex items-center gap-2">
-               {isRoleUpdating && <RefreshCw size={14} className="animate-spin text-blue-500" />}
+               {isRoleUpdating && <RefreshCw size={13} className="animate-spin text-blue-500" />}
                <select
                  value={employee.role}
                  disabled={isSelf || isRoleUpdating}
                  onChange={(e) => onUpdateRole(employee._id, e.target.value, employee.full_name)}
-                 className={`px-2 py-1 text-[10px] font-bold uppercase rounded-md border outline-none cursor-pointer ${employee.role === 'admin' ? 'bg-purple-50 text-purple-700' : 'bg-slate-50 text-slate-700'} ${isSelf ? 'opacity-50' : 'hover:bg-white'}`}
+                 className={`px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide rounded-md border outline-none cursor-pointer transition-colors ${
+                   employee.role === 'admin' 
+                    ? 'bg-purple-50 border-purple-100 text-purple-600' 
+                    : 'bg-slate-50 border-slate-200 text-slate-600'
+                 } ${isSelf ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white'}`}
                >
                  <option value="admin">Admin</option>
                  <option value="register">Registrar</option>
@@ -135,13 +148,13 @@ const EmployeesTable = ({
                </select>
              </div>
 
-             <div className="flex items-center justify-end flex-wrap gap-1.5 min-w-[100px]">
-               <ActionIconButton icon={Eye} onClick={() => onViewProfile(employee)} title="View" />
+             {/* Actions (Hidden until Hover) */}
+             <div className="flex items-center justify-end flex-wrap gap-1 opacity-60 group-hover:opacity-100 transition-opacity duration-200">
+               <ActionIconButton icon={Eye} onClick={() => onViewProfile(employee)} title="View Profile" variant="neutral" />
                
-               {/* New Download Action */}
                <ActionIconButton 
                  icon={isDownloading ? Loader2 : Award} 
-                 variant="purple" 
+                 variant="neutral" 
                  onClick={() => handleDownloadIDCard(employee)} 
                  disabled={isDownloading} 
                  loading={isDownloading} 
@@ -149,8 +162,17 @@ const EmployeesTable = ({
                />
 
                <ActionIconButton icon={QrCode} variant="neutral" onClick={() => onGenerateQR(employee)} title="Digital QR" />
-               <ActionIconButton icon={employee.status === 'Active' ? Power : PowerOff} variant={employee.status === 'Active' ? "activeToggle" : "inactiveToggle"} disabled={isSelf} onClick={() => onToggleStatus(employee._id, employee.status)} title="Toggle Status" />
-               <ActionIconButton icon={Edit} variant="success" onClick={() => onEdit(employee._id)} title="Edit" />
+               
+               <ActionIconButton 
+                 icon={employee.status === 'Active' ? PowerOff : Power} 
+                 variant="neutral" 
+                 disabled={isSelf} 
+                 onClick={() => onToggleStatus(employee._id, employee.status)} 
+                 title="Toggle Status" 
+               />
+               
+               <ActionIconButton icon={Edit} variant="neutral" onClick={() => onEdit(employee._id)} title="Edit" />
+               
                <ActionIconButton icon={Trash2} variant="danger" disabled={isSelf} onClick={() => onDelete(employee._id, employee.full_name)} title="Delete" />
              </div>
            </div>
@@ -170,6 +192,7 @@ const EmployeesTable = ({
       onPageChange={onPageChange}
       searchTerm={searchTerm}
       emptyStateTitle="No employees found"
+      emptyStateSubtitle="There are no employees matching your current filters or search criteria."
     />
   );
 };

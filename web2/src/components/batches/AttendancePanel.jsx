@@ -1,23 +1,20 @@
 import React, { useState, useEffect } from "react";
 import { Check, X, Save, UserX } from "lucide-react";
-import Avatar from "../../components/common/Avatar"; // Your avatar component
-import { API } from "../../api/axios"; // Your axios instance
+import Avatar from "../../components/common/Avatar";
+import { useUpdateClassAttendance } from "../../hooks/useBatches"; // Import the hook
 import toast from "react-hot-toast";
 
 const AttendancePanel = ({ selectedClass, batchStudents }) => {
-    console.log(batchStudents)
-  // Local state to track changes before saving
   const [attendanceState, setAttendanceState] = useState({});
-  const [isSaving, setIsSaving] = useState(false);
+  
+  // Use the React Query Mutation
+  const { mutate: updateAttendance, isPending: isSaving } = useUpdateClassAttendance(selectedClass.batch_id || selectedClass.batch);
 
-  // Sync with database data when a class is clicked
   useEffect(() => {
     if (selectedClass) {
       const initialState = {};
-      // If the class already has attendance saved in DB, load it
-      if (selectedClass.attendance && selectedClass.attendance.length > 0) {
+      if (selectedClass.attendance?.length > 0) {
         selectedClass.attendance.forEach(record => {
-          // record.student might be an object if populated, or string ID
           const studentId = typeof record.student === 'object' ? record.student._id : record.student;
           initialState[studentId] = record.status;
         });
@@ -26,99 +23,98 @@ const AttendancePanel = ({ selectedClass, batchStudents }) => {
     }
   }, [selectedClass]);
 
-  // Handle marking present/absent
   const markAttendance = (studentId, status) => {
     setAttendanceState(prev => ({
       ...prev,
-      [studentId]: status
+      [studentId]: prev[studentId] === status ? null : status // Toggle behavior
     }));
   };
 
-  // Save to Database
-  const handleSaveAttendance = async () => {
-    setIsSaving(true);
-    try {
-      // Format data for the backend array
-      const attendanceRecords = Object.keys(attendanceState).map(studentId => ({
+  const handleSaveAttendance = () => {
+    const attendanceRecords = Object.keys(attendanceState).map(studentId => {
+      const studentObj = batchStudents.find(s => s._id === studentId);
+      return {
         student: studentId,
+        student_name: studentObj ? studentObj.student_name : "Unknown Student",
         status: attendanceState[studentId]
-      }));
+      };
+    });
 
-      await API.put(`/batches/classes/${selectedClass._id}/attendance`, { attendanceRecords });
-      toast.success("Attendance saved successfully!");
-    } catch (error) {
-      toast.error("Failed to save attendance.");
-    } finally {
-      setIsSaving(false);
-    }
+    // Execute mutation
+    updateAttendance({ 
+      classId: selectedClass._id, 
+      attendanceRecords 
+    });
   };
 
-  if (!batchStudents || batchStudents.length === 0) {
+  const validStudents = Array.isArray(batchStudents) 
+    ? batchStudents.filter(s => s && s._id)
+    : [];
+
+  if (validStudents.length === 0) {
     return (
-      <div className="p-6 text-center text-gray-500">
-        <UserX className="mx-auto mb-2 opacity-50" size={32} />
-        <p>No students found in this batch.</p>
+      <div className="p-10 text-center text-gray-400">
+        <UserX className="mx-auto mb-3 opacity-20" size={48} />
+        <p className="text-sm font-bold">No students found in this batch.</p>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-        <h3 className="font-bold text-gray-800">
-          Class {selectedClass.class_number} Attendance
-        </h3>
-        <span className="text-xs font-medium bg-teal-100 text-teal-800 px-2 py-1 rounded-md">
-          {batchStudents.length} Students
+    <div className="flex flex-col h-full bg-white">
+      {/* Sticky Header for Mobile */}
+      <div className="sticky top-0 z-20 p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/90 backdrop-blur-md">
+        <div className="min-w-0">
+          <h3 className="text-sm font-black text-gray-800 truncate">
+            Class {selectedClass.class_number}
+          </h3>
+          <p className="text-[10px] font-bold text-teal-600 truncate">{selectedClass.topic}</p>
+        </div>
+        <span className="shrink-0 text-[10px] font-black bg-teal-100 text-teal-800 px-2 py-1 rounded-lg">
+          {validStudents.length} ENROLLED
         </span>
       </div>
 
-      {/* Student List */}
-      <div className="flex-1 overflow-y-auto p-2">
-        {batchStudents.map((student) => {
+      {/* List Section */}
+      <div className="flex-1 overflow-y-auto p-3 space-y-2 custom-scrollbar">
+        {validStudents.map((student) => {
           const status = attendanceState[student._id];
 
           return (
             <div 
               key={student._id} 
-              className={`flex items-center justify-between p-3 mb-2 rounded-xl border transition-all ${
-                status === 'present' ? 'border-teal-200 bg-teal-50' : 
-                status === 'absent' ? 'border-red-200 bg-red-50' : 
-                'border-gray-100 hover:border-gray-300'
+              onClick={() => markAttendance(student._id, 'present')}
+              className={`flex items-center justify-between p-3 rounded-2xl border transition-all active:scale-[0.98] cursor-pointer ${
+                status === 'present' ? 'border-teal-200 bg-teal-50/50' : 
+                status === 'absent' ? 'border-red-200 bg-red-50/50' : 
+                'border-gray-100 bg-white shadow-sm'
               }`}
             >
               <div className="flex items-center gap-3">
-                <Avatar src={student.photo_url} alt={student.student_name} fallbackText={student.student_name} size="sm" />
-                <div>
-                  <p className="text-sm font-bold text-gray-800">{student.student_name}</p>
-                  <p className="text-[10px] text-gray-500 font-mono">ID: {student.student_id}</p>
+                <Avatar 
+                  src={student.photo_url} 
+                  fallbackText={student.student_name} 
+                  size="sm" 
+                />
+                <div className="leading-tight">
+                  <p className="text-xs font-bold text-gray-800">{student.student_name}</p>
+                  <p className="text-[9px] text-gray-400 font-medium uppercase tracking-tighter">{student.student_id}</p>
                 </div>
               </div>
 
-              {/* Action Buttons (✓ / X) */}
-              <div className="flex items-center gap-1.5 bg-white p-1 rounded-lg shadow-sm border border-gray-100">
+              {/* Action Buttons */}
+              <div className="flex items-center gap-1.5 bg-white p-1 rounded-xl border border-gray-100" onClick={(e) => e.stopPropagation()}>
                 <button
                   onClick={() => markAttendance(student._id, 'present')}
-                  className={`p-1.5 rounded-md transition-all ${
-                    status === 'present' 
-                      ? 'bg-teal-500 text-white shadow-md' 
-                      : 'text-gray-400 hover:bg-teal-50 hover:text-teal-600'
-                  }`}
-                  title="Mark Present"
+                  className={`p-1.5 rounded-lg transition-all ${status === 'present' ? 'bg-teal-500 text-white shadow-lg shadow-teal-200' : 'text-gray-300'}`}
                 >
-                  <Check size={16} strokeWidth={3} />
+                  <Check size={14} strokeWidth={3} />
                 </button>
-                
                 <button
                   onClick={() => markAttendance(student._id, 'absent')}
-                  className={`p-1.5 rounded-md transition-all ${
-                    status === 'absent' 
-                      ? 'bg-red-500 text-white shadow-md' 
-                      : 'text-gray-400 hover:bg-red-50 hover:text-red-600'
-                  }`}
-                  title="Mark Absent"
+                  className={`p-1.5 rounded-lg transition-all ${status === 'absent' ? 'bg-red-500 text-white shadow-lg shadow-red-200' : 'text-gray-300'}`}
                 >
-                  <X size={16} strokeWidth={3} />
+                  <X size={14} strokeWidth={3} />
                 </button>
               </div>
             </div>
@@ -126,15 +122,15 @@ const AttendancePanel = ({ selectedClass, batchStudents }) => {
         })}
       </div>
 
-      {/* Save Button Fixed at Bottom */}
-      <div className="p-4 border-t border-gray-100 bg-white">
+      {/* Save Button with Bottom Safe Area Padding */}
+      <div className="p-4 border-t border-gray-100 bg-white pb-6 md:pb-4">
         <button
           onClick={handleSaveAttendance}
           disabled={isSaving || Object.keys(attendanceState).length === 0}
-          className="w-full py-3 bg-[#000c1d] hover:bg-slate-800 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+          className="w-full py-4 bg-[#1e293b] hover:bg-slate-800 text-white text-[11px] font-black tracking-[0.2em] uppercase rounded-2xl flex items-center justify-center gap-2 transition-all disabled:opacity-30 shadow-xl active:scale-[0.95]"
         >
-          <Save size={18} />
-          {isSaving ? "Saving..." : "Save Attendance"}
+          <Save size={16} />
+          {isSaving ? "Syncing..." : "Update Records"}
         </button>
       </div>
     </div>

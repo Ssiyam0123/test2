@@ -12,7 +12,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import userRoute from "./routes/userRoutes.js";
 import batchRoutes from "./routes/batchRoutes.js";
-
+import branchRoutes from "./routes/branchRoutes.js";
 
 const app = express();
 
@@ -52,6 +52,7 @@ app.use("/api/admin", userRoute);
 app.use("/api/courses", courseRoutes);
 app.use("/api/dashboard", dashbordRoutes);
 app.use("/api/generate-certificate", certificateRoutes);
+app.use("/api/branches", branchRoutes);
 // Add to your imports at the top
 
 // Add to your route middlewares

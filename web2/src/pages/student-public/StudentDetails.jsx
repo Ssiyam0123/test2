@@ -2,14 +2,14 @@ import React from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   User, Hash, BookOpen, Calendar, Phone, Mail, MapPin, ArrowLeft,
-  CheckCircle, XCircle, Clock, Award, Building, FileText, Shield,
+  XCircle, Clock, Award, Building, FileText, Shield,
   Info, Edit3, UserCheck, MessageSquare, Quote
 } from "lucide-react";
-import useAuth from "../store/useAuth";
-import LogoLoader from "../components/LogoLoader.jsx";
-import { usePublicStudentProfile, useStudent } from "../hooks/useStudents.js";
-import { InfoItem, SectionCard } from "../components/ProfileLayout.jsx";
-import { apiURL } from "../../Constant.js";
+import useAuth from "../../store/useAuth.js";
+import LogoLoader from "../../components/LogoLoader.jsx";
+import { usePublicStudentProfile, useStudent } from "../../hooks/useStudents.js";
+import { InfoItem, SectionCard } from "../../components/ProfileLayout.jsx";
+import { apiURL } from "../../../Constant.js";
 
 const BASE_URL = apiURL.image_url;
 
@@ -18,7 +18,6 @@ const StudentDetails = () => {
   const navigate = useNavigate();
   const { authUser } = useAuth();
 
-  // 1. Consolidated Data Fetching
   const {
     data: adminData,
     isLoading: adminLoading,
@@ -33,12 +32,12 @@ const StudentDetails = () => {
     error: publicErrorObj,
   } = usePublicStudentProfile(id, { enabled: !authUser });
 
-  // 2. State Consolidation
   const isLoading = authUser ? adminLoading : publicLoading;
   const isError = authUser ? adminErr : publicErr;
   const error = authUser ? adminErrorObj : publicErrorObj;
   const studentResponse = authUser ? adminData : publicData;
 
+  // IMPORTANT: The backend returns { success: true, data: { ... } }
   const student = studentResponse?.data || studentResponse;
   const comments = student?.comments || [];
 
@@ -46,7 +45,6 @@ const StudentDetails = () => {
   if (isError || !student)
     return <ErrorState navigate={navigate} authUser={authUser} error={error} />;
 
-  // Helpers
   const getImageUrl = (url) => {
     if (!url) return null;
     return url.startsWith("http") ? url : `${BASE_URL}${url}`;
@@ -67,7 +65,6 @@ const StudentDetails = () => {
         </div>
       </div>
 
-      {/* Hero Header Section */}
       <div className="relative pt-6 md:pt-12 pb-24 px-4 overflow-hidden bg-white/[0.02] border-b border-white/5">
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-500/10 blur-[120px] rounded-full pointer-events-none" />
         <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-[#EC1B23]/10 blur-[120px] rounded-full pointer-events-none" />
@@ -102,7 +99,9 @@ const StudentDetails = () => {
                   <Hash size={14} className="text-[#EC1B23]" /> {student.student_id}
                 </div>
                 <div className="px-4 py-1.5 bg-slate-800/80 rounded-xl border border-slate-700 text-sm font-bold flex items-center gap-2 text-slate-200">
-                  <Building size={14} className="text-blue-400" /> Batch {student.batch}
+                  <Building size={14} className="text-blue-400" /> 
+                  {/* FIX: student.batch is now an object, access batch_name */}
+                  {student.batch?.batch_name || "N/A"}
                 </div>
               </div>
             </div>
@@ -110,7 +109,6 @@ const StudentDetails = () => {
         </div>
       </div>
 
-      {/* Main Grid Content */}
       <div className="max-w-6xl mx-auto px-4 -mt-10 relative z-20">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
           
@@ -121,8 +119,14 @@ const StudentDetails = () => {
           </SectionCard>
 
           <SectionCard title="Academic Portfolio" icon={BookOpen} color="text-purple-500">
-            <InfoItem icon={Award} label="Enrolled Course" value={student.course_name} />
-            <InfoItem icon={Clock} label="Standard Duration" value={`${student.course_duration?.value} ${student.course_duration?.unit}`} />
+            {/* FIX: student.course is an object, access course_name */}
+            <InfoItem icon={Award} label="Enrolled Course" value={student.course?.course_name || "N/A"} />
+            <InfoItem 
+                icon={Clock} 
+                label="Standard Duration" 
+                
+                value={`${student.course?.duration?.value || 0} ${student.course?.duration?.unit || 'months'}`} 
+            />
             <InfoItem icon={UserCheck} label="Completion" value={student.status?.toUpperCase()} />
             <InfoItem icon={Info} label="Assessment" value={student.competency?.replace("_", " ")} color="text-emerald-400" />
           </SectionCard>
@@ -136,7 +140,6 @@ const StudentDetails = () => {
           </SectionCard>
         </div>
 
-        {/* INSTRUCTOR COMMENTS SECTION */}
         {authUser && (
           <div className="mt-12 animate-in fade-in slide-in-from-bottom-6 duration-700">
             <div className="flex items-center gap-3 mb-6 px-2">
@@ -188,7 +191,6 @@ const StudentDetails = () => {
           </div>
         )}
 
-        {/* Admin Buttons */}
         {authUser && (
           <div className="mt-10 flex flex-col sm:flex-row gap-4">
             <button onClick={() => navigate(`/admin/update-student/${student._id}`)} className="flex-1 py-5 bg-gradient-to-r from-[#EC1B23] to-[#FF3D3D] text-white font-black rounded-3xl transition-all flex items-center justify-center gap-3 active:scale-[0.98]">
@@ -203,17 +205,5 @@ const StudentDetails = () => {
     </div>
   );
 };
-
-const ErrorState = ({ navigate, authUser }) => (
-  <div className="min-h-screen bg-[#0f172a] flex items-center justify-center p-6 text-center">
-    <div className="max-w-md w-full bg-slate-900 border border-slate-800 p-10 rounded-[3rem] shadow-2xl">
-      <XCircle className="w-16 h-16 text-[#EC1B23] mx-auto mb-8" />
-      <h1 className="text-3xl font-black text-white mb-4">No Record Found</h1>
-      <button onClick={() => navigate(authUser ? "/admin/all-students" : "/")} className="w-full py-4 bg-white text-slate-900 rounded-2xl font-black hover:bg-slate-100 transition-all flex items-center justify-center gap-2">
-        <ArrowLeft size={18} /> Try New Search
-      </button>
-    </div>
-  </div>
-);
 
 export default StudentDetails;

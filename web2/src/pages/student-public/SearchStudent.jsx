@@ -12,9 +12,9 @@ import {
   Building,
   AlertCircle,
 } from "lucide-react";
-import LogoLoader from "../components/LogoLoader";
-import { usePublicStudentSearch } from "../hooks/useStudents";
-import { apiURL } from "../../Constant.js";
+import LogoLoader from "../../components/LogoLoader.jsx";
+import { usePublicStudentSearch } from "../../hooks/useStudents.js";
+import { apiURL } from "../../../Constant.js";
 
 const BASE_URL = apiURL.image_url;
 

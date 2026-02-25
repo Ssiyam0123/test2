@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useCreateCourse, useUpdateCourse, useCourse } from "../hooks/useCourses";
-import EntityForm from "../components/common/EntityForm";
-import Loader from "../components/Loader";
+import { useCreateCourse, useUpdateCourse, useCourse } from "../../hooks/useCourses";
+import EntityForm from "../../components/common/EntityForm";
+import Loader from "../../components/Loader";
 import { Check, ChevronDown, Plus } from "lucide-react";
 import toast from "react-hot-toast";
 

@@ -5,20 +5,26 @@ import {
   Hash, Shield, User, Facebook, Twitter, Instagram, Linkedin, 
   Globe, Building, Clock, XCircle
 } from "lucide-react";
-import LogoLoader from "../components/LogoLoader";
-import { apiURL } from "../../Constant.js";
-import { useUser } from "../hooks/useUser.js";
+import LogoLoader from "../../components/LogoLoader.jsx";
+import { apiURL } from "../../../Constant.js";
+import { useUser } from "../../hooks/useUser.js";
+import useAuth from "../../store/useAuth.js";
 
 const BASE_URL = apiURL.image_url;
 
 const EmployeeDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { authUser } = useAuth(); // Access the current user's session
   
   const { data: employee, isLoading, isError, error } = useUser(id);
 
   if (isLoading) return <LogoLoader />;
   if (isError || !employee) return <ErrorState navigate={navigate} error={error} />;
+
+  // Permission Logic
+  const isAdmin = authUser?.role === 'admin';
+  const isPrivileged = ['admin', 'registrar'].includes(authUser?.role);
 
   const getImageUrl = (url) => {
     if (!url) return null;
@@ -28,9 +34,7 @@ const EmployeeDetails = () => {
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
     return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
+      year: "numeric", month: "short", day: "numeric",
     });
   };
 
@@ -54,22 +58,14 @@ const EmployeeDetails = () => {
 
   return (
     <div className="min-h-screen bg-[#f4f7fb] font-sans pb-20">
-      {/* Mobile Top Bar */}
-      <div className="lg:hidden sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200 px-4 h-16 flex items-center">
-        <button onClick={() => navigate(-1)} className="flex items-center text-slate-600 font-semibold gap-2">
-          <ArrowLeft size={20} /> Directory
-        </button>
-      </div>
-
       {/* Corporate Cover Header */}
       <div className="h-64 bg-gradient-to-r from-slate-900 via-[#0f172a] to-indigo-950 relative overflow-hidden">
-        {/* Subtle Background Pattern */}
         <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white to-transparent mix-blend-overlay"></div>
         
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 pt-8">
-          <button onClick={() => navigate(-1)} className="hidden lg:flex items-center gap-2 text-slate-300 hover:text-white transition-colors font-medium text-sm group bg-white/5 px-4 py-2 rounded-full w-fit backdrop-blur-sm border border-white/10">
+          <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-slate-300 hover:text-white transition-colors font-medium text-sm group bg-white/5 px-4 py-2 rounded-full w-fit backdrop-blur-sm border border-white/10">
             <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
-            Back to Staff Directory
+            Back to Directory
           </button>
         </div>
       </div>
@@ -77,10 +73,9 @@ const EmployeeDetails = () => {
       {/* Main Content Area */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-24 relative z-20">
         
-        {/* Main Profile Card - FIX: Removed overflow-hidden so the avatar pops out correctly */}
+        {/* Profile Identity Card */}
         <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 p-6 sm:p-10 mb-8 flex flex-col md:flex-row gap-8 items-center md:items-end relative">
           
-          {/* Avatar */}
           <div className="relative -mt-20 md:-mt-24 shrink-0">
             <div className="h-40 w-40 md:h-48 md:w-48 rounded-3xl overflow-hidden border-8 border-white shadow-lg bg-slate-100 flex items-center justify-center">
               {employee.photo_url ? (
@@ -89,13 +84,11 @@ const EmployeeDetails = () => {
                 <User size={64} className="text-slate-300" />
               )}
             </div>
-            {/* Status Indicator - FIX: Centered at the bottom using left-1/2 & -translate-x-1/2 */}
             <div className={`absolute -bottom-3 left-1/2 -translate-x-1/2 px-4 py-1.5 rounded-xl border-2 border-white text-xs font-bold uppercase tracking-wider shadow-sm whitespace-nowrap ${getStatusStyle(employee.status)}`}>
               {employee.status}
             </div>
           </div>
 
-          {/* Core Info */}
           <div className="flex-1 text-center md:text-left mt-4 md:mt-0">
             <div className="flex flex-col md:flex-row md:items-center gap-3 mb-2">
               <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
@@ -109,7 +102,6 @@ const EmployeeDetails = () => {
               <Briefcase size={18} className="text-indigo-400" /> {employee.designation}
             </p>
 
-            {/* Quick Stats Banner */}
             <div className="flex flex-wrap justify-center md:justify-start gap-4">
               <div className="flex items-center gap-2 bg-slate-50 px-4 py-2 rounded-xl border border-slate-100">
                 <Building size={16} className="text-slate-400" />
@@ -119,28 +111,25 @@ const EmployeeDetails = () => {
                 <Hash size={16} className="text-slate-400" />
                 <span className="text-sm font-semibold text-slate-700 font-mono">{employee.employee_id}</span>
               </div>
-              <div className="flex items-center gap-2 bg-slate-50 px-4 py-2 rounded-xl border border-slate-100">
-                <Clock size={16} className="text-slate-400" />
-                <span className="text-sm font-semibold text-slate-700">Joined {formatDate(employee.joining_date)}</span>
-              </div>
             </div>
           </div>
 
-          {/* Action Button */}
-          <div className="w-full md:w-auto mt-4 md:mt-0">
-            <button
-              onClick={() => navigate(`/admin/update-employee/${employee._id}`)}
-              className="w-full md:w-auto px-6 py-3.5 bg-slate-900 hover:bg-indigo-600 text-white font-semibold rounded-2xl transition-all shadow-lg shadow-slate-200 flex items-center justify-center gap-2 active:scale-95"
-            >
-              <Edit3 size={18} /> Update Profile
-            </button>
-          </div>
+          {/* Action Button: Restricted to Admin */}
+          {isAdmin && (
+            <div className="w-full md:w-auto mt-4 md:mt-0">
+              <button
+                onClick={() => navigate(`/admin/update-employee/${employee._id}`)}
+                className="w-full md:w-auto px-6 py-3.5 bg-slate-900 hover:bg-indigo-600 text-white font-semibold rounded-2xl transition-all shadow-lg flex items-center justify-center gap-2 active:scale-95"
+              >
+                <Edit3 size={18} /> Update Profile
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Detailed Information Grid */}
+        {/* Detailed Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
-          {/* Left Column: Contact & Socials */}
           <div className="space-y-8">
             <InfoCard title="Contact Information" icon={Phone} iconColor="text-emerald-500" bg="bg-emerald-50">
               <DetailRow icon={Mail} label="Email Address" value={employee.email} isLink href={`mailto:${employee.email}`} />
@@ -155,48 +144,49 @@ const EmployeeDetails = () => {
                 <SocialButton type="instagram" url={employee.social_links?.instagram} />
               </div>
               {!employee.social_links?.facebook && !employee.social_links?.linkedin && !employee.social_links?.twitter && !employee.social_links?.instagram && (
-                <p className="text-sm text-slate-400 text-center py-4 bg-slate-50 rounded-xl border border-slate-100 border-dashed">No social links linked.</p>
+                <p className="text-sm text-slate-400 text-center py-4 bg-slate-50 rounded-xl border border-slate-100 border-dashed">Social profiles not linked.</p>
               )}
             </InfoCard>
           </div>
 
-          {/* Right Column: System & HR Info */}
           <div className="lg:col-span-2 space-y-8">
-            <InfoCard title="System Credentials" icon={Shield} iconColor="text-indigo-500" bg="bg-indigo-50">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100">
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Login Username</p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-lg font-mono font-bold text-slate-800">{employee.username}</span>
-                    <User size={20} className="text-slate-300" />
+            {/* System Info: Only visible to Admin/Registrar */}
+            {isPrivileged && (
+              <InfoCard title="System Credentials" icon={Shield} iconColor="text-indigo-500" bg="bg-indigo-50">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Login Username</p>
+                    <div className="flex items-center justify-between">
+                      <span className="text-lg font-mono font-bold text-slate-800">{employee.username}</span>
+                      <User size={20} className="text-slate-300" />
+                    </div>
+                  </div>
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Access Level</p>
+                    <div className="flex items-center justify-between">
+                      <span className="text-lg font-bold text-slate-800 capitalize">{employee.role} Access</span>
+                      <Shield size={20} className="text-indigo-300" />
+                    </div>
                   </div>
                 </div>
-                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100">
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Access Level</p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-lg font-bold text-slate-800 capitalize">{employee.role} Access</span>
-                    <Shield size={20} className="text-indigo-300" />
-                  </div>
-                </div>
-              </div>
-            </InfoCard>
+              </InfoCard>
+            )}
 
             <InfoCard title="Employment Record" icon={Briefcase} iconColor="text-rose-500" bg="bg-rose-50">
                <div className="space-y-0">
-                  <TimelineRow date={formatDate(employee.createdAt)} title="Profile Created in System" desc={`Added as ${employee.role}`} isFirst />
-                  <TimelineRow date={formatDate(employee.joining_date)} title="Official Joining Date" desc={`Hired as ${employee.designation} in ${employee.department}`} />
-                  <TimelineRow date={formatDate(employee.updatedAt)} title="Last Profile Update" desc="Most recent modification to records" isLast />
+                  <TimelineRow date={formatDate(employee.joining_date)} title="Official Joining Date" desc={`Hired as ${employee.designation} in ${employee.department}`} isFirst />
+                  <TimelineRow date={formatDate(employee.createdAt)} title="Profile Creation" desc="System initialization date" />
+                  <TimelineRow date={formatDate(employee.updatedAt)} title="Recent Activity" desc="Last administrative record update" isLast />
                </div>
             </InfoCard>
           </div>
-
         </div>
       </div>
     </div>
   );
 };
 
-// --- Reusable Sub-Components --- //
+// --- Sub-Components --- //
 
 const InfoCard = ({ title, icon: Icon, iconColor, bg, children }) => (
   <div className="bg-white p-6 sm:p-8 rounded-3xl shadow-sm border border-slate-200/60 relative">
@@ -231,7 +221,7 @@ const SocialButton = ({ type, url }) => {
   const config = {
     linkedin: { icon: Linkedin, color: "text-[#0A66C2] bg-[#0A66C2]/10 hover:bg-[#0A66C2] hover:text-white", label: "LinkedIn" },
     facebook: { icon: Facebook, color: "text-[#1877F2] bg-[#1877F2]/10 hover:bg-[#1877F2] hover:text-white", label: "Facebook" },
-    twitter: { icon: Twitter, color: "text-slate-800 bg-slate-100 hover:bg-slate-800 hover:text-white", label: "Twitter / X" },
+    twitter: { icon: Twitter, color: "text-slate-800 bg-slate-100 hover:bg-slate-800 hover:text-white", label: "Twitter" },
     instagram: { icon: Instagram, color: "text-[#E4405F] bg-[#E4405F]/10 hover:bg-gradient-to-tr hover:from-[#F58529] hover:to-[#DD2A7B] hover:text-white", label: "Instagram" },
   };
 
@@ -262,10 +252,10 @@ const ErrorState = ({ navigate, error }) => (
       <div className="inline-flex items-center justify-center p-6 bg-rose-50 rounded-full mb-6">
         <XCircle className="w-16 h-16 text-rose-500" />
       </div>
-      <h1 className="text-2xl font-bold text-slate-800 mb-3">Record Unavailable</h1>
-      <p className="text-slate-500 mb-8">{error?.message || "This employee profile could not be found."}</p>
-      <button onClick={() => navigate("/admin/all-employees")} className="w-full py-3.5 bg-slate-900 text-white rounded-xl font-semibold hover:bg-indigo-600 transition-colors">
-        Return to Directory
+      <h1 className="text-2xl font-bold text-slate-800 mb-3">Record Missing</h1>
+      <p className="text-slate-500 mb-8">{error?.message || "The employee record could not be retrieved."}</p>
+      <button onClick={() => navigate(-1)} className="w-full py-3.5 bg-slate-900 text-white rounded-xl font-semibold hover:bg-indigo-600 transition-colors">
+        Go Back
       </button>
     </div>
   </div>

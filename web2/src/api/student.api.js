@@ -69,3 +69,9 @@ export const fetchStudentComments = async (studentId) => {
 };
 
 
+// Admin/Registrar: Private search for the admin dashboard
+export const fetchAdminStudentBySearch = async (query) => {
+  if (!query.trim()) throw new Error("Search query is required");
+  const { data } = await API.get(`/students/search?query=${encodeURIComponent(query.trim())}`);
+  return data;
+};

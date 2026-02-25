@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { useCourses, useDeleteCourse, useToggleCourseStatus } from "../hooks/useCourses";
+import { useCourses, useDeleteCourse, useToggleCourseStatus } from "../../hooks/useCourses";
 
 // Components
-import CourseFilters from "../components/Search_filter/CourseFilters";
-import PageHeader from "../components/common/PageHeader";
-import DataErrorState from "../components/common/DataErrorState";
-import DataTable from "../components/common/DataTable";
-import ActionIconButton from "../components/common/ActionIconButton";
+import CourseFilters from "../../components/Search_filter/CourseFilters";
+import PageHeader from "../../components/common/PageHeader";
+import DataErrorState from "../../components/common/DataErrorState";
+import DataTable from "../../components/common/DataTable";
+import ActionIconButton from "../../components/common/ActionIconButton";
 
 // Icons
 import { Edit, Trash2, BookOpen, Hash, Clock, Power, PowerOff } from "lucide-react";

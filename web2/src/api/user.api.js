@@ -30,7 +30,7 @@ export const addUser = async (formData) => {
 
 // Admin: Update an existing user (handles form data / image uploads)
 export const updateUser = async ({ id, formData }) => {
-  const { data } = await API.put(`/users/update/${id}`, formData, {
+  const { data } = await API.put(`/users/${id}`, formData, {
     headers: { "Content-Type": "multipart/form-data" },
   });
   return data;
@@ -50,7 +50,7 @@ export const toggleUserRole = async (id) => {
 
 // Admin: Delete a user permanently
 export const deleteUser = async (id) => {
-  const { data } = await API.delete(`/users/delete/${id}`);
+  const { data } = await API.delete(`/users/${id}`);
   return data;
 };
 

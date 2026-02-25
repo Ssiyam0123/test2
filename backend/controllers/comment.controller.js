@@ -6,7 +6,7 @@ export const addComment = async (req, res) => {
   try {
     const { studentId } = req.params;
     const { text } = req.body;
-    const instructorId = req.user._id; // Taken from protectRoute middleware
+    const instructorId = req.user._id; 
 
     // 1. Validation
     if (!text || text.trim() === "") {

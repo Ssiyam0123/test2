@@ -1,8 +1,8 @@
 import React from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useUser } from "../hooks/useUser.js"; // Your new hook!
+import { useUser } from "../../hooks/useUser.js"; // Your new hook!
 import AddEmployeeForm from "./AddEmployee.jsx"; // Assuming this is where your form is saved
-import LogoLoader from "../components/LogoLoader.jsx";
+import Loader from "../../components/Loader.jsx";
 
 const UpdateEmployee = () => {
   const { id } = useParams();
@@ -16,7 +16,7 @@ const UpdateEmployee = () => {
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <LogoLoader />
+        <Loader />
       </div>
     );
   }

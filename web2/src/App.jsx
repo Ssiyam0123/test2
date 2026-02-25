@@ -1,38 +1,65 @@
 import React, { useEffect } from "react";
-import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from "react-router-dom";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+  Outlet,
+} from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
-import AdminLayout from "./components/AdminLayout";
-import PublicLayout from "./components/PublicLayout";
-import Dashboard from "./pages/Dashboard";
-import LoginPage from "./pages/LoginPage";
+// ==========================================
+// STORE & LAYOUTS
+// ==========================================
 import useAuth from "./store/useAuth";
 import LogoLoader from "./components/LogoLoader.jsx";
+import AdminLayout from "./components/AdminLayout";
+import PublicLayout from "./components/PublicLayout";
 
-// Student Pages
-import AddStudent from "./pages/AddStudent";
-import AllStudents from "./pages/AllStudents";
-import StudentDetails from "./pages/StudentDetails";
-import UpdateStudent from "./pages/UpdateStudent";
-import SearchStudent from "./pages/SearchStudent.jsx";
+// ==========================================
+// PUBLIC & AUTH PAGES
+// ==========================================
+import LoginPage from "./pages/LoginPage";
+import Dashboard from "./pages/Dashboard";
+import SearchStudent from "./pages/student-public/SearchStudent.jsx";
+import StudentDetails from "./pages/student-public/StudentDetails.jsx";
+import EmployeeDetails from "./pages/employee-public/EmployeeDetails.jsx";
 
-// Course Pages
-import AddCourse from "./pages/AddCourse";
-import AllCourses from "./pages/AllCourses";
+// ==========================================
+// FEATURE DOMAINS
+// ==========================================
 
-// Employee Pages
-import AddEmployeeForm from "./pages/AddEmployee.jsx";
-import AllEmployees from "./pages/AllEmployees.jsx";
-import UpdateEmployee from "./pages/UpdateEmployee.jsx";
-import EmployeeDetails from "./pages/EmployeeDetails.jsx";
+// Students
+import AllStudents from "./pages/students/AllStudents.jsx";
+import AddStudent from "./pages/students/AddStudent.jsx";
+import UpdateStudent from "./pages/students/UpdateStudent.jsx";
 
-// Admin & Batch Pages
+// Courses
+import AllCourses from "./pages/courses/AllCourses.jsx";
+import AddCourse from "./pages/courses/AddCourse.jsx";
+
+// Employees & Admins
+import AllEmployees from "./pages/employees/AllEmployees.jsx";
+import AddEmployeeForm from "./pages/employees/AddEmployee.jsx";
+import UpdateEmployee from "./pages/employees/UpdateEmployee.jsx";
 import ManageAdmins from "./pages/ManageAdmins";
-import ManageBatches from "./pages/ManageBatches.jsx";
-import AddBatch from "./pages/AddBatch.jsx"; // <-- ADDED IMPORT
-import BatchListPage from "./pages/BatchListPage.jsx";
-import EditBatch from "./components/batches/EditBatch.jsx";
 
+// Batches
+import ManageBatchesTabs from "./pages/batches/ManageBatchesTabs.jsx";
+import ManageBatches from "./pages/batches/ManageBatches.jsx";
+import BatchListPage from "./pages/batches/BatchListPage.jsx";
+import AddBatch from "./pages/batches/AddBatch.jsx";
+import BatchFormContainer from "./components/batches/BatchFormContainer.jsx";
+import ManageBranches from "./pages/branches/ManageBranches.jsx";
+import BranchDetails from "./pages/branches/BranchDetails.jsx";
+
+// Branches (Newly Integrated)
+import AllBranches from "./pages/branches/AllBranches.jsx"; // Assuming this table component is built
+import ManageBranchForm from "./pages/branches/ManageBranchForm.jsx";
+
+// ==========================================
+// APP CONFIGURATION
+// ==========================================
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -44,6 +71,9 @@ const queryClient = new QueryClient({
   },
 });
 
+// ==========================================
+// ROUTE GUARDS
+// ==========================================
 const ProtectedRoute = ({ children }) => {
   const { authUser } = useAuth();
   return authUser ? children : <Navigate to="/login" replace />;
@@ -51,12 +81,11 @@ const ProtectedRoute = ({ children }) => {
 
 const RoleGuard = ({ allowedRoles }) => {
   const { role } = useAuth();
-  
   if (!allowedRoles.includes(role)) {
+    // Graceful fallback for lower-tier users trying to access high-tier routes
     const fallback = role === "instructor" ? "/admin/all-students" : "/admin";
     return <Navigate to={fallback} replace />;
   }
-  
   return <Outlet />;
 };
 
@@ -68,6 +97,9 @@ const AdminIndex = () => {
   return <Dashboard />;
 };
 
+// ==========================================
+// MAIN ROUTER
+// ==========================================
 function App() {
   const { checkAuth, isCheckingAuth, authUser } = useAuth();
 
@@ -81,19 +113,21 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <Router>
         <Routes>
-          {/* PUBLIC ROUTES */}
+          {/* ---------------- PUBLIC ROUTES ---------------- */}
           <Route element={<PublicLayout />}>
             <Route path="/" element={<SearchStudent />} />
             <Route path="/student/:id" element={<StudentDetails />} />
             <Route path="/employee/:id" element={<EmployeeDetails />} />
           </Route>
-          
-          <Route 
-            path="/login" 
-            element={authUser ? <Navigate to="/admin" replace /> : <LoginPage />} 
+
+          <Route
+            path="/login"
+            element={
+              authUser ? <Navigate to="/admin" replace /> : <LoginPage />
+            }
           />
 
-          {/* ADMIN PROTECTED ROUTES */}
+          {/* ---------------- ADMIN ROUTES ---------------- */}
           <Route
             path="/admin"
             element={
@@ -102,39 +136,78 @@ function App() {
               </ProtectedRoute>
             }
           >
+            {/* Default Dashboard Routing */}
             <Route index element={<AdminIndex />} />
 
-            {/* SHARED ROUTES: Admin, Registrar, Instructor */}
-            <Route element={<RoleGuard allowedRoles={["admin", "registrar", "instructor"]} />}>
+            {/* TIER 1: Shared Access (Admin, Registrar, Instructor) */}
+            <Route
+              element={
+                <RoleGuard
+                  allowedRoles={["admin", "registrar", "instructor"]}
+                />
+              }
+            >
+              {/* Read-Only / Operational Views */}
               <Route path="all-students" element={<AllStudents />} />
               <Route path="all-courses" element={<AllCourses />} />
-              <Route path="batches" element={<ManageBatches />} /> {/* Moved here so Instructors can view calendar */}
+              <Route path="manage-batches" element={<ManageBatchesTabs />} />
+              <Route path="batches/:id" element={<ManageBatches />} />
+              <Route path="branches" element={<AllBranches />} />
+              <Route
+                path="update-branch/:id"
+                element={<ManageBranchForm mode="edit" />}
+              />
+              <Route path="manage-branches" element={<ManageBranches />} />
+              <Route path="branches/:id" element={<BranchDetails />} />
             </Route>
 
-            {/* MID-TIER ROUTES: Admin, Registrar only */}
-            <Route element={<RoleGuard allowedRoles={["admin", "registrar"]} />}>
+            {/* TIER 2: Management Access (Admin, Registrar) */}
+            <Route
+              element={<RoleGuard allowedRoles={["admin", "registrar"]} />}
+            >
+              {/* Creation & Update Views */}
               <Route path="add-student" element={<AddStudent />} />
               <Route path="update-student/:id" element={<UpdateStudent />} />
               <Route path="add-course" element={<AddCourse />} />
-              <Route path="update-course/:id" element={<AddCourse mode="edit" />} />
-              
-              {/* FIX: Corrected component assignment */}
-              <Route path="add-batch" element={<AddBatch />} /> 
+              <Route
+                path="update-course/:id"
+                element={<AddCourse mode="edit" />}
+              />
+              <Route path="add-batch" element={<AddBatch />} />
             </Route>
 
-            {/* HIGH-TIER ROUTES: Admin strictly */}
+            {/* TIER 3: Super Admin Strictly (Admin Only) */}
             <Route element={<RoleGuard allowedRoles={["admin"]} />}>
-              <Route path="all-employees" element={<AllEmployees />} />
-              <Route path="all-batches" element={<BatchListPage />} />
-              <Route path="add-employee" element={<AddEmployeeForm />} />
-              <Route path="update-employee/:id" element={<UpdateEmployee mode="edit" />} />
-              <Route path="employee/:id" element={<EmployeeDetails />} />
+              {/* Sensitive Data & Infrastructure Configuration */}
               <Route path="manage-admins" element={<ManageAdmins />} />
-              <Route path="/admin/edit-batch/:id" element={<EditBatch />} />
-            
+
+              {/* Employee Management */}
+              <Route path="all-employees" element={<AllEmployees />} />
+              <Route
+                path="add-employee"
+                element={<AddEmployeeForm mode="add" />}
+              />
+              <Route
+                path="update-employee/:id"
+                element={<UpdateEmployee mode="edit" />}
+              />
+              <Route path="employee/:id" element={<EmployeeDetails />} />
+
+              {/* Core System Configuration */}
+              <Route path="all-batches" element={<BatchListPage />} />
+              <Route path="edit-batch/:id" element={<BatchFormContainer />} />
+              <Route
+                path="add-branch"
+                element={<ManageBranchForm mode="add" />}
+              />
+              <Route
+                path="update-branch/:id"
+                element={<ManageBranchForm mode="edit" />}
+              />
             </Route>
           </Route>
 
+          {/* Catch-all fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Router>

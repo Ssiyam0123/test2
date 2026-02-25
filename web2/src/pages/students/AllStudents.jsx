@@ -4,25 +4,28 @@ import {
   useStudents,
   useDeleteStudent,
   useToggleStudentStatus,
-  useAddComment,
-  useStudentComments
-} from "../hooks/useStudents";
-import { useConfirmToast } from "../components/ConfirmToast";
-import StudentFilters from "../components/Search_filter/StudentFilters.jsx";
-import QRCodeModal from "../components/modal/QRCodeModal.jsx";
-import useAuth from "../store/useAuth.js";
+} from "../../hooks/useStudents.js";
+import { useConfirmToast } from "../../components/ConfirmToast.jsx";
+import StudentFilters from "../../components/Search_filter/StudentFilters.jsx";
+import QRCodeModal from "../../components/modal/QRCodeModal.jsx";
+import useAuth from "../../store/useAuth.js";
 
-// Reusable Components
-import PageHeader from "../components/common/PageHeader";
-import TableSkeleton from "../components/common/TableSkeleton";
-import DataErrorState from "../components/common/DataErrorState";
+import PageHeader from "../../components/common/PageHeader.jsx";
+import TableSkeleton from "../../components/common/TableSkeleton.jsx";
+import DataErrorState from "../../components/common/DataErrorState.jsx";
 
-const StudentsTable = React.lazy(() => import("../components/table/StudentsTable.jsx"));
-import CommentModal from "../components/modal/CommentModal.jsx";
+const StudentsTable = React.lazy(() => import("../../components/table/StudentsTable.jsx"));
+import CommentModal from "../../components/modal/CommentModal.jsx";
 
 const INITIAL_FILTERS = {
-  status: "all", batch: "all", course: "all", competency: "all",
-  is_active: "all", is_verified: "all", date_from: "", date_to: "",
+  status: "all", 
+  batch: "all", 
+  course: "all", 
+  competency: "all",
+  is_active: "all", 
+  is_verified: "all", 
+  date_from: "", 
+  date_to: "",
 };
 
 const AllStudents = () => {
@@ -33,14 +36,41 @@ const AllStudents = () => {
   const [selectedStudentForQr, setSelectedStudentForQr] = useState(null);
   const [selectedStudentForComment, setSelectedStudentForComment] = useState(null);
   const [filters, setFilters] = useState(INITIAL_FILTERS);
+  
+  // ==========================================
+  // SEARCH LOGIC (FIXED)
+  // ==========================================
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  // Update debounced search after 500ms delay
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+    }, 500);
+
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
+
   const [page, setPage] = useState(1);
   const limit = 20;
 
-  const queryFilters = useMemo(
-    () => ({ ...filters, ...(searchTerm && { search: searchTerm }) }),
-    [filters, searchTerm]
-  );
+  // Memoize filters to prevent unnecessary re-renders
+  const queryFilters = useMemo(() => {
+    const activeFilters = { ...filters };
+    
+    // Only add search if it actually has content
+    if (debouncedSearch) {
+      activeFilters.search = debouncedSearch;
+    }
+
+    // Remove "all" values so they don't clutter the URL query string
+    Object.keys(activeFilters).forEach(key => {
+      if (activeFilters[key] === "all") delete activeFilters[key];
+    });
+
+    return activeFilters;
+  }, [filters, debouncedSearch]);
 
   const { data, isLoading, error, refetch, isRefetching } = useStudents(page, limit, queryFilters);
   const deleteStudentMutation = useDeleteStudent();
@@ -50,7 +80,10 @@ const AllStudents = () => {
   const pagination = data?.pagination;
   const filterOptions = data?.filters;
 
-  useEffect(() => { setPage(1); }, [queryFilters]);
+  // Reset to page 1 when any filter changes
+  useEffect(() => { 
+    setPage(1); 
+  }, [queryFilters]);
 
   const handleDelete = (id, studentName) => {
     showConfirmToast({
@@ -80,7 +113,8 @@ const AllStudents = () => {
       <div className="mb-6">
         <StudentFilters 
           onFilterChange={setFilters} 
-          onSearchSubmit={setSearchTerm} 
+          searchTerm={searchTerm} // Changed to pass raw text
+          onSearchChange={setSearchTerm} // New handler for instant feedback
           filterOptions={filterOptions} 
           initialFilters={filters} 
           isLoading={isLoading} 
@@ -104,8 +138,12 @@ const AllStudents = () => {
             toggleLoading={toggleStatusMutation.isPending}
             page={page}
             onPageChange={setPage}
-            searchTerm={searchTerm}
-            onClearFilters={() => { setFilters(INITIAL_FILTERS); setSearchTerm(""); }}
+            searchTerm={debouncedSearch}
+            onClearFilters={() => { 
+              setFilters(INITIAL_FILTERS); 
+              setSearchTerm(""); 
+              setDebouncedSearch("");
+            }}
             filters={filters}
           />
         )}

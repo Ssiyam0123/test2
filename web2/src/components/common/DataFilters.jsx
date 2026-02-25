@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
-import { Filter, X, ChevronDown, ChevronUp } from "lucide-react";
+import { Filter, X, ChevronDown, ChevronUp, Search } from "lucide-react";
 import SearchBar from './SearchBar';
 
 const badgeColorClasses = {
-  blue: "bg-blue-100 text-blue-800 text-blue-600 hover:text-blue-800",
-  green: "bg-green-100 text-green-800 text-green-600 hover:text-green-800",
-  purple: "bg-purple-100 text-purple-800 text-purple-600 hover:text-purple-800",
-  yellow: "bg-yellow-100 text-yellow-800 text-yellow-600 hover:text-yellow-800",
-  orange: "bg-orange-100 text-orange-800 text-orange-600 hover:text-orange-800",
-  indigo: "bg-indigo-100 text-indigo-800 text-indigo-600 hover:text-indigo-800",
-  red: "bg-red-100 text-red-800 text-red-600 hover:text-red-800",
-  default: "bg-gray-100 text-gray-800 text-gray-600 hover:text-gray-800"
+  blue: "bg-blue-50 text-blue-700 border-blue-100",
+  green: "bg-emerald-50 text-emerald-700 border-emerald-100",
+  purple: "bg-purple-50 text-purple-700 border-purple-100",
+  yellow: "bg-amber-50 text-amber-700 border-amber-100",
+  orange: "bg-orange-50 text-orange-700 border-orange-100",
+  indigo: "bg-indigo-50 text-indigo-700 border-indigo-100",
+  red: "bg-rose-50 text-rose-700 border-rose-100",
+  default: "bg-slate-50 text-slate-700 border-slate-200"
 };
 
 const DataFilters = ({
@@ -23,13 +23,12 @@ const DataFilters = ({
 }) => {
   const [showFilters, setShowFilters] = useState(false);
 
-  // Determine which filters are currently active (not empty and not 'all')
+  // Determine which filters are currently active
   const activeFilters = filterConfig.filter(f => {
     const val = filters[f.key];
     return val !== undefined && val !== "" && val !== "all";
   });
 
-  // Helper to format values for badges (e.g., matching a Course ID to the Course Name)
   const getDisplayValue = (configItem, val) => {
     if (configItem.type === 'select' && configItem.options) {
       const option = configItem.options.find(o => String(o.value) === String(val));
@@ -40,55 +39,89 @@ const DataFilters = ({
   };
 
   return (
-    <>
+    <div className="space-y-4">
       {/* Search Bar Block */}
       {searchConfig && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6">
-          <SearchBar
+        <div className="relative group">
+          <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+            <Search size={18} className="text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+          </div>
+          <input
+            type="text"
             value={searchConfig.value}
-            onChange={searchConfig.onChange}
-            onSubmit={searchConfig.onSubmit}
+            onChange={(e) => searchConfig.onChange(e.target.value)}
             placeholder={searchConfig.placeholder || "Search..."}
-            showButton={searchConfig.showButton !== false}
-            isLoading={isLoading}
+            className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-2xl outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50/50 shadow-sm transition-all text-sm font-medium placeholder:text-slate-400"
+            disabled={isLoading}
           />
+          {isLoading && (
+             <div className="absolute right-4 inset-y-0 flex items-center">
+                <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+             </div>
+          )}
         </div>
       )}
 
-      {/* Filter Toggle Button */}
-      {filterConfig && filterConfig.length > 0 && (
-        <div className="mb-6">
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className="flex items-center space-x-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-            disabled={isLoading}
-          >
-            <Filter size={20} />
-            <span>Filter</span>
-            {showFilters ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-          </button>
-        </div>
-      )}
+      {/* Filter Toggle and Active Badges Summary */}
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          onClick={() => setShowFilters(!showFilters)}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all shadow-sm border ${
+            showFilters 
+            ? 'bg-[#1e293b] text-white border-[#1e293b]' 
+            : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+          }`}
+          disabled={isLoading}
+        >
+          <Filter size={18} />
+          <span>Filters</span>
+          {activeFilters.length > 0 && (
+            <span className="ml-1 px-1.5 py-0.5 bg-blue-500 text-white text-[10px] rounded-full">
+              {activeFilters.length}
+            </span>
+          )}
+          {showFilters ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+        </button>
+
+        {/* Inline Active Badges (When panel is closed) */}
+        {!showFilters && activeFilters.length > 0 && (
+          <div className="flex flex-wrap gap-2 animate-in fade-in slide-in-from-left-2">
+            {activeFilters.map((field) => (
+              <span key={field.key} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[11px] font-black uppercase tracking-tight ${badgeColorClasses[field.color] || badgeColorClasses.default}`}>
+                {field.label}: {getDisplayValue(field, filters[field.key])}
+                <X 
+                  size={14} 
+                  className="cursor-pointer hover:opacity-70" 
+                  onClick={() => onFilterChange(field.key, field.type === 'date' ? "" : "all")}
+                />
+              </span>
+            ))}
+            <button onClick={onClearFilters} className="text-[11px] font-bold text-slate-400 hover:text-rose-500 transition-colors uppercase tracking-widest px-2">
+              Clear All
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* Filters Panel */}
-      {showFilters && filterConfig && filterConfig.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold text-gray-800">Filters</h3>
+      {showFilters && (
+        <div className="bg-white/80 backdrop-blur-xl rounded-[2rem] shadow-xl shadow-slate-200/50 border border-white p-6 animate-in zoom-in-95 duration-200">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Refine Results</h3>
             <button
               onClick={onClearFilters}
-              className="flex items-center space-x-1 text-sm text-gray-600 hover:text-gray-800"
+              className="flex items-center gap-1.5 text-xs font-bold text-rose-500 hover:bg-rose-50 px-3 py-1.5 rounded-lg transition-all"
               disabled={isLoading}
             >
-              <X size={16} />
-              <span>Clear all filters</span>
+              <X size={14} />
+              <span>Clear Filters</span>
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {filterConfig.map((field) => (
-              <div key={field.key}>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+              <div key={field.key} className="flex flex-col gap-2">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
                   {field.label}
                 </label>
                 
@@ -96,7 +129,7 @@ const DataFilters = ({
                   <select
                     value={filters[field.key]}
                     onChange={(e) => onFilterChange(field.key, e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold text-slate-700 outline-none focus:bg-white focus:ring-2 focus:ring-blue-500/10 focus:border-blue-200 transition-all appearance-none cursor-pointer"
                     disabled={isLoading}
                   >
                     <option value="all">{field.defaultOption || `All ${field.label}`}</option>
@@ -109,46 +142,16 @@ const DataFilters = ({
                     type={field.type || "text"}
                     value={filters[field.key] || ""}
                     onChange={(e) => onFilterChange(field.key, e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold text-slate-700 outline-none focus:bg-white focus:ring-2 focus:ring-blue-500/10 focus:border-blue-200 transition-all"
                     disabled={isLoading}
                   />
                 )}
               </div>
             ))}
           </div>
-
-          {/* Active Filters Badges */}
-          {activeFilters.length > 0 && (
-            <div className="mt-4 pt-4 border-t">
-              <p className="text-sm text-gray-600 mb-2">Active Filters:</p>
-              <div className="flex flex-wrap gap-2">
-                {activeFilters.map((field) => {
-                  const colors = badgeColorClasses[field.color] || badgeColorClasses.default;
-                  const [bgClasses, btnClasses] = [
-                    colors.split(' text-')[0] + ' text-' + colors.split(' text-')[1], // Gets bg-blue-100 text-blue-800
-                    'text-' + colors.split(' text-')[2] + ' ' + colors.split(' ')[3]  // Gets text-blue-600 hover:text-blue-800
-                  ];
-
-                  return (
-                    <span key={field.key} className={`inline-flex items-center px-3 py-1 rounded-full text-sm ${bgClasses}`}>
-                      {field.label}: {getDisplayValue(field, filters[field.key])}
-                      <button
-                        type="button"
-                        onClick={() => onFilterChange(field.key, field.type === 'date' ? "" : "all")}
-                        className={`ml-2 ${btnClasses}`}
-                        disabled={isLoading}
-                      >
-                        <X size={14} />
-                      </button>
-                    </span>
-                  );
-                })}
-              </div>
-            </div>
-          )}
         </div>
       )}
-    </>
+    </div>
   );
 };
 

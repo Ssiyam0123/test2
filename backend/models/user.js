@@ -3,31 +3,63 @@ import bcrypt from "bcryptjs";
 
 const userSchema = new mongoose.Schema(
   {
-    username: { type: String, required: true, unique: true, trim: true },
+    username: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
+      match: [
+        /^[a-zA-Z0-9_]+$/,
+        "Username can only contain letters, numbers, and underscores",
+      ],
+    },
     email: {
       type: String,
       required: true,
       unique: true,
       trim: true,
       lowercase: true,
+      match: [
+        /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/,
+        "Please fill a valid email address",
+      ],
     },
-    password: { type: String, required: true, minlength: 6, select: false },
+    password: {
+      type: String,
+      required: true,
+      minlength: 6,
+      maxlength: 128,
+      select: false,
+    },
     role: {
       type: String,
       enum: ["admin", "instructor", "register", "staff", "user"],
       default: "user",
     },
     employee_id: { type: String, unique: true, sparse: true, trim: true },
-    full_name: { type: String, default: "" },
+    full_name: {
+      type: String,
+      required: true,
+      trim: true,
+      match: [/^[a-zA-Z\s\-']+$/, "Invalid name format"],
+    },
     photo_url: { type: String, default: "" },
-    phone: { type: String },
-    designation: { type: String },
-    department: { type: String },
+    phone: { type: String, match: [/^[0-9+\-\s()]*$/, "Invalid phone number"] },
+    designation: { type: String, trim: true },
+    department: { type: String, trim: true },
     joining_date: { type: Date, default: Date.now },
     status: {
       type: String,
       enum: ["Active", "On Leave", "Resigned"],
       default: "Active",
+    },
+    branch: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Branch",
+      required: function () {
+        return this.role !== "admin";
+      },
+      index: true, // Crucial for performance as DB grows
     },
     social_links: {
       facebook: { type: String, default: "" },
