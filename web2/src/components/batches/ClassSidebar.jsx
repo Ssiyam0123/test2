@@ -1,14 +1,23 @@
 import React from "react";
 import { format } from "date-fns";
-import { Clock, CalendarClock, Edit3, Trash2, Users, ShoppingBag, DollarSign, ArrowLeft } from "lucide-react";
-// Assuming you have an attendance component to render when viewTab === 'attendance'
-import ClassAttendance from ""; 
+import { 
+  Clock, 
+  CalendarClock, 
+  Edit3, 
+  Trash2, 
+  Users, 
+  ShoppingBag, 
+  DollarSign, 
+  ArrowLeft,
+  Plus
+} from "lucide-react";
+import ClassAttendance from "./ClassAttendance";
 
 export default function ClassSidebar({
   viewTab,
   setViewTab,
   authUser,
-  allClasses = [], // <-- NEW PROP
+  allClasses = [],
   classesOnSelectedDate,
   pendingClasses,
   onEditClass,
@@ -20,23 +29,34 @@ export default function ClassSidebar({
   selectedAttendanceClass,
   onOpenAttendance,
   onBackToDaily,
-  onMarkComplete,
   onOpenRequisition
 }) {
 
-  // If we are currently marking attendance inside the sidebar view
+  // Role Checks
+  const isInstructor = authUser?.role === "instructor";
+  const isStaff = ["admin", "registrar"].includes(authUser?.role);
+
+  // ==========================================
+  // INLINE ATTENDANCE VIEW
+  // ==========================================
   if (viewTab === "attendance" && selectedAttendanceClass) {
     return (
       <div className="bg-white/40 rounded-3xl p-4 md:p-6 border border-white/60 h-full overflow-y-auto custom-scrollbar flex flex-col">
-        <button onClick={onBackToDaily} className="self-start mb-4 text-xs font-bold text-gray-500 hover:text-gray-800 flex items-center gap-1.5 transition-colors bg-white px-3 py-1.5 rounded-lg border border-gray-100 shadow-sm">
+        <button 
+          onClick={onBackToDaily} 
+          className="self-start mb-4 text-xs font-bold text-gray-500 hover:text-gray-800 flex items-center gap-1.5 transition-colors bg-white px-3 py-1.5 rounded-lg border border-gray-100 shadow-sm"
+        >
           <ArrowLeft size={14} /> Back to Schedule
         </button>
-        <ClassAttendance classData={selectedAttendanceClass} students={batchStudent} />
+        <ClassAttendance 
+          classData={selectedAttendanceClass} 
+          students={batchStudent} 
+        />
       </div>
     );
   }
 
-  // Derive the classes that have been scheduled, sorted most recent first for the Bazar tab
+  // Derive scheduled classes for the Bazar feed
   const bazarClasses = allClasses
     .filter(c => c.date_scheduled)
     .sort((a, b) => new Date(b.date_scheduled) - new Date(a.date_scheduled));
@@ -86,12 +106,17 @@ export default function ClassSidebar({
                     <span className={`px-2 py-0.5 text-white text-[9px] font-black rounded uppercase ${cls.is_completed ? 'bg-teal-500' : 'bg-[#1e293b]'}`}>
                       Class {cls.class_number} {cls.is_completed && "✓"}
                     </span>
-                    <div className="flex gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => onQuickSchedule(cls)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg" title="Quick Reschedule"><CalendarClock size={16}/></button>
-                      <button onClick={() => onEditClass(cls)} className="p-1.5 text-teal-600 hover:bg-teal-50 rounded-lg" title="Edit Details"><Edit3 size={16}/></button>
-                      <button onClick={() => onDeleteClass(cls._id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg" title="Delete Class"><Trash2 size={16}/></button>
-                    </div>
+                    
+                    {/* STAFF ONLY: Schedule / Edit / Delete */}
+                    {isStaff && (
+                      <div className="flex gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => onQuickSchedule(cls)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg" title="Quick Reschedule"><CalendarClock size={16}/></button>
+                        <button onClick={() => onEditClass(cls)} className="p-1.5 text-teal-600 hover:bg-teal-50 rounded-lg" title="Edit Details"><Edit3 size={16}/></button>
+                        <button onClick={() => onDeleteClass(cls._id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg" title="Delete Class"><Trash2 size={16}/></button>
+                      </div>
+                    )}
                   </div>
+                  
                   <h4 className="text-sm font-bold text-gray-800 leading-tight mb-3 flex-1">{cls.topic}</h4>
                   
                   <div className="flex justify-between items-end mt-auto pt-3 border-t border-gray-50">
@@ -101,11 +126,24 @@ export default function ClassSidebar({
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <button onClick={() => onOpenRequisition(cls)} className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-600 hover:bg-amber-100 rounded-lg transition-colors text-xs font-bold">
-                        <ShoppingBag size={12} /> Bazar
+                      {/* ROLE-BASED REQUISITION BUTTON */}
+                      <button 
+                        onClick={() => onOpenRequisition(cls)} 
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-600 hover:bg-amber-100 rounded-lg transition-colors text-xs font-bold"
+                      >
+                        <ShoppingBag size={12} /> 
+                        {isInstructor ? "Request Bazar" : "Log Bazar Cost"}
                       </button>
-                      <button onClick={() => onMarkComplete(cls)} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors text-xs font-bold ${cls.is_completed ? 'bg-gray-100 text-gray-600' : 'bg-teal-50 text-teal-600'}`}>
-                        <Users size={12} /> {cls.is_completed ? "Roster" : "Attendance"}
+
+                      {/* ATTENDANCE BUTTON (Opens inline) */}
+                      <button 
+                        onClick={() => onOpenAttendance(cls)} 
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors text-xs font-bold ${
+                          cls.is_completed ? 'bg-gray-100 text-gray-600' : 'bg-teal-50 text-teal-600'
+                        }`}
+                      >
+                        <Users size={12} /> 
+                        {cls.is_completed ? "View Roster" : "Take Attendance"}
                       </button>
                     </div>
                   </div>
@@ -131,16 +169,23 @@ export default function ClassSidebar({
                   <div>
                     <div className="flex justify-between items-start mb-1">
                       <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Class {cls.class_number}</span>
-                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => onEditClass(cls)} className="p-1 text-gray-400 hover:text-teal-600"><Edit3 size={14}/></button>
-                        <button onClick={() => onDeleteClass(cls._id)} className="p-1 text-gray-400 hover:text-red-500"><Trash2 size={14}/></button>
-                      </div>
+                      
+                      {/* STAFF ONLY: Edit / Delete */}
+                      {isStaff && (
+                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button onClick={() => onEditClass(cls)} className="p-1 text-gray-400 hover:text-teal-600"><Edit3 size={14}/></button>
+                          <button onClick={() => onDeleteClass(cls._id)} className="p-1 text-gray-400 hover:text-red-500"><Trash2 size={14}/></button>
+                        </div>
+                      )}
                     </div>
                     <h4 className="text-[13px] font-bold text-gray-700 leading-snug mb-3">{cls.topic}</h4>
                   </div>
-                  <button onClick={() => onScheduleClass(cls)} className="w-full py-2 bg-amber-50 text-amber-600 text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-amber-100 transition-colors">
-                    Schedule Now
-                  </button>
+                  
+                  {isStaff && (
+                    <button onClick={() => onScheduleClass(cls)} className="w-full py-2 bg-amber-50 text-amber-600 text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-amber-100 transition-colors">
+                      Schedule Now
+                    </button>
+                  )}
                 </div>
               ))
             ) : (
@@ -149,7 +194,7 @@ export default function ClassSidebar({
               </div>
             )}
             
-            {['admin', 'registrar'].includes(authUser?.role) && (
+            {isStaff && (
               <button onClick={onAddClass} className="w-full mt-2 py-3 border-2 border-dashed border-teal-200 text-teal-600 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-teal-50 transition-all flex items-center justify-center gap-2">
                 <Plus size={16} /> Add Topic
               </button>
@@ -224,7 +269,7 @@ export default function ClassSidebar({
                       }`}
                     >
                       <ShoppingBag size={14} /> 
-                      {hasActualCost ? "View Ledger" : "Manage Bazar"}
+                      {hasActualCost ? "View Ledger" : (isInstructor ? "Update Request" : "Log Final Cost")}
                     </button>
 
                   </div>

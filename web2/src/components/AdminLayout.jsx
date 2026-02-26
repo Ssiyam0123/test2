@@ -16,7 +16,8 @@ import {
   X,
   UserCircle,
   Building2,
-  MapPin // Added for Branch Table View
+  MapPin,
+  PackageSearch // <-- ADDED IMPORT
 } from "lucide-react";
 import useAuth from "../store/useAuth";
 import { apiURL } from "../../Constant.js";
@@ -93,25 +94,37 @@ const AdminLayout = () => {
         ],
       },
       // ==========================================
-      // UPDATED: Branches & Locations Module
+      // NEW: INVENTORY MODULE
+      // ==========================================
+      {
+        label: "Inventory",
+        items: [
+          {
+            name: "Manage Inventory",
+            href: "/admin/inventory",
+            icon: PackageSearch,
+            roles: ["admin", "registrar"], // Kept strictly for admin/staff
+          },
+        ],
+      },
       // ==========================================
       {
         label: "Branches & Locations",
         items: [
           {
-            name: "Manage Branches", // The Card Grid View (Operations)
+            name: "Manage Branches",
             href: "/admin/manage-branches", 
             icon: Building2, 
             roles: ["admin", "registrar", "instructor"], 
           },
           {
-            name: "Add Branch", // Admin Only
+            name: "Add Branch",
             href: "/admin/add-branch",
             icon: PlusCircle, 
             roles: ["admin"], 
           },
           {
-            name: "All Branches", // The Table View (Directory)
+            name: "All Branches",
             href: "/admin/branches", 
             icon: MapPin, 
             roles: ["admin", "registrar", "instructor"], 

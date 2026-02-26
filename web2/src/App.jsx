@@ -53,9 +53,10 @@ import BatchFormContainer from "./components/batches/BatchFormContainer.jsx";
 import ManageBranches from "./pages/branches/ManageBranches.jsx";
 import BranchDetails from "./pages/branches/BranchDetails.jsx";
 
-// Branches (Newly Integrated)
-import AllBranches from "./pages/branches/AllBranches.jsx"; // Assuming this table component is built
+// Branches & Inventory (Newly Integrated)
+import AllBranches from "./pages/branches/AllBranches.jsx";
 import ManageBranchForm from "./pages/branches/ManageBranchForm.jsx";
+import ManageInventory from "./pages/inventory/ManageInventory.jsx";
 
 // ==========================================
 // APP CONFIGURATION
@@ -82,7 +83,6 @@ const ProtectedRoute = ({ children }) => {
 const RoleGuard = ({ allowedRoles }) => {
   const { role } = useAuth();
   if (!allowedRoles.includes(role)) {
-    // Graceful fallback for lower-tier users trying to access high-tier routes
     const fallback = role === "instructor" ? "/admin/all-students" : "/admin";
     return <Navigate to={fallback} replace />;
   }
@@ -160,6 +160,9 @@ function App() {
               <Route path="manage-branches" element={<ManageBranches />} />
               <Route path="manage-branches/:id" element={<BranchDetails />} />
               <Route path="branches/:id" element={<BranchDetails />} />
+              
+              {/* FIXED PATH: Removed leading slash so it maps to /admin/inventory */}
+              <Route path="inventory" element={<ManageInventory />} />
             </Route>
 
             {/* TIER 2: Management Access (Admin, Registrar) */}
