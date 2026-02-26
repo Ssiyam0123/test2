@@ -13,6 +13,8 @@ import { fileURLToPath } from "url";
 import userRoute from "./routes/userRoutes.js";
 import batchRoutes from "./routes/batchRoutes.js";
 import branchRoutes from "./routes/branchRoutes.js";
+import expenseRoutes from "./routes/expenseRoute.js";
+import inventoryRoutes from "./routes/expenseRoute.js";
 
 const app = express();
 
@@ -54,6 +56,9 @@ app.use("/api/dashboard", dashbordRoutes);
 app.use("/api/generate-certificate", certificateRoutes);
 app.use("/api/branches", branchRoutes);
 // Add to your imports at the top
+app.use("/api/expenses", expenseRoutes);
+
+app.use("/api/inventory", inventoryRoutes)
 
 // Add to your route middlewares
 app.use("/api/batches", batchRoutes);

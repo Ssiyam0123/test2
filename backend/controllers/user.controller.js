@@ -1,7 +1,8 @@
 import User from "../models/user.js";
 import Comment from "../models/comment.js";
 import { deleteLocalFile } from "../middlewares/multer.js";
-
+import  Branch  from "../models/branch.js";
+import mongoose from "mongoose"
 // ==========================================
 // COMMENTS LOGIC
 // ==========================================
@@ -39,22 +40,45 @@ export const getStudentComments = async (req, res) => {
 // STANDARD USER / EMPLOYEE CRUD
 // ==========================================
 
+
 export const getAllUsers = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 30;
     const skip = (page - 1) * limit;
 
-    const { search, status, department, designation, date_from, date_to, role } = req.query;
+    // 1. Destructure 'branch' from query
+    const { 
+      search, status, department, designation, 
+      date_from, date_to, role, branch 
+    } = req.query;
+
     let filter = {};
 
+    // ==========================================
+    // 2. CRITICAL: BRANCH ISOLATION LOGIC
+    // ==========================================
+    if (req.user.role === "admin") {
+      // Super Admin: Can see all branches, OR filter by a specific one
+      if (branch && branch !== "all" && mongoose.Types.ObjectId.isValid(branch)) {
+        filter.branch = branch;
+      }
+    } else {
+      // Registrar / Instructor: FORCED isolation to their own branch
+      // This prevents them from accessing other branch employee data via API manipulation
+      filter.branch = req.user.branch;
+    }
+
+    // ==========================================
+    // 3. APPLY OTHER FILTERS
+    // ==========================================
     if (search) {
+      const searchRegex = { $regex: search, $options: "i" };
       filter.$or = [
-        { full_name: { $regex: search, $options: "i" } },
-        { employee_id: { $regex: search, $options: "i" } },
-        { email: { $regex: search, $options: "i" } },
-        { phone: { $regex: search, $options: "i" } },
-        { username: { $regex: search, $options: "i" } },
+        { full_name: searchRegex },
+        { employee_id: searchRegex },
+        { email: searchRegex },
+        { username: searchRegex },
       ];
     }
 
@@ -69,29 +93,55 @@ export const getAllUsers = async (req, res) => {
       if (date_to) filter.joining_date.$lte = new Date(date_to);
     }
 
-    const [users, total, distinctDepartments, distinctDesignations, distinctStatuses, distinctRoles] = await Promise.all([
-      User.find(filter).select("-password").sort({ createdAt: -1 }).skip(skip).limit(limit),
+    // ==========================================
+    // 4. EXECUTE WITH BRANCH POPULATION
+    // ==========================================
+    const [
+      users, 
+      total, 
+      distinctDepartments, 
+      distinctDesignations, 
+      distinctStatuses, 
+      distinctRoles,
+      branches // Fetch branches for the admin filter dropdown
+    ] = await Promise.all([
+      User.find(filter)
+        .populate("branch", "branch_name branch_code") // Populated for table display
+        .select("-password")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
       User.countDocuments(filter),
-      User.distinct("department"),
-      User.distinct("designation"),
-      User.distinct("status"),
-      User.distinct("role"),
+      User.distinct("department", filter),
+      User.distinct("designation", filter),
+      User.distinct("status", filter),
+      User.distinct("role", filter),
+      req.user.role === "admin" ? Branch.find({ is_active: true }).select("branch_name branch_code").lean() : []
     ]);
 
     res.status(200).json({
+      success: true,
       data: users,
-      pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
+      pagination: { 
+        total, 
+        page, 
+        limit, 
+        totalPages: Math.ceil(total / limit) 
+      },
       filters: {
         departments: distinctDepartments.filter(Boolean).sort(),
         designations: distinctDesignations.filter(Boolean).sort(),
         statuses: distinctStatuses.filter(Boolean).sort(),
         roles: distinctRoles.filter(Boolean).sort(),
+        branches: branches // Sent to frontend for the dropdown
       }
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("GET_ALL_USERS_ERROR:", error);
+    res.status(500).json({ success: false, message: error.message });
   }
-};
+};;
 
 export const addUser = async (req, res) => {
   try {

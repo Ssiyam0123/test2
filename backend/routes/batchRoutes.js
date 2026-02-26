@@ -13,26 +13,47 @@ import {
   processBatchPayload 
 } from "../validators/batch.validator.js";
 
+// IMPORT AUTH MIDDLEWARES
+import protectRoute from "../middlewares/auth.middleware.js";
+import { authorize } from "../middlewares/auth.js";
+
 const router = express.Router();
+
+// ALL batch routes require the user to be logged in
+router.use(protectRoute);
 
 // Get operations
 router.get("/", getAllBatches);
+router.get("/:id", getBatchById);
 router.get("/:batchId/classes", getBatchClasses);
 
-// Core CRUD with Middlewares
-router.post("/", validateBatchRequiredFields, checkBatchDuplicates, processBatchPayload, createBatch);
-router.put("/:id", checkBatchDuplicates, processBatchPayload, updateBatch);
-router.delete("/:id", deleteBatch);
-router.get("/:id", getBatchById);
+// Core CRUD
+router.post(
+  "/", 
+  authorize("admin", "registrar"), // Only Admins & Registrars can create batches
+  validateBatchRequiredFields, 
+  checkBatchDuplicates, 
+  processBatchPayload, 
+  createBatch
+);
+
+router.put(
+  "/:id", 
+  authorize("admin", "registrar"), 
+  checkBatchDuplicates, 
+  processBatchPayload, 
+  updateBatch
+);
+
+router.delete("/:id", authorize("admin"), deleteBatch); // Only Admin can delete
+
 // Syllabus & Class Management
-router.post("/:batchId/syllabus", addClassToSyllabus);
-router.post("/:batchId/auto-schedule", autoScheduleSyllabus);
+router.post("/:batchId/syllabus", authorize("admin", "registrar", "instructor"), addClassToSyllabus);
+router.post("/:batchId/auto-schedule", authorize("admin", "registrar"), autoScheduleSyllabus);
 
-// THE FIX: Differentiated the PUT routes!
-router.put("/classes/:classContentId/schedule", scheduleClass); 
-router.put("/classes/:classId", updateClassContent);
-
-router.delete("/classes/:classId", deleteClassContent);
-router.put("/classes/:classId/attendance", updateClassAttendance);
+router.put("/classes/:classContentId/schedule", authorize("admin", "registrar"), scheduleClass); 
+router.put("/classes/:classId", authorize("admin", "registrar", "instructor"), updateClassContent);
+router.delete("/classes/:classId", authorize("admin", "registrar"), deleteClassContent);
+router.put("/classes/:classId/attendance", authorize("admin", "registrar", "instructor"), updateClassAttendance);
 
 export default router;

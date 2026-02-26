@@ -1,8 +1,7 @@
-// src/pages/batches/ManageBatches.jsx
 import React, { useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { isSameDay, isAfter, startOfToday } from "date-fns";
-import { Layers } from "lucide-react";
+import { Layers, CalendarDays, ClipboardCheck } from "lucide-react"; // Imported new icons
 
 // Hooks & Store
 import { useActiveBatches, useBatchClasses, useAutoSchedule, useDeleteClass } from "../../hooks/useBatches";
@@ -11,6 +10,7 @@ import useAuth from "../../store/useAuth";
 // Components
 import BatchHeader from "../../components/batches/BatchHeader";
 import BatchWorkspace from "../../components/batches/BatchWorkspace";
+import AttendanceBook from "../../pages/batches/AttendanceBook"; // IMPORT THE NEW ATTENDANCE BOOK
 import AddClassModal from "../../components/batches/AddClassModal";
 import AddSyllabusModal from "../../components/batches/AddSyllabusModal";
 import EditSyllabusModal from "../../components/modal/EditSyllabusModal"; 
@@ -19,7 +19,7 @@ import QuickScheduleModal from "../../components/batches/QuickScheduleModal";
 import Loader from "../../components/Loader";
 
 export default function ManageBatches() {
-  const { id: batchId } = useParams(); // Reads the :id from the URL
+  const { id: batchId } = useParams(); 
   const navigate = useNavigate();
   const { authUser } = useAuth();
   
@@ -28,6 +28,9 @@ export default function ManageBatches() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [viewTab, setViewTab] = useState("daily");
+  
+  // NEW: Toggle between Calendar Workspace and Attendance Matrix
+  const [activeView, setActiveView] = useState("schedule"); // 'schedule' | 'attendance'
 
   // Modal States
   const [isModalOpen, setIsModalOpen] = useState(false); 
@@ -39,23 +42,19 @@ export default function ManageBatches() {
   const [editingClass, setEditingClass] = useState(null);
   const [classToSchedule, setClassToSchedule] = useState(null);
   
-  // Fetch ALL active batches (for the pill navigation tabs)
   const { data: batchesResponse } = useActiveBatches();
   const batches = batchesResponse?.data || [];
   
-  // Find the exact batch we are viewing
   const selectedBatch = useMemo(() => {
     return batches.find(b => b._id === batchId) || null;
   }, [batches, batchId]);
 
-  // Fetch Classes for Workbench
   const { data: classesResponse, isLoading: isClassesLoading } = useBatchClasses(batchId);
   const allBatchClasses = classesResponse?.data || [];
   
   const { mutate: autoSchedule, isPending: isAutoScheduling } = useAutoSchedule(batchId);
   const { mutate: deleteClass } = useDeleteClass(batchId);
 
-  // Derived Logic
   const pendingClasses = useMemo(() => {
     return allBatchClasses.filter(c => 
       !c.date_scheduled || isAfter(new Date(c.date_scheduled), startOfToday())
@@ -81,54 +80,83 @@ export default function ManageBatches() {
           
           <BatchHeader searchTerm={searchTerm} setSearchTerm={setSearchTerm} authUser={authUser} />
 
-          {/* Horizontal Pill Tabs for easy switching between workbenches */}
-          <div className="mb-6 w-full overflow-x-auto custom-scrollbar">
-            <div className="flex items-center gap-1.5 bg-slate-100/60 p-1.5 rounded-[1.25rem] w-fit min-w-full sm:min-w-0 border border-slate-200/60">
-              {batches.map((batch) => {
-                const isActive = batch._id === batchId;
-                return (
-                  <button
-                    key={batch._id}
-                    onClick={() => navigate(`/admin/batches/${batch._id}`)}
-                    className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-bold whitespace-nowrap transition-all duration-300
-                      ${isActive ? 'bg-white text-slate-800 shadow-sm border border-slate-200/50' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/50 border border-transparent'}
-                    `}
-                  >
-                    <Layers size={16} className={`${isActive ? 'text-teal-500' : 'text-slate-400 opacity-70'} transition-colors`} />
-                    {batch.batch_name}
-                  </button>
-                );
-              })}
+          {/* TOP CONTROLS: Batch Selector & View Toggle */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+            
+            {/* Batch Navigation Pills */}
+            <div className="overflow-x-auto custom-scrollbar flex-1">
+              <div className="flex items-center gap-1.5 bg-slate-100/60 p-1.5 rounded-[1.25rem] w-fit border border-slate-200/60">
+                {batches.map((batch) => {
+                  const isActive = batch._id === batchId;
+                  return (
+                    <button
+                      key={batch._id}
+                      onClick={() => navigate(`/admin/batches/${batch._id}`)}
+                      className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-bold whitespace-nowrap transition-all duration-300
+                        ${isActive ? 'bg-white text-slate-800 shadow-sm border border-slate-200/50' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/50 border border-transparent'}
+                      `}
+                    >
+                      <Layers size={16} className={`${isActive ? 'text-teal-500' : 'text-slate-400 opacity-70'} transition-colors`} />
+                      {batch.batch_name}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
+
+            {/* View Mode Toggle (Schedule vs Attendance) */}
+            <div className="flex items-center bg-slate-100/60 p-1.5 rounded-2xl border border-slate-200/60 shrink-0">
+              <button 
+                onClick={() => setActiveView("schedule")}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 ${activeView === 'schedule' ? 'bg-white text-teal-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+              >
+                <CalendarDays size={16} /> Schedule
+              </button>
+              <button 
+                onClick={() => setActiveView("attendance")}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 ${activeView === 'attendance' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+              >
+                <ClipboardCheck size={16} /> Attendance
+              </button>
+            </div>
+
           </div>
 
-          {/* Workbench Calendar Area */}
-          {isClassesLoading ? (
-            <div className="flex-1 flex items-center justify-center"><Loader /></div>
-          ) : (
-            <BatchWorkspace 
-              batch={selectedBatch} 
-              authUser={authUser} 
-              allClasses={allBatchClasses} 
-              pendingClasses={pendingClasses} 
-              classesOnSelectedDate={classesOnSelectedDate}
-              currentDate={currentDate} 
-              setCurrentDate={setCurrentDate}
-              selectedDate={selectedDate} 
-              setSelectedDate={setSelectedDate}
-              viewTab={viewTab} 
-              setViewTab={setViewTab}
-              onBack={() => navigate('/admin/manage-batches')} // Goes back to cards!
-              onShowSyllabus={() => setIsViewSyllabusOpen(true)}
-              onAddClass={() => setIsSyllabusModalOpen(true)}
-              onScheduleClass={() => setIsModalOpen(true)}
-              onQuickSchedule={(cls) => { setClassToSchedule(cls); setIsQuickScheduleOpen(true); }}
-              onEditClass={(cls) => { setEditingClass(cls); setIsEditModalOpen(true); }}
-              onDeleteClass={handleDelete}
-              autoSchedule={autoSchedule} 
-              isAutoScheduling={isAutoScheduling}
-            />
-          )}
+          {/* MAIN WORKSPACE AREA */}
+          <div className="flex-1 overflow-hidden flex flex-col relative">
+            {isClassesLoading ? (
+              <div className="absolute inset-0 flex items-center justify-center"><Loader /></div>
+            ) : activeView === "schedule" ? (
+              // ---------------- SCHEDULE VIEW ----------------
+              <BatchWorkspace 
+                batch={selectedBatch} 
+                authUser={authUser} 
+                allClasses={allBatchClasses} 
+                pendingClasses={pendingClasses} 
+                classesOnSelectedDate={classesOnSelectedDate}
+                currentDate={currentDate} 
+                setCurrentDate={setCurrentDate}
+                selectedDate={selectedDate} 
+                setSelectedDate={setSelectedDate}
+                viewTab={viewTab} 
+                setViewTab={setViewTab}
+                onBack={() => navigate('/admin/manage-batches')} 
+                onShowSyllabus={() => setIsViewSyllabusOpen(true)}
+                onAddClass={() => setIsSyllabusModalOpen(true)}
+                onScheduleClass={() => setIsModalOpen(true)}
+                onQuickSchedule={(cls) => { setClassToSchedule(cls); setIsQuickScheduleOpen(true); }}
+                onEditClass={(cls) => { setEditingClass(cls); setIsEditModalOpen(true); }}
+                onDeleteClass={handleDelete}
+                autoSchedule={autoSchedule} 
+                isAutoScheduling={isAutoScheduling}
+              />
+            ) : (
+              // ---------------- ATTENDANCE VIEW ----------------
+              <div className="flex-1 overflow-y-auto custom-scrollbar">
+                <AttendanceBook batch={selectedBatch} classes={allBatchClasses} />
+              </div>
+            )}
+          </div>
 
         </div>
       </div>

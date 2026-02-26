@@ -13,11 +13,15 @@ import useAuth from "../../store/useAuth.js";
 import PageHeader from "../../components/common/PageHeader.jsx";
 import TableSkeleton from "../../components/common/TableSkeleton.jsx";
 import DataErrorState from "../../components/common/DataErrorState.jsx";
-
-const StudentsTable = React.lazy(() => import("../../components/table/StudentsTable.jsx"));
 import CommentModal from "../../components/modal/CommentModal.jsx";
 
+// Import Branches Hook
+import { useBranches } from "../../hooks/useBranches.js";
+
+const StudentsTable = React.lazy(() => import("../../components/table/StudentsTable.jsx"));
+
 const INITIAL_FILTERS = {
+  branch: "all", // ADDED BRANCH
   status: "all", 
   batch: "all", 
   course: "all", 
@@ -32,39 +36,38 @@ const AllStudents = () => {
   const navigate = useNavigate();
   const { showConfirmToast } = useConfirmToast();
   const { authUser } = useAuth();
-
+  
+  // Fetch Branches
+  const { data: branchesRes } = useBranches();
+  
   const [selectedStudentForQr, setSelectedStudentForQr] = useState(null);
   const [selectedStudentForComment, setSelectedStudentForComment] = useState(null);
   const [filters, setFilters] = useState(INITIAL_FILTERS);
   
   // ==========================================
-  // SEARCH LOGIC (FIXED)
+  // SEARCH LOGIC
   // ==========================================
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
-  // Update debounced search after 500ms delay
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedSearch(searchTerm);
     }, 500);
-
     return () => clearTimeout(handler);
   }, [searchTerm]);
 
   const [page, setPage] = useState(1);
   const limit = 20;
 
-  // Memoize filters to prevent unnecessary re-renders
+  // Memoize filters for the API Call
   const queryFilters = useMemo(() => {
     const activeFilters = { ...filters };
     
-    // Only add search if it actually has content
     if (debouncedSearch) {
       activeFilters.search = debouncedSearch;
     }
 
-    // Remove "all" values so they don't clutter the URL query string
     Object.keys(activeFilters).forEach(key => {
       if (activeFilters[key] === "all") delete activeFilters[key];
     });
@@ -78,9 +81,21 @@ const AllStudents = () => {
 
   const students = data?.data || [];
   const pagination = data?.pagination;
-  const filterOptions = data?.filters;
+  
 
-  // Reset to page 1 when any filter changes
+  const combinedFilterOptions = useMemo(() => {
+    const baseOptions = data?.filters || {};
+    
+    // Only pass branches if the user is a Super Admin
+    if (authUser?.role === "admin") {
+      baseOptions.branches = branchesRes?.data || [];
+    } else {
+      baseOptions.branches = [];
+    }
+
+    return baseOptions;
+  }, [data?.filters, branchesRes?.data, authUser?.role]);
+
   useEffect(() => { 
     setPage(1); 
   }, [queryFilters]);
@@ -113,9 +128,9 @@ const AllStudents = () => {
       <div className="mb-6">
         <StudentFilters 
           onFilterChange={setFilters} 
-          searchTerm={searchTerm} // Changed to pass raw text
-          onSearchChange={setSearchTerm} // New handler for instant feedback
-          filterOptions={filterOptions} 
+          searchTerm={searchTerm} 
+          onSearchChange={setSearchTerm}
+          filterOptions={combinedFilterOptions} 
           initialFilters={filters} 
           isLoading={isLoading} 
         />

@@ -8,7 +8,8 @@ const batchSchema = new mongoose.Schema(
       ref: "Course",
       required: true,
     },
-    instructor: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    // CHANGED: Now an array of references
+    instructors: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     students: [{ type: mongoose.Schema.Types.ObjectId, ref: "Student" }],
     class_contents: [
       { type: mongoose.Schema.Types.ObjectId, ref: "ClassContent" },
@@ -49,7 +50,7 @@ const batchSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Branch",
       required: true,
-      index: true, // Crucial for performance as DB grows
+      index: true,
     },
   },
   { timestamps: true },
@@ -59,33 +60,48 @@ const batchSchema = new mongoose.Schema(
 batchSchema.index({ status: 1, start_date: -1 });
 batchSchema.index({ course: 1, status: 1 });
 
-// Reference validation
-// Reference and Branch-Isolation validation
+// Reference and Branch-Isolation validation for MULTIPLE instructors
 batchSchema.pre("save", async function (next) {
-  if (this.instructor) {
-    const instructor = await mongoose
-      .model("User")
-      .findById(this.instructor)
-      .select("branch");
+  if (this.instructors && this.instructors.length > 0) {
+    try {
+      // Fetch all instructors in the array at once
+      const instructorsData = await mongoose
+        .model("User")
+        .find({ _id: { $in: this.instructors } })
+        .select("branch");
+        
+      // Ensure we found the exact number of instructors requested
+      if (instructorsData.length !== this.instructors.length) {
+        return next(new Error("One or more referenced Instructors do not exist."));
+      }
       
-    if (!instructor) {
-      throw new Error("Referenced Instructor does not exist.");
+      // Check branch isolation for each instructor
+      for (const instructor of instructorsData) {
+        if (instructor.branch && this.branch && instructor.branch.toString() !== this.branch.toString()) {
+          return next(new Error(`Security Violation: An assigned instructor does not belong to this branch.`));
+        }
+      }
+      
+      next();
+    } catch (err) {
+      return next(err);
     }
-    
-    // Check if the instructor belongs to the same branch as this batch
-    if (instructor.branch && instructor.branch.toString() !== this.branch.toString()) {
-      throw new Error("Security Violation: Instructor does not belong to this branch.");
-    }
+  } else {
+    next(); // Move on if no instructors are assigned yet
   }
-  next();
 });
+
 // Cascade delete ClassContent when Batch is removed
 batchSchema.pre(
   "deleteOne",
   { document: true, query: false },
   async function (next) {
-    await mongoose.model("ClassContent").deleteMany({ batch: this._id });
-    next();
+    try {
+      await mongoose.model("ClassContent").deleteMany({ batch: this._id });
+      next();
+    } catch (err) {
+      next(err);
+    }
   },
 );
 

@@ -1,9 +1,9 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   Edit, Trash2, QrCode, Power, PowerOff, Eye, Loader2, MessageSquare, ShieldCheck, Award, Mail, Phone,
+  MapPin,
 } from "lucide-react";
-import { API } from "../../api/axios.js";
-import toast from "react-hot-toast";
+import { useDownloadCertificate } from "../../hooks/useStudents.js";
 import DataTable from "../common/DataTable.jsx";
 import ActionIconButton from "../common/ActionIconButton.jsx";
 import Avatar from "../common/Avatar.jsx";
@@ -11,30 +11,17 @@ import Avatar from "../common/Avatar.jsx";
 const StudentsTable = ({
   students, currentUser, pagination, onDelete, onToggleStatus, onGenerateQR, onAddComment, onViewDetails, onEdit, deleteLoading, toggleLoading, page, onPageChange, searchTerm, isLoading = false,
 }) => {
-  const [downloadingId, setDownloadingId] = useState(null);
+  // Initialize the download hook
+  const downloadMutation = useDownloadCertificate();
 
-  const handleDownloadCertificate = async (student) => {
-    try {
-      setDownloadingId(student._id);
-      const response = await API.get(`/generate-certificate/download/${student._id}`, { responseType: "blob" });
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute("download", `CIB_Certificate_${student.student_id}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-      toast.success("Certificate downloaded successfully");
-    } catch (error) {
-      toast.error("Failed to generate certificate");
-    } finally {
-      setDownloadingId(null);
-    }
+  const handleDownloadCertificate = (student) => {
+    // Pass the entire student object to the mutation
+    downloadMutation.mutate(student);
   };
 
   const columns = [
     { label: "Student Name", className: "w-[30%]" },
+    { label: "Branch", className: "hidden sm:table-cell w-[10%]" }, // NEW COLUMN
     { label: "ID", className: "hidden md:table-cell w-[15%]" },
     { label: "Course", className: "hidden lg:table-cell w-[20%]" },
     { label: "Contact", className: "hidden xl:table-cell w-[15%]" },
@@ -44,6 +31,8 @@ const StudentsTable = ({
 
   const renderStudentRow = (student) => {
     const isInactive = !student.is_active;
+    // Check if THIS specific row is the one currently downloading
+    const isDownloadingThis = downloadMutation.isPending && downloadMutation.variables?._id === student._id;
 
     return (
       <tr
@@ -67,8 +56,18 @@ const StudentsTable = ({
             </div>
           </div>
         </td>
+{/* NEW: 2. Branch Column */}
+        <td className="px-6 py-4 hidden sm:table-cell align-middle">
+          <div className="flex items-center gap-1.5">
+            <MapPin size={12} className="text-indigo-400" />
+            <span className="text-[13px] font-bold text-slate-700">
+              {/* Note: Use optional chaining to prevent crashes if branch is missing */}
+              {student.branch?.branch_code || "N/A"}
+            </span>
+          </div>
+        </td>
 
-        {/* 2. ID */}
+        {/* 3. ID (Adjusted index) */}
         <td className="px-6 py-4 hidden md:table-cell align-middle">
           <span className="text-[13px] font-semibold text-slate-600 tracking-wide">
             {student.student_id}
@@ -122,11 +121,11 @@ const StudentsTable = ({
             )}
             {currentUser && (
               <ActionIconButton
-                icon={downloadingId === student._id ? Loader2 : Award}
+                icon={isDownloadingThis ? Loader2 : Award}
                 variant="purple"
                 onClick={() => handleDownloadCertificate(student)}
-                disabled={downloadingId === student._id}
-                loading={downloadingId === student._id}
+                disabled={isDownloadingThis}
+                loading={isDownloadingThis}
                 title="Download Certificate"
               />
             )}

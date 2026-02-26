@@ -220,10 +220,25 @@ export const getAllStudents = async (req, res) => {
     const limit = parseInt(req.query.limit) || 30;
     const skip = (page - 1) * limit;
 
-    const { search, status, batch, course, is_active, competency } = req.query;
+    // 1. Destructure 'branch' from the query parameters
+    const { search, status, batch, course, is_active, competency, branch } = req.query;
 
-    // Initialize with the branch isolation filter!
+    // 2. Initialize filter with branch isolation (from your middleware)
     let filter = { ...req.branchFilter }; 
+
+    // ==========================================
+    // 3. SECURE BRANCH FILTERING LOGIC
+    // ==========================================
+    if (req.user.role === "admin") {
+      // If Super Admin selects a specific branch, apply it. 
+      // Otherwise, stay global (filter stays empty or uses branch query).
+      if (branch && branch !== "all" && mongoose.Types.ObjectId.isValid(branch)) {
+        filter.branch = branch;
+      }
+    } else {
+      // Registrar/Instructor: Forced to their own branch via middleware
+      filter.branch = req.user.branch;
+    }
 
     if (search) {
       const searchRegex = { $regex: search, $options: "i" };
@@ -235,13 +250,16 @@ export const getAllStudents = async (req, res) => {
       ];
     }
 
+    // Apply exact match filters
     if (status && status !== "all") filter.status = status;
     if (competency && competency !== "all") filter.competency = competency;
     if (is_active && is_active !== "all") filter.is_active = is_active === "true";
 
+    // Validate and apply Batch/Course filters
     if (batch && batch !== "all" && mongoose.Types.ObjectId.isValid(batch)) filter.batch = batch;
     if (course && course !== "all" && mongoose.Types.ObjectId.isValid(course)) filter.course = course;
 
+    // 4. Database Queries
     const [
       students,
       total,
@@ -251,15 +269,14 @@ export const getAllStudents = async (req, res) => {
       Student.find(filter)
         .populate("course", "course_name course_code duration fee")
         .populate("batch", "batch_name batch_type time_slot")
-        .populate("branch", "branch_name branch_code") // Pull branch data
+        .populate("branch", "branch_name branch_code") // Ensure branch info is available for the table
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .lean(),
       Student.countDocuments(filter),
-      // Ensure we only get distinct batches FOR THIS SPECIFIC BRANCH
-      Student.distinct("batch", req.branchFilter), 
-      // Courses might be global, so we don't necessarily apply branchFilter here
+      // Only get distinct batches for the currently filtered set of students
+      Student.distinct("batch", filter), 
       Course.find({ is_active: true }).select("_id course_name").lean(),
     ]);
 
@@ -278,6 +295,7 @@ export const getAllStudents = async (req, res) => {
       },
     });
   } catch (error) {
+    console.error("GET_ALL_STUDENTS ERROR:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };

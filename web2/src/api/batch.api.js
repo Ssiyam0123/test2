@@ -72,9 +72,15 @@ export const scheduleClass = async (classContentId, date_scheduled) => {
 // ATTENDANCE ENDPOINTS
 // ==============================
 
-// For updating attendance on a specific class
-export const updateClassAttendance = async (classId, attendanceRecords) => {
-  const { data } = await API.put(`/batches/classes/${classId}/attendance`, { attendanceRecords });
+// ==============================
+// ATTENDANCE ENDPOINTS
+// ==============================
+
+// For updating attendance AND financials on a specific class
+export const updateClassAttendance = async (classId, payload) => {
+  // ⚠️ Notice we removed the {} brackets around payload!
+  // This sends the data directly so the backend can read it.
+  const { data } = await API.put(`/batches/classes/${classId}/attendance`, payload);
   return data;
 };
 

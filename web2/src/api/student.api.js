@@ -75,3 +75,11 @@ export const fetchAdminStudentBySearch = async (query) => {
   const { data } = await API.get(`/students/search?query=${encodeURIComponent(query.trim())}`);
   return data;
 };
+
+export const downloadStudentCertificate = async (studentId) => {
+  // Use the extracted ID, not the whole object
+  const response = await API.get(`/generate-certificate/download/${studentId}`, { 
+    responseType: "blob" 
+  });
+  return response.data;
+};

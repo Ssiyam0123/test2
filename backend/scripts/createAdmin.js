@@ -28,6 +28,7 @@ const createAdmin = async () => {
       // Authentication Fields
       username: adminUsername,
       email: adminEmail,
+      full_name : "siyam",
       password: "123456", 
       role: "admin",
       User_id: "ADM-001",

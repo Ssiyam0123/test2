@@ -148,28 +148,51 @@ export const useScheduleClass = (batchId) => {
 // ATTENDANCE MUTATIONS
 // ==============================
 
-export const useUpdateClassAttendance = (batchId) => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ classId, attendanceRecords }) => BatchAPI.updateClassAttendance(classId, attendanceRecords),
-    onSuccess: () => {
-      toast.success("Attendance records updated!");
-      queryClient.invalidateQueries({ queryKey: ["batchClasses", batchId] });
-    },
-    onError: (error) => {
-      toast.error(error?.response?.data?.message || "Failed to save attendance.");
-    },
-  });
-};
+
 
 // Legacy endpoint wrapper (from your original code)
 export const useUpdateAttendance = (batchId) => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (attendanceData) => BatchAPI.updateBatchAttendance(batchId, attendanceData),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["batchClasses", batchId] });
-      queryClient.invalidateQueries({ queryKey: ["batches"] });  
+    onSuccess: async () => {
+      await Promise.all([
+        // FIXED TYPO: Changed "batch-classes" to "batchClasses"
+        queryClient.invalidateQueries({ queryKey: ["batchClasses", batchId] }),
+        queryClient.invalidateQueries({ queryKey: ["expenses"] })
+      ]);
+      
+      toast.success("Class report and expenses saved successfully!");
     },
+  });
+};
+
+
+
+
+
+
+export const useUpdateClassAttendance = (batchId) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ classId, payload }) => {
+      const response = await BatchAPI.updateClassAttendance(classId, payload);
+      return response.data;
+    },
+    onSuccess: async () => {
+      // ⚠️ Use a broader invalidation to guarantee the UI catches the new data
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["batchClasses"] }), // Removed exact ID to force all classes to refresh
+        queryClient.invalidateQueries({ queryKey: ["batch"] }), 
+        queryClient.invalidateQueries({ queryKey: ["expenses"] })
+      ]);
+      
+      toast.success("Class report saved successfully!");
+    },
+    onError: (error) => {
+      toast.error(error?.response?.data?.message || "Failed to submit class report");
+      console.error("Class Completion Error:", error);
+    }
   });
 };

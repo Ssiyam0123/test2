@@ -158,6 +158,7 @@ function App() {
                 element={<ManageBranchForm mode="edit" />}
               />
               <Route path="manage-branches" element={<ManageBranches />} />
+              <Route path="manage-branches/:id" element={<BranchDetails />} />
               <Route path="branches/:id" element={<BranchDetails />} />
             </Route>
 

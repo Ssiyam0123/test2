@@ -1,21 +1,41 @@
-// hooks/useDashboard.js
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import toast from "react-hot-toast";
-import { fetchDashboardStats, fetchDashboardStatsWithFilters } from "../api/dashboard.api.js";
 
+
+
+
+import { useQuery,useQueryClient } from "@tanstack/react-query";
+import { 
+  fetchDashboardStats, 
+  fetchDashboardStatsWithFilters,
+  fetchBranchStats 
+} from "../api/dashboard.api.js";
+import toast from "react-hot-toast";
+
+// Existing global hook
 export const useDashboardStats = (filters = {}) => {
   return useQuery({
     queryKey: ["dashboard", "stats", filters],
     queryFn: () => fetchDashboardStatsWithFilters(filters),
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    cacheTime: 10 * 60 * 1000, // 10 minutes
-    refetchOnWindowFocus: false,
+    staleTime: 5 * 60 * 1000,
     retry: 1,
+  });
+};
+
+// NEW: Hook for Branch Specific Analytics
+export const useBranchStats = (branchId) => {
+  return useQuery({
+    queryKey: ["dashboard", "branch", branchId],
+    queryFn: () => fetchBranchStats(branchId),
+    enabled: !!branchId, // Only run if branchId exists
+    staleTime: 5 * 60 * 1000,
     onError: (error) => {
-      toast.error(`Failed to load dashboard data: ${error.message}`);
+      toast.error(`Failed to load branch data: ${error.message}`);
     },
   });
 };
+
+// ... keep your usePrefetchDashboard and useRefreshDashboard hooks as they were
+
+
 
 export const usePrefetchDashboard = () => {
   const queryClient = useQueryClient();

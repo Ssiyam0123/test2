@@ -50,7 +50,6 @@ const EntityForm = ({
     
     if (formErrors[name]) setFormErrors((prev) => ({ ...prev, [name]: undefined }));
     
-    // Checkbox Group Array logic
     if (e.target.dataset.group === "checkbox-group") {
       setFormData((prev) => {
         const currentArray = Array.isArray(prev[name]) ? prev[name] : [];
@@ -161,15 +160,15 @@ const EntityForm = ({
                 <div key={field.name} className={field.fullWidth ? "col-span-full" : ""}>
                   {field.render({
                     value: formData[field.name],
-                    onChange: (val) => setFormData(prev => ({ ...prev, [field.name]: val }))
+                    onChange: (val) => {
+                      setFormData(prev => ({ ...prev, [field.name]: val }));
+                      if (field.onChange) field.onChange(val); // Trigger custom onChange
+                    }
                   })}
                 </div>
               );
             }
 
-            // ==========================================
-            // UPDATED: Checkbox Group Logic (Clean Grid UI)
-            // ==========================================
             if (field.type === "checkbox-group") {
               const currentValues = Array.isArray(formData[field.name]) ? formData[field.name] : [];
               return (
@@ -177,7 +176,6 @@ const EntityForm = ({
                   <label className="block mb-4 text-[13px] font-bold text-gray-800 tracking-wide ml-1">
                     {field.label}
                   </label>
-                  {/* The grid controls the layout exactly like the image */}
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-y-4 gap-x-6 ml-1">
                     {field.options.map((opt) => (
                       <label 
@@ -190,8 +188,10 @@ const EntityForm = ({
                           value={opt.value}
                           data-group="checkbox-group"
                           checked={currentValues.includes(opt.value)}
-                          onChange={handleChange}
-                          // Uses accent color to get the native teal fill without custom SVGs
+                          onChange={(e) => {
+                            handleChange(e);
+                            if (field.onChange) field.onChange(e); // Trigger custom onChange
+                          }}
                           className="w-[18px] h-[18px] text-teal-600 bg-white border-gray-300 rounded focus:ring-teal-500 accent-teal-600 cursor-pointer transition-all"
                         />
                         <span className="text-[14px] text-gray-700 font-medium select-none group-hover:text-gray-900 transition-colors">
@@ -207,7 +207,20 @@ const EntityForm = ({
 
             if (field.type === "select") {
               return (
-                <SelectGroup key={field.name} label={field.label} name={field.name} value={formData[field.name] || ""} onChange={handleChange} options={field.options} defaultOption={field.defaultOption} required={field.required} error={formErrors[field.name]} />
+                <SelectGroup 
+                  key={field.name} 
+                  label={field.label} 
+                  name={field.name} 
+                  value={formData[field.name] || ""} 
+                  onChange={(e) => {
+                    handleChange(e);
+                    if (field.onChange) field.onChange(e); // Trigger custom onChange
+                  }} 
+                  options={field.options} 
+                  defaultOption={field.defaultOption} 
+                  required={field.required} 
+                  error={formErrors[field.name]} 
+                />
               );
             }
             
@@ -218,7 +231,10 @@ const EntityForm = ({
                   <textarea 
                     name={field.name} 
                     value={formData[field.name] || ""} 
-                    onChange={handleChange} 
+                    onChange={(e) => {
+                      handleChange(e);
+                      if (field.onChange) field.onChange(e); // Trigger custom onChange
+                    }} 
                     rows={field.rows || "3"} 
                     placeholder={field.placeholder} 
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-sm placeholder-gray-400 focus:outline-none focus:ring-4 focus:ring-teal-500/5 focus:border-teal-500 transition-all duration-200" 
@@ -235,7 +251,10 @@ const EntityForm = ({
                   name={field.name} 
                   type={field.type || "text"} 
                   value={formData[field.name] || ""} 
-                  onChange={handleChange} 
+                  onChange={(e) => {
+                    handleChange(e);
+                    if (field.onChange) field.onChange(e); // Trigger custom onChange
+                  }} 
                   placeholder={field.placeholder} 
                   required={field.required} 
                   error={formErrors[field.name]} 
@@ -265,7 +284,16 @@ const EntityForm = ({
           <div className="flex flex-wrap gap-6 pt-6 border-t border-gray-50">
             {singleCheckboxFields.map((field) => (
               <label key={field.name} className="flex items-center space-x-3 cursor-pointer group">
-                <input type="checkbox" name={field.name} checked={formData[field.name] || false} onChange={handleChange} className="w-[18px] h-[18px] text-teal-600 rounded-lg border-gray-300 focus:ring-teal-500 accent-teal-600 transition-all cursor-pointer" />
+                <input 
+                  type="checkbox" 
+                  name={field.name} 
+                  checked={formData[field.name] || false} 
+                  onChange={(e) => {
+                    handleChange(e);
+                    if (field.onChange) field.onChange(e); // Trigger custom onChange
+                  }} 
+                  className="w-[18px] h-[18px] text-teal-600 rounded-lg border-gray-300 focus:ring-teal-500 accent-teal-600 transition-all cursor-pointer" 
+                />
                 <span className="text-sm font-bold text-gray-600 group-hover:text-gray-900 transition-colors">{field.label}</span>
               </label>
             ))}

@@ -58,13 +58,13 @@ const StudentSearch = () => {
   const navigate = useNavigate();
   const resultsRef = useRef(null);
 
- const {
-  data: searchData,
-  isLoading,
-  isError,
-  error,
-  isFetching,
-} = usePublicStudentSearch(searchQuery, isSearchEnabled);
+  const {
+    data: searchData,
+    isLoading,
+    isError,
+    error,
+    isFetching,
+  } = usePublicStudentSearch(searchQuery, isSearchEnabled);
 
   const getImageUrl = (url) => {
     if (!url) return null;
@@ -101,10 +101,6 @@ const StudentSearch = () => {
 
   const searchResults = searchData?.data ? [searchData.data] : [];
   const hasSearched = isSearchEnabled || searchData || isError;
-
-//   useEffect(()=>{
-// console.log(searchResults);
-//   },[searchResults])
 
   return (
     <div className="bg-[#000c1d] min-h-screen text-white selection:bg-[#EC1B23]/30">
@@ -193,15 +189,12 @@ const StudentSearch = () => {
                               src={getImageUrl(student.photo_url)}
                               alt={student.student_name}
                               onError={(e) => {
-                                // Fallback if the image URL is broken
                                 e.target.style.display = "none";
-                                e.target.nextElementSibling.style.display =
-                                  "flex";
+                                e.target.nextElementSibling.style.display = "flex";
                               }}
                             />
                           ) : null}
 
-                          {/* Fallback avatar if no photo exists or image fails to load */}
                           <div
                             className="h-full w-full items-center justify-center bg-slate-800"
                             style={{
@@ -236,12 +229,14 @@ const StudentSearch = () => {
                         <InfoItem
                           icon={BookOpen}
                           label="Course Title"
-                          value={student.course_name}
+                          // SAFE EXTRACTION: Grab nested course_name if course is an object
+                          value={student.course?.course_name || student.course_name}
                         />
                         <InfoItem
                           icon={Building}
-                          label="Batch ID"
-                          value={student.batch}
+                          label="Batch"
+                          // SAFE EXTRACTION: Grab nested batch_name if batch is an object
+                          value={student.batch?.batch_name || (typeof student.batch === "string" ? student.batch : "N/A")}
                         />
                       </div>
 

@@ -16,6 +16,7 @@ import {
   checkBranchDuplicates,
   processBranchPayload
 } from "../validators/branch.validator.js";
+import { getBranchStats } from "../controllers/dashboard.controller.js";
 
 const router = express.Router();
 
@@ -48,5 +49,5 @@ router.put(
 // DANGER: Admin only
 router.patch("/:id/toggle", authorize("admin"), toggleBranchStatus);
 router.delete("/:id", authorize("admin"), deleteBranch);
-
+router.get("/branch-stats/:branchId", protectRoute, getBranchStats);
 export default router;

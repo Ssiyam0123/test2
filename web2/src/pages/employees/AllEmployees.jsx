@@ -16,7 +16,11 @@ import DataErrorState from "../../components/common/DataErrorState.jsx";
 import EmployeeFilters from "../../components/Search_filter/EmployeeFilters.jsx";
 import EmployeesTable from "../../components/table/EmployeesTable.jsx";
 
+// Import Branches Hook
+import { useBranches } from "../../hooks/useBranches.js";
+
 const INITIAL_FILTERS = {
+  branch: "all", // ADDED BRANCH
   status: "all",
   department: "all",
   role: "all",
@@ -28,6 +32,9 @@ const AllEmployees = () => {
   const navigate = useNavigate();
   const { authUser } = useAuth();
   const currentUserId = authUser?.id || authUser?._id;
+
+  // Fetch Branches
+  const { data: branchesRes } = useBranches();
 
   const [filters, setFilters] = useState(INITIAL_FILTERS);
   const [searchTerm, setSearchTerm] = useState("");
@@ -64,6 +71,16 @@ const AllEmployees = () => {
 
   const employees = data?.data || [];
   const pagination = data?.pagination;
+
+  // ==========================================
+  // INJECT BRANCHES INTO FILTER OPTIONS
+  // ==========================================
+  const combinedFilterOptions = useMemo(() => {
+    return {
+      // Only Super Admins see the branch filter dropdown
+      branches: authUser?.role === "admin" ? branchesRes?.data || [] : []
+    };
+  }, [branchesRes?.data, authUser?.role]);
 
   useEffect(() => {
     setPage(1);
@@ -102,6 +119,7 @@ const AllEmployees = () => {
           searchTerm={searchTerm}
           onSearchChange={setSearchTerm}
           onFilterChange={setFilters}
+          filterOptions={combinedFilterOptions} // <--- PASSING THE BRANCHES HERE
           initialFilters={INITIAL_FILTERS}
           isLoading={isLoading}
         />

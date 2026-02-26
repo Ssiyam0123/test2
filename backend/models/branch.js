@@ -14,7 +14,7 @@ const branchSchema = new mongoose.Schema(
       unique: true, 
       uppercase: true, 
       trim: true 
-    }, // e.g., "DHK-01"
+    }, 
     address: { type: String, required: true },
     contact_email: { type: String, lowercase: true },
     contact_phone: { type: String },

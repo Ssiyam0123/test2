@@ -1,8 +1,39 @@
+import mongoose from "mongoose";
 import Batch from "../models/batch.js";
 
+export const validateBatchRequiredFields = (req, res, next) => {
+  const isUpdate = req.method === "PUT";
+  const { batch_name, course, branch, start_date, schedule_days, start_time, end_time } = req.body;
+  
+  if (!isUpdate) {
+    // Determine the effective branch (Admin sends it, Registrar auto-gets it)
+    const effectiveBranch = branch || (req.user && req.user.role !== 'admin' ? req.user.branch : null);
 
+    if (!batch_name || !course || !effectiveBranch || !start_date) {
+      return res.status(400).json({ message: "Batch name, course, branch, and start date are required." });
+    }
 
-// 2. Check for Duplicate Batch Names (Remains Unchanged)
+    // ==========================================
+    // 🛡️ PREVENT 500 CAST ERRORS
+    // ==========================================
+    // If the frontend sends the default placeholder text instead of an ID, block it here.
+    if (!mongoose.Types.ObjectId.isValid(course)) {
+      return res.status(400).json({ message: "Please select a valid Course." });
+    }
+    if (!mongoose.Types.ObjectId.isValid(effectiveBranch)) {
+      return res.status(400).json({ message: "Please select a valid Campus/Branch." });
+    }
+
+    if (!schedule_days || schedule_days.length === 0) {
+      return res.status(400).json({ message: "At least one class day must be selected." });
+    }
+    if (!start_time || !end_time) {
+      return res.status(400).json({ message: "Start and End times are required." });
+    }
+  }
+  next();
+};
+
 export const checkBatchDuplicates = async (req, res, next) => {
   try {
     const { batch_name } = req.body;
@@ -23,44 +54,35 @@ export const checkBatchDuplicates = async (req, res, next) => {
   }
 };
 
-// 1. Check Required Fields
-export const validateBatchRequiredFields = (req, res, next) => {
-  const isUpdate = req.method === "PUT";
-  const { batch_name, course, start_date, schedule_days, start_time, end_time } = req.body;
-  
-  // During creation, everything is required. 
-  // During update, we only check fields that are actually present in the request.
-  if (!isUpdate) {
-    if (!batch_name || !course || !start_date) {
-      return res.status(400).json({ message: "Batch name, course, and start date are required." });
-    }
-    if (!schedule_days || schedule_days.length === 0) {
-      return res.status(400).json({ message: "At least one class day must be selected." });
-    }
-    if (!start_time || !end_time) {
-      return res.status(400).json({ message: "Start time and End time are required." });
-    }
-  }
-
-  next();
-};
-
-// 3. Process Payload (Fixing potential reference errors)
 export const processBatchPayload = (req, res, next) => {
   try {
-    // Only nest if the times are actually provided (important for partial updates)
+    // Auto-inject branch ID for non-admins so they don't have to select it
+    if (req.user && req.user.role !== 'admin') {
+      req.body.branch = req.user.branch;
+    }
+
+    // ==========================================
+    // 👨‍🏫 INSTRUCTOR ARRAY FORMATTING
+    // ==========================================
+    // If only one instructor is selected, some frontends send it as a string instead of an array.
+    // This ensures Mongoose always receives an array.
+    if (req.body.instructors) {
+      if (!Array.isArray(req.body.instructors)) {
+        req.body.instructors = [req.body.instructors];
+      }
+    }
+
+    // Format Time Slot
     if (req.body.start_time || req.body.end_time) {
       req.body.time_slot = {
         start_time: req.body.start_time || req.body.time_slot?.start_time,
         end_time: req.body.end_time || req.body.time_slot?.end_time
       };
-      
-      // Don't delete them yet if you have other validators running
-      // Or simply check if they exist before deleting
       delete req.body.start_time;
       delete req.body.end_time;
     }
 
+    // Format Date
     if (req.body.start_date) {
       req.body.start_date = new Date(req.body.start_date);
     }

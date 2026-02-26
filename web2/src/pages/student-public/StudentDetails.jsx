@@ -1,13 +1,14 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   User, Hash, BookOpen, Calendar, Phone, Mail, MapPin, ArrowLeft,
   XCircle, Clock, Award, Building, FileText, Shield,
-  Info, Edit3, UserCheck, MessageSquare, Quote
+  Info, Edit3, UserCheck, MessageSquare, Quote, ClipboardCheck, CheckCircle2 // Added Icons
 } from "lucide-react";
 import useAuth from "../../store/useAuth.js";
 import LogoLoader from "../../components/LogoLoader.jsx";
 import { usePublicStudentProfile, useStudent } from "../../hooks/useStudents.js";
+import { useBatchClasses } from "../../hooks/useBatches.js"; // Added Batch Hook
 import { InfoItem, SectionCard } from "../../components/ProfileLayout.jsx";
 import { apiURL } from "../../../Constant.js";
 
@@ -37,9 +38,58 @@ const StudentDetails = () => {
   const error = authUser ? adminErrorObj : publicErrorObj;
   const studentResponse = authUser ? adminData : publicData;
 
-  // IMPORTANT: The backend returns { success: true, data: { ... } }
   const student = studentResponse?.data || studentResponse;
   const comments = student?.comments || [];
+
+  // ==========================================
+  // ATTENDANCE ENGINE
+  // ==========================================
+  // Safely extract the batch ID whether it's populated or just a string reference
+  const batchId = student?.batch?._id || student?.batch;
+  
+  // Fetch the classes for this specific batch
+  const { data: classesResponse } = useBatchClasses(batchId);
+  const batchClasses = classesResponse?.data || [];
+
+  // Crunch the numbers
+  const attendanceStats = useMemo(() => {
+    if (!batchClasses.length || !student?._id) return null;
+
+    let present = 0;
+    let totalMarked = 0;
+    const recentHistory = [];
+
+    // Only look at classes that have been marked as completed
+    const completedClasses = batchClasses.filter(cls => cls.is_completed);
+
+    completedClasses.forEach(cls => {
+      // Find this specific student in the class attendance array
+      const record = cls.attendance?.find(
+        a => a.student === student._id || a.student?._id === student._id
+      );
+
+      if (record) {
+        totalMarked++;
+        if (record.status === "present") present++;
+        
+        recentHistory.push({
+          classNum: cls.class_number,
+          date: cls.date_scheduled,
+          status: record.status
+        });
+      }
+    });
+
+    // Sort by most recent class first and grab the last 5
+    recentHistory.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    return {
+      present,
+      totalMarked,
+      percentage: totalMarked > 0 ? Math.round((present / totalMarked) * 100) : 0,
+      recent: recentHistory.slice(0, 5)
+    };
+  }, [batchClasses, student?._id]);
 
   if (isLoading) return <LogoLoader />;
   if (isError || !student)
@@ -100,7 +150,6 @@ const StudentDetails = () => {
                 </div>
                 <div className="px-4 py-1.5 bg-slate-800/80 rounded-xl border border-slate-700 text-sm font-bold flex items-center gap-2 text-slate-200">
                   <Building size={14} className="text-blue-400" /> 
-                  {/* FIX: student.batch is now an object, access batch_name */}
                   {student.batch?.batch_name || "N/A"}
                 </div>
               </div>
@@ -110,36 +159,91 @@ const StudentDetails = () => {
       </div>
 
       <div className="max-w-6xl mx-auto px-4 -mt-10 relative z-20">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
           
-          <SectionCard title="Contact Registry" icon={User} color="text-blue-500">
-            <InfoItem icon={Mail} label="Email Address" value={student.email} />
-            <InfoItem icon={Phone} label="Primary Contact" value={student.contact_number} />
-            <InfoItem icon={MapPin} label="Postal Address" value={student.address} />
-          </SectionCard>
+          <div className="lg:col-span-1">
+            <SectionCard title="Contact Registry" icon={User} color="text-blue-500">
+              <InfoItem icon={Mail} label="Email Address" value={student.email} />
+              <InfoItem icon={Phone} label="Primary Contact" value={student.contact_number} />
+              <InfoItem icon={MapPin} label="Postal Address" value={student.address} />
+            </SectionCard>
+          </div>
 
-          <SectionCard title="Academic Portfolio" icon={BookOpen} color="text-purple-500">
-            {/* FIX: student.course is an object, access course_name */}
-            <InfoItem icon={Award} label="Enrolled Course" value={student.course?.course_name || "N/A"} />
-            <InfoItem 
-                icon={Clock} 
-                label="Standard Duration" 
-                
-                value={`${student.course?.duration?.value || 0} ${student.course?.duration?.unit || 'months'}`} 
-            />
-            <InfoItem icon={UserCheck} label="Completion" value={student.status?.toUpperCase()} />
-            <InfoItem icon={Info} label="Assessment" value={student.competency?.replace("_", " ")} color="text-emerald-400" />
-          </SectionCard>
+          <div className="lg:col-span-1">
+            <SectionCard title="Academic Portfolio" icon={BookOpen} color="text-purple-500">
+              <InfoItem icon={Award} label="Enrolled Course" value={student.course?.course_name || "N/A"} />
+              <InfoItem 
+                  icon={Clock} 
+                  label="Standard Duration" 
+                  value={`${student.course?.duration?.value || 0} ${student.course?.duration?.unit || 'months'}`} 
+              />
+              <InfoItem icon={UserCheck} label="Completion" value={student.status?.toUpperCase()} />
+              <InfoItem icon={Info} label="Assessment" value={student.competency?.replace("_", " ")} color="text-emerald-400" />
+            </SectionCard>
+          </div>
 
-          <SectionCard title="Official Records" icon={Shield} color="text-emerald-500">
-            <div className={`p-5 rounded-2xl mb-6 border-2 flex items-center justify-between ${student.is_active ? "bg-green-500/10 border-green-500/20" : "bg-red-500/10 border-red-500/20"}`}>
-              <span className="text-xs font-black tracking-widest text-slate-400 uppercase">System Status</span>
-              <span className={`text-[10px] px-3 py-1 rounded-lg font-black uppercase ${student.is_active ? "bg-green-600 text-white" : "bg-red-600 text-white"}`}>{student.is_active ? "Active" : "Archived"}</span>
-            </div>
-            <InfoItem icon={Calendar} label="Issue Date" value={new Date(student.issue_date).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })} />
-          </SectionCard>
+          <div className="lg:col-span-1">
+            <SectionCard title="Official Records" icon={Shield} color="text-emerald-500">
+              <div className={`p-5 rounded-2xl mb-6 border-2 flex items-center justify-between ${student.is_active ? "bg-green-500/10 border-green-500/20" : "bg-red-500/10 border-red-500/20"}`}>
+                <span className="text-xs font-black tracking-widest text-slate-400 uppercase">System Status</span>
+                <span className={`text-[10px] px-3 py-1 rounded-lg font-black uppercase ${student.is_active ? "bg-green-600 text-white" : "bg-red-600 text-white"}`}>{student.is_active ? "Active" : "Archived"}</span>
+              </div>
+              <InfoItem icon={Calendar} label="Issue Date" value={new Date(student.issue_date).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })} />
+            </SectionCard>
+          </div>
+
+          {/* ========================================== */}
+          {/* NEW ATTENDANCE CARD */}
+          {/* ========================================== */}
+          <div className="lg:col-span-1">
+            <SectionCard title="Attendance" icon={ClipboardCheck} color="text-teal-500">
+              {attendanceStats ? (
+                <>
+                  <div className="flex items-center justify-between mb-6">
+                    <span className="text-xs font-black tracking-widest text-slate-400 uppercase">Overall Rate</span>
+                    <span className={`text-2xl font-black ${
+                      attendanceStats.percentage >= 80 ? 'text-emerald-400' : 
+                      attendanceStats.percentage >= 50 ? 'text-amber-400' : 'text-rose-400'
+                    }`}>
+                      {attendanceStats.percentage}%
+                    </span>
+                  </div>
+
+                  <div className="space-y-3">
+                    <span className="text-[10px] font-black tracking-widest text-slate-500 uppercase">Recent Classes</span>
+                    {attendanceStats.recent.length > 0 ? (
+                      attendanceStats.recent.map((rec, i) => (
+                        <div key={i} className="flex items-center justify-between p-2.5 rounded-xl bg-slate-800/50 border border-slate-700/50">
+                          <div className="flex items-center gap-3">
+                            {rec.status === "present" ? (
+                              <CheckCircle2 size={16} className="text-emerald-400" />
+                            ) : (
+                              <XCircle size={16} className="text-rose-400" />
+                            )}
+                            <span className="text-xs font-bold text-slate-300">Class {rec.classNum}</span>
+                          </div>
+                          <span className="text-[10px] font-medium text-slate-500">
+                            {new Date(rec.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                          </span>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-xs text-slate-500 italic text-center py-2">No completed classes found.</div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-8 opacity-50">
+                  <Clock className="w-8 h-8 text-slate-500 mb-2" />
+                  <span className="text-xs font-bold text-slate-400 text-center">No attendance data<br/>available yet</span>
+                </div>
+              )}
+            </SectionCard>
+          </div>
+
         </div>
 
+        {/* Observations Section */}
         {authUser && (
           <div className="mt-12 animate-in fade-in slide-in-from-bottom-6 duration-700">
             <div className="flex items-center gap-3 mb-6 px-2">
@@ -191,6 +295,7 @@ const StudentDetails = () => {
           </div>
         )}
 
+        {/* Action Buttons */}
         {authUser && (
           <div className="mt-10 flex flex-col sm:flex-row gap-4">
             <button onClick={() => navigate(`/admin/update-student/${student._id}`)} className="flex-1 py-5 bg-gradient-to-r from-[#EC1B23] to-[#FF3D3D] text-white font-black rounded-3xl transition-all flex items-center justify-center gap-3 active:scale-[0.98]">

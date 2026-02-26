@@ -4,6 +4,7 @@ import Batch from "../models/batch.js";
 import User from "../models/user.js";
 import ClassContent from "../models/classContent.js";
 import Comment from "../models/comment.js";
+import mongoose from "mongoose";
 
 export const getDashboardStats = async (req, res) => {
   try {
@@ -181,5 +182,61 @@ export const getDashboardStats = async (req, res) => {
       message: "Error fetching dashboard statistics",
       error: error.message,
     });
+  }
+};
+
+
+
+
+
+export const getBranchStats = async (req, res) => {
+  try {
+    const { branchId } = req.params;
+
+    // VALIDATION: Prevent crash if ID is malformed
+    if (!mongoose.Types.ObjectId.isValid(branchId)) {
+      return res.status(400).json({ success: false, message: "Invalid Branch ID format" });
+    }
+
+    const branchObjectId = new mongoose.Types.ObjectId(branchId);
+
+    // Run queries in parallel for speed
+    const [generalStats, batchDistribution] = await Promise.all([
+      Promise.all([
+        Student.countDocuments({ branch: branchObjectId }),
+        Batch.countDocuments({ branch: branchObjectId, status: "Active" }),
+        User.countDocuments({ branch: branchObjectId, role: "instructor" }),
+        Course.countDocuments({ is_active: true }), 
+      ]),
+
+      Batch.aggregate([
+        { $match: { branch: branchObjectId } },
+        {
+          $project: {
+            batch_name: 1,
+            // Safety check: ensure students array exists before getting size
+            student_count: { $size: { $ifNull: ["$students", []] } },
+            createdAt: 1
+          },
+        },
+        { $sort: { createdAt: -1 } },
+        { $limit: 10 },
+      ]),
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        totalStudents: generalStats[0],
+        activeBatches: generalStats[1],
+        instructors: generalStats[2],
+        activeCourses: generalStats[3],
+        chartData: batchDistribution,
+      },
+    });
+  } catch (error) {
+    // LOG THE ACTUAL ERROR to your terminal so you can see it
+    console.error("DASHBOARD_STATS_ERROR:", error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };

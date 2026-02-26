@@ -1,8 +1,9 @@
 // src/pages/batches/ManageBatchesTabs.jsx
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useActiveBatches } from "../../hooks/useBatches";
+import { useActiveBatches, useDeleteBatch } from "../../hooks/useBatches"; // IMPORT DELETION HOOK
 import useAuth from "../../store/useAuth";
+import { useConfirmToast } from "../../components/ConfirmToast.jsx"; // IMPORT CONFIRM TOAST
 
 import BatchHeader from "../../components/batches/BatchHeader";
 import BatchList from "../../components/batches/BatchList";
@@ -12,6 +13,10 @@ export default function ManageBatchesTabs() {
   const navigate = useNavigate();
   const { authUser } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
+  
+  // Initialize Toast and Mutation
+  const { showConfirmToast } = useConfirmToast();
+  const deleteBatchMutation = useDeleteBatch();
 
   const { data: batchesResponse, isLoading: batchesLoading } = useActiveBatches();
   const batches = batchesResponse?.data || [];
@@ -20,6 +25,23 @@ export default function ManageBatchesTabs() {
     b.batch_name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     (b.course?.course_name && b.course.course_name.toLowerCase().includes(searchTerm.toLowerCase()))
   );
+
+  // ==========================================
+  // DELETE HANDLER LOGIC
+  // ==========================================
+  const handleDeleteBatch = (e, id, batchName) => {
+    e.stopPropagation(); // Prevents the card click from navigating to the details page
+
+    showConfirmToast({
+      type: "delete",
+      title: "Delete Batch",
+      message: `Are you sure you want to permanently delete`,
+      itemName: batchName,
+      confirmText: "Delete",
+      confirmColor: "red",
+      onConfirm: async () => await deleteBatchMutation.mutateAsync(id),
+    })
+  };
 
   if (batchesLoading) return <Loader />;
 
@@ -30,11 +52,12 @@ export default function ManageBatchesTabs() {
           
           <BatchHeader searchTerm={searchTerm} setSearchTerm={setSearchTerm} authUser={authUser} />
 
-          {/* Navigates to the ID route when clicked */}
           <BatchList 
             batches={filteredBatches} 
             authUser={authUser} 
             onSelectBatch={(batch) => navigate(`/admin/batches/${batch._id}`)} 
+            onDeleteBatch={handleDeleteBatch}
+            isDeleting={deleteBatchMutation.isPending}
           />
 
         </div>

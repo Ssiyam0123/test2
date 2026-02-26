@@ -14,7 +14,6 @@ import { upload } from "../middlewares/multer.js";
 import protectRoute from "../middlewares/auth.middleware.js";
 import { authorize } from "../middlewares/auth.js";
 
-// Import new validators
 import { 
   validateUserFields, 
   checkUserDuplicates, 
@@ -24,7 +23,6 @@ import {
 
 const router = express.Router();
 
-// Apply auth to all routes
 router.use(protectRoute);
 
 // Admin & Registrar: View and Search users
@@ -37,9 +35,9 @@ router.post(
   "/create", 
   authorize("admin"), 
   upload.single("photo"),
-  validateUserFields, 
+  // validateUserFields, 
   checkUserDuplicates, 
-  processUserPayload, // <--- THIS WAS MISSING! It now formats social_links and photo_url properly
+  processUserPayload,
   addUser
 );
 
@@ -53,19 +51,12 @@ router.put(
   updateUser
 );
 
-
+// Unified exact route naming convention
 router.delete("/:id/image", authorize("admin"), removeUserImage);
-
-
-
 router.delete("/:id", authorize("admin"), deleteUser);
-
-
-
 router.patch("/update-status/:id", authorize("admin"), updateUserStatus);
-router.patch("/toggle-role/:id", authorize("admin"), validateRoleUpdate, updateUserRole);
 
-// Admin only: Role updates
+// Role updates
 router.patch(
   "/:id/role", 
   authorize("admin"), 

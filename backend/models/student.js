@@ -6,7 +6,7 @@ const studentSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
-      match: [/^[a-zA-Z\s\-']+$/, "Invalid name format"],
+      // match: [/^[a-zA-Z\s\-']+$/, "Invalid name format"],
     },
     fathers_name: { type: String, required: true, trim: true },
     student_id: {

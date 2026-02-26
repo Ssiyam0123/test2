@@ -3,11 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { useAddStudent, useUpdateStudent } from "../../hooks/useStudents.js";
 import { useActiveCourses } from "../../hooks/useCourses.js";
 import { useActiveBatches } from "../../hooks/useBatches.js"; 
+import { useBranches } from "../../hooks/useBranches.js"; // IMPORT THIS
+import useAuth from "../../store/useAuth"; // IMPORT THIS
 import Loader from "../../components/Loader.jsx";
 import EntityForm from "../../components/common/EntityForm.jsx";
 
 const buildStudentPayload = (baseFormData, jsonPayload, coursesData) => {
-
   const selectedCourseId = jsonPayload.course;
   const courseDetails = coursesData?.data?.find(c => c._id === selectedCourseId);
 
@@ -18,31 +19,37 @@ const buildStudentPayload = (baseFormData, jsonPayload, coursesData) => {
        baseFormData.append("course_duration[value]", courseDetails.duration.value);
        baseFormData.append("course_duration[unit]", courseDetails.duration.unit);
     } else {
-       // Fallback if missing
        baseFormData.append("course_duration[value]", 3);
        baseFormData.append("course_duration[unit]", "months");
     }
   }
-
   return baseFormData;
 };
 
 const AddStudentForm = ({ mode = "add", data = null }) => {
   const navigate = useNavigate();
+  const { authUser } = useAuth();
   
   const { data: coursesData, isLoading: coursesLoading, error: coursesError } = useActiveCourses();
   const { data: batchesData, isLoading: batchesLoading, error: batchesError } = useActiveBatches();
+  const { data: branchesResponse, isLoading: branchesLoading } = useBranches(); // Fetch branches
   
   const addStudentMutation = useAddStudent();
   const editStudentMutation = useUpdateStudent();
 
-  // 1. Course Options
+  const branchOptions = useMemo(() => {
+    if (!branchesResponse?.data) return [];
+    return branchesResponse.data.map(b => ({ 
+      value: b._id, 
+      label: `${b.branch_name} (${b.branch_code})` 
+    }));
+  }, [branchesResponse]);
+
   const courseOptions = useMemo(() => {
     const activeCourses = coursesData?.data || [];
     return activeCourses.map((c) => ({ value: c._id, label: c.course_name }));
   }, [coursesData]);
 
-  // 2. Batch Options
   const batchOptions = useMemo(() => {
     const allBatches = batchesData?.data || [];
     return allBatches.map((b) => ({ 
@@ -51,16 +58,16 @@ const AddStudentForm = ({ mode = "add", data = null }) => {
     }));
   }, [batchesData]);
 
-  // 3. Initial Data
   const initialData = mode === "edit" && data ? {
     ...data,
     course: data.course?._id || data.course || "", 
     batch: data.batch?._id || data.batch || "", 
+    branch: data.branch?._id || data.branch || "", // ADDED THIS
     issue_date: data.issue_date?.split("T")[0] || "",
     completion_date: data.completion_date?.split("T")[0] || "",
   } : {
     student_name: "", fathers_name: "", student_id: "", registration_number: "",
-    gender: "male", course: "", competency: "not_assessed", batch: "", status: "active",
+    gender: "male", course: "", competency: "not_assessed", batch: "", branch: "", status: "active",
     issue_date: "", completion_date: "", contact_number: "", email: "", address: "",
     is_active: true, is_verified: false,
   };
@@ -73,6 +80,16 @@ const AddStudentForm = ({ mode = "add", data = null }) => {
     ]},
     
     { divider: true, name: "divider-academic", title: "Academic Information" }, 
+
+    // CONDITIONAL BRANCH FIELD
+    ...(authUser?.role === "admin" ? [{
+      name: "branch",
+      label: "Assigned Campus",
+      type: "select",
+      options: branchOptions,
+      required: true,
+      defaultOption: "Select Campus",
+    }] : []),
 
     { name: "student_id", label: "Student ID", required: true },
     { name: "registration_number", label: "Registration Number" },
@@ -101,10 +118,8 @@ const AddStudentForm = ({ mode = "add", data = null }) => {
     { name: "is_verified", label: "Student Verified", type: "checkbox" },
   ];
 
-
   const handleSubmit = (formData, jsonPayload) => {
     const finalPayload = buildStudentPayload(formData, jsonPayload, coursesData);
-
     const mutationConfig = { onSuccess: () => navigate("/admin/all-students") };
     
     if (mode === "edit") {
@@ -115,7 +130,7 @@ const AddStudentForm = ({ mode = "add", data = null }) => {
   };
 
   const isMutating = addStudentMutation.isPending || editStudentMutation.isPending;
-  const isLoading = coursesLoading || batchesLoading;
+  const isLoading = coursesLoading || batchesLoading || branchesLoading;
 
   if (isLoading) return <Loader />;
   if (coursesError || batchesError) return <div className="p-6 text-red-600">Error loading data. Please refresh.</div>;
@@ -123,7 +138,7 @@ const AddStudentForm = ({ mode = "add", data = null }) => {
   return (
     <div className="min-h-screen bg-[#e8f0f2] py-8 px-4">
       <EntityForm
-        key={data?._id || "new"} // Ensures form resets properly between edits
+        key={data?._id || "new"}
         title={mode === "edit" ? "Edit Student Profile" : "Register New Student"}
         subtitle={`Fill out the information below to ${mode === "edit" ? "update" : "create"} a student record.`}
         config={studentConfig}

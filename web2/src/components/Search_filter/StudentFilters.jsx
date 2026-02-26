@@ -10,6 +10,7 @@ const StudentFilters = ({
   isLoading = false,
 }) => {
   const [filters, setFilters] = useState({
+    branch: "all", // NEW
     status: "all",
     batch: "all",
     course: "all",
@@ -33,6 +34,7 @@ const StudentFilters = ({
 
   const clearFilters = () => {
     const cleared = {
+      branch: "all", // NEW
       status: "all",
       batch: "all",
       course: "all",
@@ -54,20 +56,29 @@ const StudentFilters = ({
     showButton: false,
   };
 
-  // ==========================================
-  // CRITICAL FIX: Ensure options are STRINGS
-  // ==========================================
   const filterConfig = [
+    // CONDITIONAL BRANCH FILTER (Only shows if parent passes branches)
+    ...(filterOptions?.branches?.length > 0 ? [{
+      key: "branch",
+      label: "Campus / Branch",
+      type: "select",
+      color: "indigo",
+      options: filterOptions.branches.map((b) => ({
+        value: b._id ? String(b._id) : String(b),
+        label: b.branch_name ? String(b.branch_name) : String(b),
+      })),
+    }] : []),
+
     {
       key: "status",
       label: "Status",
       type: "select",
       color: "blue",
-      options:
-        filterOptions?.statuses?.map((s) => ({
-          value: String(s),
-          label: String(s).charAt(0).toUpperCase() + String(s).slice(1),
-        })) || [],
+      options: [
+        { value: "active", label: "Active" },
+        { value: "inactive", label: "Inactive" },
+        { value: "completed", label: "Completed" },
+      ],
     },
     {
       key: "batch",
@@ -76,8 +87,8 @@ const StudentFilters = ({
       color: "green",
       options:
         filterOptions?.batches?.map((b) => ({
-          value: String(b),
-          label: String(b),
+          value: b._id ? String(b._id) : String(b), 
+          label: b.batch_name ? String(b.batch_name) : String(b),
         })) || [],
     },
     {
@@ -87,8 +98,8 @@ const StudentFilters = ({
       color: "purple",
       options:
         filterOptions?.courses?.map((c) => ({
-          value: String(c._id),
-          label: String(c.course_name),
+          value: c._id ? String(c._id) : String(c),
+          label: c.course_name ? String(c.course_name) : String(c),
         })) || [],
     },
     {
@@ -104,12 +115,12 @@ const StudentFilters = ({
     },
     {
       key: "is_active",
-      label: "Active Status",
+      label: "System Status",
       type: "boolean",
       color: "orange",
       options: [
-        { value: "true", label: "Active" },
-        { value: "false", label: "Inactive" },
+        { value: "true", label: "Active Account" },
+        { value: "false", label: "Disabled Account" },
       ],
     },
     {
@@ -118,12 +129,12 @@ const StudentFilters = ({
       type: "boolean",
       color: "indigo",
       options: [
-        { value: "true", label: "Verified" },
-        { value: "false", label: "Not Verified" },
+        { value: "true", label: "Verified ✓" },
+        { value: "false", label: "Pending Verification" },
       ],
     },
-    { key: "date_from", label: "Date From", type: "date", color: "red" },
-    { key: "date_to", label: "Date To", type: "date", color: "red" },
+    { key: "date_from", label: "Enrolled After", type: "date", color: "red" },
+    { key: "date_to", label: "Enrolled Before", type: "date", color: "red" },
   ];
 
   return (

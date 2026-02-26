@@ -12,7 +12,8 @@ import {
   fetchAdminStudentBySearch,
   removeStudentPhoto, // Added missing import
   addStudentComment, 
-  fetchStudentComments
+  fetchStudentComments,
+  downloadStudentCertificate
 } from "../api/student.api.js";
 
 
@@ -262,4 +263,33 @@ export const toastConfig = {
     iconTheme: { primary: "#ffffff", secondary: "#ef4444" },
   },
   loading: { duration: Infinity },
+};
+
+
+// web2/src/hooks/useStudents.js
+
+export const useDownloadCertificate = () => {
+  return useMutation({
+    // FIX: Extract the ID before passing it to the API function
+    mutationFn: (student) => downloadStudentCertificate(student._id),
+    
+    onSuccess: (blobData, student) => {
+      const url = window.URL.createObjectURL(new Blob([blobData]));
+      const link = document.createElement("a");
+      link.href = url;
+      // Sanitize the filename to prevent spaces/special chars from breaking the download
+      const safeName = student.student_name.replace(/[^a-zA-Z0-9]/g, "_");
+      link.setAttribute("download", `CIB_Certificate_${safeName}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      
+      toast.success("Certificate downloaded successfully");
+    },
+    onError: (error) => {
+      console.error("Download Error:", error);
+      toast.error("Failed to generate certificate");
+    },
+  });
 };

@@ -7,20 +7,24 @@ const cleanupFailedUpload = (file) => {
 
 // 1. Check Required Fields & Formats
 export const validateUserFields = (req, res, next) => {
-  const { full_name, email, phone, employee_id, username, password } = req.body;
+  const { full_name, email, phone, employee_id, username, password, branch } =
+    req.body;
   const isPost = req.method === "POST"; // True for creation, False for updates
 
   const missing = [];
-  if (!full_name) missing.push("full_name");
+  // if (!full_name) missing.push("full_name");
   if (!email) missing.push("email");
   if (!phone) missing.push("phone");
   if (!employee_id) missing.push("employee_id");
   if (!username) missing.push("username");
+  if (isPost && !branch) missing.push("branch");
   if (isPost && !password) missing.push("password"); // Password only strictly required on creation
 
   if (missing.length > 0) {
     cleanupFailedUpload(req.file);
-    return res.status(400).json({ message: `Missing required fields: ${missing.join(", ")}` });
+    return res
+      .status(400)
+      .json({ message: `Missing required fields: ${missing.join(", ")}` });
   }
 
   // Email format validation
@@ -33,7 +37,9 @@ export const validateUserFields = (req, res, next) => {
   // Password length validation (only if provided)
   if (password && password.length < 6) {
     cleanupFailedUpload(req.file);
-    return res.status(400).json({ message: "Password must be at least 6 characters long." });
+    return res
+      .status(400)
+      .json({ message: "Password must be at least 6 characters long." });
   }
 
   next();
@@ -52,18 +58,25 @@ export const checkUserDuplicates = async (req, res, next) => {
     if (excludeDbId) query._id = { $ne: excludeDbId }; // Ignore current user if updating
 
     if (query.$or.length > 0) {
-      const existingUser = await User.findOne(query).select("email username employee_id");
+      const existingUser = await User.findOne(query).select(
+        "email username employee_id",
+      );
 
       if (existingUser) {
         cleanupFailedUpload(req.file);
         if (email && existingUser.email === email.toLowerCase().trim()) {
           return res.status(400).json({ message: "Email already exists." });
         }
-        if (username && existingUser.username === username.toLowerCase().trim()) {
+        if (
+          username &&
+          existingUser.username === username.toLowerCase().trim()
+        ) {
           return res.status(400).json({ message: "Username already exists." });
         }
         if (employee_id && existingUser.employee_id === employee_id.trim()) {
-          return res.status(400).json({ message: "Employee ID already exists." });
+          return res
+            .status(400)
+            .json({ message: "Employee ID already exists." });
         }
       }
     }
@@ -81,13 +94,21 @@ export const processUserPayload = (req, res, next) => {
     const payload = { ...req.body };
 
     // Clean strings
-    const stringFields = ["full_name", "phone", "employee_id", "username", "designation", "department"];
+    const stringFields = [
+      "full_name",
+      "phone",
+      "employee_id",
+      "username",
+      "designation",
+      "department",
+    ];
     stringFields.forEach((field) => {
-      if (typeof payload[field] === "string") payload[field] = payload[field].trim();
+      if (typeof payload[field] === "string")
+        payload[field] = payload[field].trim();
     });
 
     if (payload.email) payload.email = payload.email.toLowerCase().trim();
-    
+    if (payload.branch) payload.branch = payload.branch.trim();
     // Set default role if not provided
     if (!payload.role) payload.role = "staff";
 
@@ -113,7 +134,9 @@ export const processUserPayload = (req, res, next) => {
     }
 
     // Clean undefined
-    Object.keys(payload).forEach((key) => payload[key] === undefined && delete payload[key]);
+    Object.keys(payload).forEach(
+      (key) => payload[key] === undefined && delete payload[key],
+    );
 
     req.body = payload;
     next();
@@ -127,14 +150,16 @@ export const processUserPayload = (req, res, next) => {
 export const validateRoleUpdate = (req, res, next) => {
   const { role } = req.body;
   const validRoles = ["admin", "instructor", "register", "staff"];
-  
+
   if (!validRoles.includes(role)) {
     return res.status(400).json({ message: "Invalid role selected." });
   }
 
   // Prevent self-modification
   if (req.user && req.user._id.toString() === req.params.id) {
-    return res.status(400).json({ message: "You cannot change your own role." });
+    return res
+      .status(400)
+      .json({ message: "You cannot change your own role." });
   }
 
   next();
