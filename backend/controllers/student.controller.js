@@ -4,6 +4,8 @@ import Course from "../models/course.js"; // ADDED
 import Fee from "../models/fee.js";       // ADDED
 import { deleteLocalFile } from "../middlewares/multer.js";
 import mongoose from "mongoose";
+import payment from "../models/payment.js";
+import fee from "../models/fee.js";
 
 const getSessionInfo = async () => {
   const session = await mongoose.startSession();
@@ -13,33 +15,24 @@ const getSessionInfo = async () => {
   return { session, isReplicaSet };
 };
 
+// 1. ADD STUDENT (Atomic Transaction)
 export const addStudent = async (req, res) => {
   const { session, isReplicaSet } = await getSessionInfo();
   try {
     if (isReplicaSet) session.startTransaction();
-    
-    // 1. Fetch Course to grab the base sticker price
+
     const course = await Course.findById(req.body.course).session(session);
-    if (!course) {
-      throw new Error("Selected course not found");
-    }
+    if (!course) throw new Error("Selected course not found");
 
     if (req.file) req.body.photo_url = `/uploads/students/${req.file.filename}`;
 
-    // 2. Create the Student
     const [student] = await Student.create([req.body], { session });
 
-    // 3. Update Batch
-    await Batch.findByIdAndUpdate(
-      student.batch,
-      { $push: { students: student._id } },
-      { session },
-    );
+    await Batch.findByIdAndUpdate(student.batch, { $push: { students: student._id } }, { session });
 
-    // 4. Generate Financial Ledger (Master Invoice)
     const baseFee = course.base_fee || 0;
     const discount = Number(req.body.discount_amount) || 0;
-    const netPayable = Math.max(0, baseFee - discount); // Prevent negative dues
+    const netPayable = Math.max(0, baseFee - discount);
 
     await Fee.create([{
       student: student._id,
@@ -49,22 +42,21 @@ export const addStudent = async (req, res) => {
       discount: discount,
       net_payable: netPayable,
       paid_amount: 0,
-      status: netPayable === 0 ? "Paid" : "Unpaid" // Auto-clears if 100% scholarship
+      status: netPayable === 0 ? "Paid" : "Unpaid"
     }], { session });
 
     if (isReplicaSet) await session.commitTransaction();
     res.status(201).json({ success: true, data: student });
   } catch (error) {
-    if (isReplicaSet && session.inTransaction())
-      await session.abortTransaction();
+    if (isReplicaSet && session.inTransaction()) await session.abortTransaction();
     if (req.file) deleteLocalFile(req.file.path);
-    res
-      .status(error.code === 11000 ? 400 : 500)
-      .json({ success: false, message: error.message });
+    res.status(500).json({ success: false, message: error.message });
   } finally {
     session.endSession();
   }
 };
+
+
 
 export const updateStudent = async (req, res) => {
   const { session, isReplicaSet } = await getSessionInfo();
@@ -107,75 +99,97 @@ export const updateStudent = async (req, res) => {
   }
 };
 
+// 2. GET ALL STUDENTS (O(1) Database Trip using Aggregation)
 export const getAllStudents = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 30;
-    const { search, status, batch, course, branch } = req.query;
+    const { search, status, branch } = req.query;
 
-    let filter = {};
-    if (req.user.role !== "admin") filter.branch = req.user.branch;
-    else if (branch && branch !== "all") filter.branch = branch;
+    let match = {};
+    if (req.user.role !== "superadmin") match.branch = new mongoose.Types.ObjectId(req.user.branch);
+    else if (branch && branch !== "all") match.branch = new mongoose.Types.ObjectId(branch);
 
+    if (status && status !== "all") match.status = status;
     if (search) {
-      const regex = { $regex: search, $options: "i" };
-      filter.$or = [
-        { student_name: regex },
-        { student_id: regex },
-        { email: regex },
+      match.$or = [
+        { student_name: { $regex: search, $options: "i" } },
+        { student_id: { $regex: search, $options: "i" } }
       ];
     }
-    if (status && status !== "all") filter.status = status;
 
-    const [students, total] = await Promise.all([
-      Student.find(filter)
-        .populate("course batch branch")
-        .sort({ createdAt: -1 })
-        .skip((page - 1) * limit)
-        .limit(limit)
-        .lean(),
-      Student.countDocuments(filter),
+    const students = await Student.aggregate([
+      { $match: match },
+      { $sort: { createdAt: -1 } },
+      { $skip: (page - 1) * limit },
+      { $limit: limit },
+      // JOIN FEE COLLECTION
+      {
+        $lookup: {
+          from: "fees",
+          localField: "_id",
+          foreignField: "student",
+          as: "fee_summary"
+        }
+      },
+      { $unwind: { path: "$fee_summary", preserveNullAndEmptyArrays: true } },
+      // JOIN COURSE COLLECTION
+      {
+        $lookup: {
+          from: "courses",
+          localField: "course",
+          foreignField: "_id",
+          as: "course"
+        }
+      },
+      { $unwind: { path: "$course", preserveNullAndEmptyArrays: true } },
+      // JOIN BRANCH COLLECTION
+      {
+        $lookup: {
+          from: "branches",
+          localField: "branch",
+          foreignField: "_id",
+          as: "branch"
+        }
+      },
+      { $unwind: { path: "$branch", preserveNullAndEmptyArrays: true } }
     ]);
 
-    res
-      .status(200)
-      .json({
-        success: true,
-        data: students,
-        pagination: { total, page, limit },
-      });
+    const total = await Student.countDocuments(match);
+
+    res.status(200).json({
+      success: true,
+      data: students,
+      pagination: { total, page, limit }
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
+// 3. DELETE STUDENT (Prevents Orphan Fees/Payments)
 export const deleteStudent = async (req, res) => {
   const { session, isReplicaSet } = await getSessionInfo();
   try {
     if (isReplicaSet) session.startTransaction();
-    
+
     const student = await Student.findById(req.params.id);
     if (!student) return res.status(404).json({ message: "Student not found" });
-    
-    if (student.photo_url) deleteLocalFile(student.photo_url);
-    const batchId = student.batch;
-    
-    await student.deleteOne({ session });
-    
-    if (batchId)
-      await Batch.findByIdAndUpdate(batchId, {
-        $pull: { students: student._id },
-      }, { session });
 
-    // Optional: Delete associated fee/payment records to clean up DB
-    await Fee.deleteMany({ student: student._id }, { session });
-    // await Payment.deleteMany({ student: student._id }, { session }); // Uncomment when Payment is imported
+    if (student.photo_url) deleteLocalFile(student.photo_url);
+
+    // CLEANUP ALL RELATIONAL DATA
+    await Promise.all([
+      Student.deleteOne({ _id: student._id }, { session }),
+      fee.deleteOne({ student: student._id }, { session }),
+      payment.deleteMany({ student: student._id }, { session }),
+      Batch.findByIdAndUpdate(student.batch, { $pull: { students: student._id } }, { session })
+    ]);
 
     if (isReplicaSet) await session.commitTransaction();
-    res.status(200).json({ success: true, message: "Student deleted" });
+    res.status(200).json({ success: true, message: "Student and all financial history deleted." });
   } catch (error) {
-    if (isReplicaSet && session.inTransaction())
-      await session.abortTransaction();
+    if (isReplicaSet && session.inTransaction()) await session.abortTransaction();
     res.status(500).json({ success: false, message: error.message });
   } finally {
     session.endSession();

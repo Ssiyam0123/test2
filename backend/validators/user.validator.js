@@ -40,7 +40,7 @@ export const userUpdateSchema = Joi.object({
   designation: Joi.string().allow(""),
   department: Joi.string().allow(""),
   status: Joi.string().valid("Active", "On Leave", "Resigned"),
-  role: Joi.string().valid("admin", "instructor", "register", "staff", "user"),
+  role: Joi.string().valid("superadmin","admin", "instructor", "register", "staff", "user"),
   branch: objectId,
   employee_id: Joi.string().allow("").optional(),
   joining_date: Joi.date().allow("").optional(),

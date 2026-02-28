@@ -6,9 +6,18 @@ const feeSchema = new mongoose.Schema(
     branch: { type: mongoose.Schema.Types.ObjectId, ref: "Branch", required: true, index: true },
     course: { type: mongoose.Schema.Types.ObjectId, ref: "Course", required: true },
     
-    total_amount: { type: Number, required: true }, // Copied from Course base_fee
+    total_amount: { type: Number, required: true }, 
     discount: { type: Number, default: 0 },
-    net_payable: { type: Number, required: true }, // total_amount - discount
+    
+    // Audit trail for discount overrides
+    discount_history: [{
+      previous_discount: { type: Number },
+      new_discount: { type: Number },
+      updated_at: { type: Date, default: Date.now },
+      updated_by: { type: mongoose.Schema.Types.ObjectId, ref: "User" }
+    }],
+
+    net_payable: { type: Number, required: true }, 
     paid_amount: { type: Number, default: 0 },
     
     status: {

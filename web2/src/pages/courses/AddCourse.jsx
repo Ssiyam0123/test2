@@ -34,6 +34,7 @@ const AddCourse = ({ mode = "add" }) => {
         course_code: courseData.course_code || "",
         duration_value: courseData.duration?.value?.toString() || "",
         duration_unit: courseData.duration?.unit || "months",
+        base_fee: courseData.base_fee?.toString() || "", // <--- ADDED
         description: courseData.description || "",
         additional_info: infoArray,
         is_active: courseData.is_active ?? true,
@@ -41,11 +42,11 @@ const AddCourse = ({ mode = "add" }) => {
     }
     return {
       course_name: "", course_code: "", duration_value: "", duration_unit: "months",
+      base_fee: "", // <--- ADDED
       description: "", additional_info: [], is_active: true,
     };
   }, [mode, courseData]);
 
-  // Inject Custom Multi-Select UI into EntityForm
   const renderMultiSelect = ({ value = [], onChange }) => {
     const handleToggle = (optValue) => {
       onChange(value.includes(optValue) ? value.filter(v => v !== optValue) : [...value, optValue]);
@@ -131,20 +132,22 @@ const AddCourse = ({ mode = "add" }) => {
     { name: "duration_unit", label: "Duration Unit", type: "select", required: true, options: [
       { value: 'days', label: 'Days' }, { value: 'months', label: 'Months' }, { value: 'years', label: 'Years' }
     ]},
+    { name: "base_fee", label: "Course Base Fee (BDT)", type: "number", placeholder: "e.g., 50000", required: true, props: { min: "0" } }, // <--- ADDED
     { name: "additional_info", type: "custom", fullWidth: true, render: renderMultiSelect },
     { name: "description", label: "Course Description", type: "textarea", rows: "4", fullWidth: true, placeholder: "Enter detailed course description..." },
     { name: "is_active", label: "Course is Active & Enrolling", type: "checkbox" }
   ];
 
-  // We capture BOTH args, but only use rawData to match your backend logic exactly
   const handleSubmit = async (formDataInstance, rawData) => {
     if (Number(rawData.duration_value) <= 0) return toast.error("Valid duration required");
+    if (Number(rawData.base_fee) < 0) return toast.error("Base fee cannot be negative"); // <--- ADDED
 
     const coursePayload = {
       course_name: String(rawData.course_name).trim(),
       course_code: String(rawData.course_code).trim(),
       duration_value: Number(rawData.duration_value),
       duration_unit: rawData.duration_unit,
+      base_fee: Number(rawData.base_fee), // <--- ADDED
       description: String(rawData.description).trim(),
       additional_info: rawData.additional_info,
       is_active: rawData.is_active,

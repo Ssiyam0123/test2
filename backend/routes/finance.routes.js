@@ -5,8 +5,9 @@ import {
   getCampusFees, 
   updateFeeDiscount 
 } from "../controllers/finance.controller.js";
-import { protectRoute } from "../middlewares/auth.middleware.js"; // Assuming you have this
-import { validateRequest } from "../middlewares/validate.middleware.js"; // Assuming you have this
+import protectRoute from "../middlewares/auth.middleware.js";
+// FIXED: Correct path to validate.js and correct function name 'validate'
+import { validate } from "../middlewares/validate.js"; 
 import { paymentCreateSchema, feeUpdateSchema } from "../validators/finance.validator.js";
 
 const router = express.Router();
@@ -21,9 +22,11 @@ router.get("/fees", getCampusFees);
 router.get("/student/:studentId", getStudentFinance);
 
 // Make a Payment
-router.post("/pay", validateRequest(paymentCreateSchema), collectPayment);
+// FIXED: Using 'validate' instead of 'validateRequest'
+router.post("/pay", validate(paymentCreateSchema), collectPayment);
 
 // Manually update a student's discount
-router.patch("/fee/:feeId/discount", validateRequest(feeUpdateSchema), updateFeeDiscount);
+// FIXED: Using 'validate' instead of 'validateRequest'
+router.patch("/fee/:feeId/discount", validate(feeUpdateSchema), updateFeeDiscount);
 
 export default router;

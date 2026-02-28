@@ -11,7 +11,7 @@ const createAdmin = async () => {
     console.log("🚀 MongoDB Connected...");
 
     const adminEmail = "admin@gmail.com";
-    const adminUsername = "admin";
+    const adminUsername = "superadmin";
 
     // 2. Check for existing account
     const existingAdmin = await User.findOne({ 
