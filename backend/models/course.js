@@ -25,6 +25,12 @@ const courseSchema = new mongoose.Schema(
         default: "months",
       },
     },
+    base_fee: { 
+      type: Number, 
+      required: true, 
+      default: 0,
+      min: [0, "Fee cannot be negative"]
+    },
     additional_info: [{ type: String }],
     description: { type: String, default: "", trim: true },
     is_active: { type: Boolean, default: true },

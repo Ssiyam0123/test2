@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from "react";
 import { ClipboardList, Plus, Trash2 } from "lucide-react";
-// ⚠️ Adjust this import path to point to where your EntityForm is located
 import EntityForm from "../common/EntityForm"; 
 
 // ==========================================
@@ -27,7 +26,7 @@ const DynamicItemsField = ({ value = [], onChange }) => {
     <div className="bg-slate-50 border border-slate-200 rounded-[1.5rem] p-5">
       <div className="flex items-center gap-2 text-slate-700 mb-4">
         <ClipboardList size={18} />
-        <h3 className="text-sm font-black uppercase tracking-widest">Bazar List (Instructor)</h3>
+        <h3 className="text-sm font-black uppercase tracking-widest">Bazar Requisition List</h3>
       </div>
       
       <div className="space-y-3">
@@ -39,7 +38,7 @@ const DynamicItemsField = ({ value = [], onChange }) => {
         </div>
 
         {value.map((item, index) => (
-          <div key={index} className="flex items-center gap-2 group">
+          <div key={index} className="flex items-center gap-2 group animate-in slide-in-from-top-1 duration-200">
             <input 
               type="text"
               value={item.name}
@@ -104,6 +103,7 @@ export default function ClassRequisitionModal({
     const parsedItems = [];
     const savedNotes = classData.financials?.expense_notes || "";
     
+    // Legacy support: If data exists in the old text format, parse it back into rows
     if (savedNotes) {
       const parts = savedNotes.split(", ");
       parts.forEach(part => {
@@ -120,64 +120,37 @@ export default function ClassRequisitionModal({
       parsedItems.push({ name: "", qty: "", unit: "kg" });
     }
 
-    return {
-      items: parsedItems,
-      budget: classData.financials?.budget || "",
-      actualCost: classData.financials?.actual_cost || ""
-    };
+    return { items: parsedItems };
   }, [classData]);
 
   if (!isOpen) return null;
 
-  // Define EntityForm structure
+  // Define EntityForm structure - strictly the items now
   const formConfig = [
     {
       name: "items",
       type: "custom",
       fullWidth: true,
       render: ({ value, onChange }) => <DynamicItemsField value={value || []} onChange={onChange} />
-    },
-    { 
-      divider: true, 
-      title: "Ledger Information" 
-    },
-    {
-      name: "budget",
-      label: "Estimated Budget (৳)",
-      type: "number",
-      placeholder: "e.g. 1500"
-    },
-    {
-      name: "actualCost",
-      label: "Actual Cost Incurred (৳)",
-      type: "number",
-      placeholder: "0.00"
     }
   ];
 
   const handleSubmit = async (formDataObj, rawFormData) => {
     setIsSubmitting(true);
-    const { items, budget, actualCost } = rawFormData;
+    const { items } = rawFormData;
 
-    // Convert dynamic rows back to a single string for the DB
-    const formattedNotes = items
+    // Map the dynamic rows directly into the Requisition array structure for the backend
+    const validRequisitionItems = items
       .filter(item => item.name && item.name.trim() !== "") 
-      .map(item => `${item.qty || 1} ${item.unit} ${item.name.trim()}`)
-      .join(", ");
+      .map(item => ({
+        item_name: item.name.trim(),
+        quantity: Number(item.qty) || 1,
+        unit: item.unit
+      }));
 
-    const attendanceRecords = classData.attendance?.map(a => ({
-      student: a.student._id || a.student,
-      status: a.status
-    })) || [];
-
+    // Build the exact payload Joi is expecting
     const payload = {
-      is_completed: classData.is_completed || false, 
-      attendanceRecords, 
-      financials: {
-        budget: Number(budget) || 0,
-        actual_cost: Number(actualCost) || 0,
-        expense_notes: formattedNotes
-      }
+      requisition: validRequisitionItems
     };
 
     try {
@@ -191,13 +164,11 @@ export default function ClassRequisitionModal({
   };
 
   return (
-    // Overlay backdrop
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
-      {/* Wrapper to control width so EntityForm looks right */}
       <div className="w-full max-w-3xl my-auto animate-in zoom-in-95 duration-200">
         <EntityForm
           title={classData?.topic}
-          subtitle={`Class ${classData?.class_number} • Requisition & Costs`}
+          subtitle={`Class ${classData?.class_number} • Requisition`}
           config={formConfig}
           initialData={initialData}
           onSubmit={handleSubmit}

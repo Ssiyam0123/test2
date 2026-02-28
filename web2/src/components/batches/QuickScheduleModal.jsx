@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { X, CalendarDays, CheckCircle2 } from "lucide-react";
-import { useScheduleClass } from "../../hooks/useBatches";
+import { useScheduleClass } from "../../hooks/useClasses";
 
 export default function QuickScheduleModal({ batchId, classData, onClose }) {
   // যদি ক্লাসে আগে থেকেই ডেট থাকে (Reschedule), সেটা ডিফল্ট ভ্যালু হিসেবে বসবে

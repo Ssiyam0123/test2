@@ -1,94 +1,66 @@
-import mongoose from "mongoose";
-import Batch from "../models/batch.js";
+import Joi from "joi";
+import { objectId } from "./common.js";
 
-export const validateBatchRequiredFields = (req, res, next) => {
-  const isUpdate = req.method === "PUT";
-  const { batch_name, course, branch, start_date, schedule_days, start_time, end_time } = req.body;
-  
-  if (!isUpdate) {
-    // Determine the effective branch (Admin sends it, Registrar auto-gets it)
-    const effectiveBranch = branch || (req.user && req.user.role !== 'admin' ? req.user.branch : null);
+export const batchSchema = Joi.object({
+  batch_name: Joi.string().required().trim(),
+  course: objectId.required(),
+  instructors: Joi.array().items(objectId).default([]),
+  branch: objectId.required(),
+  start_date: Joi.date().required(),
+  schedule_days: Joi.array()
+    .items(
+      Joi.string().valid(
+        "Saturday",
+        "Sunday",
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+      ),
+    )
+    .min(1)
+    .required(),
 
-    if (!batch_name || !course || !effectiveBranch || !start_date) {
-      return res.status(400).json({ message: "Batch name, course, branch, and start date are required." });
-    }
+  time_slot: Joi.object({
+    start_time: Joi.string().required(),
+    end_time: Joi.string().required(),
+  }).required(),
 
-    // ==========================================
-    // 🛡️ PREVENT 500 CAST ERRORS
-    // ==========================================
-    // If the frontend sends the default placeholder text instead of an ID, block it here.
-    if (!mongoose.Types.ObjectId.isValid(course)) {
-      return res.status(400).json({ message: "Please select a valid Course." });
-    }
-    if (!mongoose.Types.ObjectId.isValid(effectiveBranch)) {
-      return res.status(400).json({ message: "Please select a valid Campus/Branch." });
-    }
+  status: Joi.string()
+    .valid("Active", "Upcoming", "Completed", "Inactive")
+    .default("Upcoming"),
+});
 
-    if (!schedule_days || schedule_days.length === 0) {
-      return res.status(400).json({ message: "At least one class day must be selected." });
-    }
-    if (!start_time || !end_time) {
-      return res.status(400).json({ message: "Start and End times are required." });
-    }
-  }
-  next();
-};
+export const classAttendanceSchema = Joi.object({
+  attendanceRecords: Joi.array()
+    .items(
+      Joi.object({
+        student: objectId.required(),
+        status: Joi.string().valid("present", "absent").required(),
+      }),
+    )
+    .required(),
+  instructorId: objectId.allow(null).optional(),
+  is_completed: Joi.boolean().optional(),
+  financials: Joi.object({
+    budget: Joi.number().min(0).optional(),
+    actual_cost: Joi.number().min(0).optional(),
+    expense_notes: Joi.string().allow("").optional(),
+  }).optional(),
+});
 
-export const checkBatchDuplicates = async (req, res, next) => {
-  try {
-    const { batch_name } = req.body;
-    const excludeDbId = req.params.id || null;
-
-    if (!batch_name) return next();
-
-    const query = { batch_name: new RegExp(`^${batch_name.trim()}$`, "i") };
-    if (excludeDbId) query._id = { $ne: excludeDbId };
-
-    const existingBatch = await Batch.findOne(query).select('batch_name');
-    if (existingBatch) {
-      return res.status(400).json({ message: `Batch name "${batch_name}" already exists.` });
-    }
-    next();
-  } catch (error) {
-    res.status(500).json({ message: "Error validating batch duplicates" });
-  }
-};
-
-export const processBatchPayload = (req, res, next) => {
-  try {
-    // Auto-inject branch ID for non-admins so they don't have to select it
-    if (req.user && req.user.role !== 'admin') {
-      req.body.branch = req.user.branch;
-    }
-
-    // ==========================================
-    // 👨‍🏫 INSTRUCTOR ARRAY FORMATTING
-    // ==========================================
-    // If only one instructor is selected, some frontends send it as a string instead of an array.
-    // This ensures Mongoose always receives an array.
-    if (req.body.instructors) {
-      if (!Array.isArray(req.body.instructors)) {
-        req.body.instructors = [req.body.instructors];
-      }
-    }
-
-    // Format Time Slot
-    if (req.body.start_time || req.body.end_time) {
-      req.body.time_slot = {
-        start_time: req.body.start_time || req.body.time_slot?.start_time,
-        end_time: req.body.end_time || req.body.time_slot?.end_time
-      };
-      delete req.body.start_time;
-      delete req.body.end_time;
-    }
-
-    // Format Date
-    if (req.body.start_date) {
-      req.body.start_date = new Date(req.body.start_date);
-    }
-
-    next();
-  } catch (error) {
-    res.status(500).json({ message: "Payload processing failed" });
-  }
-};
+export const requisitionSchema = Joi.object({
+  requisition: Joi.array()
+    .items(
+      Joi.object({
+        item_name: Joi.string().required().trim(),
+        quantity: Joi.number().positive().required(),
+        unit: Joi.string()
+          .valid("kg", "g", "L", "ml", "pcs", "pkt", "box", "dozen")
+          .required(),
+      }),
+    )
+    .min(1)
+    .required(),
+});

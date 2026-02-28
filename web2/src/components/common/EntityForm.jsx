@@ -162,7 +162,7 @@ const EntityForm = ({
                     value: formData[field.name],
                     onChange: (val) => {
                       setFormData(prev => ({ ...prev, [field.name]: val }));
-                      if (field.onChange) field.onChange(val); // Trigger custom onChange
+                      if (field.onChange) field.onChange(val); 
                     }
                   })}
                 </div>
@@ -172,16 +172,13 @@ const EntityForm = ({
             if (field.type === "checkbox-group") {
               const currentValues = Array.isArray(formData[field.name]) ? formData[field.name] : [];
               return (
-                <div key={field.name} className={field.fullWidth ? "col-span-full" : "col-span-full"}>
+                <div key={field.name} className="col-span-full">
                   <label className="block mb-4 text-[13px] font-bold text-gray-800 tracking-wide ml-1">
                     {field.label}
                   </label>
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-y-4 gap-x-6 ml-1">
                     {field.options.map((opt) => (
-                      <label 
-                        key={opt.value} 
-                        className="flex items-center space-x-2.5 cursor-pointer group"
-                      >
+                      <label key={opt.value} className="flex items-center space-x-2.5 cursor-pointer group">
                         <input
                           type="checkbox"
                           name={field.name}
@@ -190,7 +187,7 @@ const EntityForm = ({
                           checked={currentValues.includes(opt.value)}
                           onChange={(e) => {
                             handleChange(e);
-                            if (field.onChange) field.onChange(e); // Trigger custom onChange
+                            if (field.onChange) field.onChange(e); 
                           }}
                           className="w-[18px] h-[18px] text-teal-600 bg-white border-gray-300 rounded focus:ring-teal-500 accent-teal-600 cursor-pointer transition-all"
                         />
@@ -205,25 +202,28 @@ const EntityForm = ({
               );
             }
 
+            // 🚀 THE FIX: Use SelectGroup component for select fields
             if (field.type === "select") {
               return (
-                <SelectGroup 
-                  key={field.name} 
-                  label={field.label} 
-                  name={field.name} 
-                  value={formData[field.name] || ""} 
-                  onChange={(e) => {
-                    handleChange(e);
-                    if (field.onChange) field.onChange(e); // Trigger custom onChange
-                  }} 
-                  options={field.options} 
-                  defaultOption={field.defaultOption} 
-                  required={field.required} 
-                  error={formErrors[field.name]} 
-                />
+                <div key={field.name} className={field.fullWidth ? "col-span-full" : ""}>
+                  <SelectGroup
+                    label={field.label}
+                    name={field.name}
+                    value={formData[field.name] || ""}
+                    options={field.options || []}
+                    defaultOption={field.defaultOption}
+                    required={field.required}
+                    disabled={field.disabled} // Passes the disabled prop!
+                    onChange={(e) => {
+                      handleChange(e);
+                      if (field.onChange) field.onChange(e);
+                    }}
+                    error={formErrors[field.name]}
+                  />
+                </div>
               );
             }
-            
+
             if (field.type === "textarea") {
               return (
                 <div key={field.name} className={`flex flex-col ${field.fullWidth ? 'col-span-full' : ''}`}>
@@ -233,7 +233,7 @@ const EntityForm = ({
                     value={formData[field.name] || ""} 
                     onChange={(e) => {
                       handleChange(e);
-                      if (field.onChange) field.onChange(e); // Trigger custom onChange
+                      if (field.onChange) field.onChange(e); 
                     }} 
                     rows={field.rows || "3"} 
                     placeholder={field.placeholder} 
@@ -253,7 +253,7 @@ const EntityForm = ({
                   value={formData[field.name] || ""} 
                   onChange={(e) => {
                     handleChange(e);
-                    if (field.onChange) field.onChange(e); // Trigger custom onChange
+                    if (field.onChange) field.onChange(e); 
                   }} 
                   placeholder={field.placeholder} 
                   required={field.required} 
@@ -290,7 +290,7 @@ const EntityForm = ({
                   checked={formData[field.name] || false} 
                   onChange={(e) => {
                     handleChange(e);
-                    if (field.onChange) field.onChange(e); // Trigger custom onChange
+                    if (field.onChange) field.onChange(e); 
                   }} 
                   className="w-[18px] h-[18px] text-teal-600 rounded-lg border-gray-300 focus:ring-teal-500 accent-teal-600 transition-all cursor-pointer" 
                 />

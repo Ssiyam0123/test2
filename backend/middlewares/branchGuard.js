@@ -1,6 +1,6 @@
 export const branchGuard = (req, res, next) => {
   // 1. Super Admins can see all branches if they pass a 'global' query
-  if (req.user.role === "admin" && req.query.global === "true") {
+  if (req.user.role === "superadmin" && req.query.global === "true") {
     req.branchFilter = {}; // No filter applied
     return next();
   }

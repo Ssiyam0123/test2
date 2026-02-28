@@ -4,7 +4,8 @@ import { isSameDay, isAfter, startOfToday } from "date-fns";
 import { Layers, CalendarDays, ClipboardCheck } from "lucide-react"; // Imported new icons
 
 // Hooks & Store
-import { useActiveBatches, useBatchClasses, useAutoSchedule, useDeleteClass } from "../../hooks/useBatches";
+import { useBatches} from "../../hooks/useBatches";
+import {  useBatchClasses, useAutoSchedule, useDeleteClass } from "../../hooks/useClasses";
 import useAuth from "../../store/useAuth";
 
 // Components
@@ -42,7 +43,7 @@ export default function ManageBatches() {
   const [editingClass, setEditingClass] = useState(null);
   const [classToSchedule, setClassToSchedule] = useState(null);
   
-  const { data: batchesResponse } = useActiveBatches();
+  const { data: batchesResponse } = useBatches();
   const batches = batchesResponse?.data || [];
   
   const selectedBatch = useMemo(() => {

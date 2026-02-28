@@ -1,7 +1,7 @@
 // src/pages/batches/ManageBatchesTabs.jsx
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useActiveBatches, useDeleteBatch } from "../../hooks/useBatches"; // IMPORT DELETION HOOK
+import { useBatches, useDeleteBatch } from "../../hooks/useBatches"; // IMPORT DELETION HOOK
 import useAuth from "../../store/useAuth";
 import { useConfirmToast } from "../../components/ConfirmToast.jsx"; // IMPORT CONFIRM TOAST
 
@@ -18,7 +18,7 @@ export default function ManageBatchesTabs() {
   const { showConfirmToast } = useConfirmToast();
   const deleteBatchMutation = useDeleteBatch();
 
-  const { data: batchesResponse, isLoading: batchesLoading } = useActiveBatches();
+  const { data: batchesResponse, isLoading: batchesLoading } = useBatches();
   const batches = batchesResponse?.data || [];
 
   const filteredBatches = batches.filter(b => 

@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import EntityForm from "../common/EntityForm";
-import { useScheduleClass } from "../../hooks/useBatches";
+import { useScheduleClass } from "../../hooks/useClasses";
 import { format } from "date-fns";
 
 const AddClassModal = ({ batchId, date, unscheduledClasses, onClose }) => {

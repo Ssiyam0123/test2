@@ -1,18 +1,7 @@
 import React, { useState } from "react";
 import {
-  Edit,
-  Trash2,
-  Briefcase,
-  Mail,
-  Phone,
-  Power,
-  PowerOff,
-  Eye,
-  RefreshCw,
-  QrCode,
-  Award,
-  Loader2,
-  MapPin,
+  Edit, Trash2, Briefcase, Mail, Phone, Power, PowerOff, 
+  Eye, RefreshCw, QrCode, Award, Loader2, Building2
 } from "lucide-react";
 import { API } from "../../api/axios.js";
 import toast from "react-hot-toast";
@@ -23,6 +12,7 @@ import Avatar from "../common/Avatar.jsx";
 const EmployeesTable = ({
   employees,
   currentUserId,
+  currentUserRole, // 🚀 READS THE PROP HERE
   pagination,
   onDelete,
   onToggleStatus,
@@ -45,9 +35,7 @@ const EmployeesTable = ({
       setDownloadingId(employee._id);
       const response = await API.get(
         `/generate-certificate/employeeid/download/${employee._id}`,
-        {
-          responseType: "blob",
-        },
+        { responseType: "blob" },
       );
 
       const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -67,10 +55,9 @@ const EmployeesTable = ({
     }
   };
 
-  // Modern column width constraints
   const columns = [
     { label: "Employee Identity", className: "w-[30%]" },
-    { label: "Branch", className: "hidden sm:table-cell w-[15%]" }, // NEW COLUMN
+    { label: "Campus", className: "hidden sm:table-cell w-[15%]" }, 
     { label: "Position", className: "hidden md:table-cell w-[20%]" },
     { label: "Contact", className: "hidden lg:table-cell w-[20%]" },
     { label: "Status", className: "hidden sm:table-cell w-[10%]" },
@@ -81,7 +68,10 @@ const EmployeesTable = ({
     const isInactive = employee.status !== "Active";
     const isSelf = employee._id === currentUserId;
     const isRoleUpdating = roleLoadingId === employee._id;
-    const isDownloading = downloadingId === employee._id;
+
+    // Security UI checks
+    const isSuperAdmin = employee.role === "superadmin";
+    const canEditRole = !isSelf && !isRoleUpdating && (currentUserRole === "superadmin" || !isSuperAdmin);
 
     return (
       <tr
@@ -90,7 +80,6 @@ const EmployeesTable = ({
           isInactive ? "opacity-60 grayscale-[20%]" : ""
         }`}
       >
-        {/* 1. Identity & Info */}
         <td className="px-6 py-4 align-middle">
           <div className="flex items-center gap-4">
             <Avatar
@@ -115,31 +104,37 @@ const EmployeesTable = ({
             </div>
           </div>
         </td>
-        {/* Add this right after the Identity <td> */}
+
         <td className="px-6 py-4 hidden sm:table-cell align-middle">
           <div className="flex items-center gap-2">
-            <MapPin size={14} className="text-indigo-400" />
-            <span className="text-[13px] font-bold text-slate-700">
-              {/* Fallback to 'Global' or 'N/A' if old data doesn't have a branch yet */}
-              {employee.branch?.branch_code || "N/A"}
-            </span>
+            <div className="p-1.5 bg-indigo-50 rounded-lg text-indigo-500">
+              <Building2 size={14} />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[13px] font-bold text-slate-700">
+                {employee.branch?.branch_name || "Global HQ"}
+              </span>
+              {employee.branch?.branch_code && (
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                  {employee.branch.branch_code}
+                </span>
+              )}
+            </div>
           </div>
         </td>
 
-        {/* 2. Position */}
         <td className="px-6 py-4 hidden md:table-cell align-middle">
           <div className="flex flex-col">
             <span className="text-[13px] font-medium text-slate-600 line-clamp-1 flex items-center gap-1.5">
               <Briefcase size={12} className="text-slate-400" />{" "}
-              {employee.designation}
+              {employee.designation || "N/A"}
             </span>
             <span className="text-[11px] font-semibold tracking-wider uppercase text-slate-400 mt-1">
-              {employee.department}
+              {employee.department || "No Department"}
             </span>
           </div>
         </td>
 
-        {/* 3. Contact */}
         <td className="px-6 py-4 hidden lg:table-cell align-middle">
           <div className="flex flex-col space-y-1">
             {employee.phone && (
@@ -158,7 +153,6 @@ const EmployeesTable = ({
           </div>
         </td>
 
-        {/* 4. Status (Minimalist Text) */}
         <td className="px-6 py-4 hidden sm:table-cell align-middle">
           <span
             className={`text-[13px] font-bold tracking-wide uppercase ${
@@ -173,58 +167,49 @@ const EmployeesTable = ({
           </span>
         </td>
 
-        {/* 5. Role & Actions */}
         <td className="px-6 py-4 text-right align-middle">
           <div className="flex flex-col items-end gap-2">
-            {/* Role Selector */}
+            
+            {/* ROLE SELECTOR */}
             <div className="flex items-center gap-2">
               {isRoleUpdating && (
                 <RefreshCw size={13} className="animate-spin text-blue-500" />
               )}
               <select
                 value={employee.role}
-                disabled={isSelf || isRoleUpdating}
-                onChange={(e) =>
-                  onUpdateRole(employee._id, e.target.value, employee.full_name)
-                }
-                className={`px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide rounded-md border outline-none cursor-pointer transition-colors ${
-                  employee.role === "admin"
-                    ? "bg-purple-50 border-purple-100 text-purple-600"
-                    : "bg-slate-50 border-slate-200 text-slate-600"
-                } ${isSelf ? "opacity-50 cursor-not-allowed" : "hover:bg-white"}`}
+                disabled={!canEditRole}
+                onChange={(e) => onUpdateRole(employee._id, e.target.value, employee.full_name)}
+                className={`px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide rounded-md border outline-none transition-colors ${
+                  isSuperAdmin 
+                    ? "bg-slate-800 border-slate-900 text-amber-400" 
+                    : employee.role === "admin"
+                      ? "bg-purple-50 border-purple-100 text-purple-600"
+                      : "bg-slate-50 border-slate-200 text-slate-600"
+                } ${!canEditRole ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-white"}`}
               >
-                <option value="admin">Admin</option>
-                <option value="register">Registrar</option>
+                {/* 🚀 CONDITIONAL SUPER ADMIN OPTION */}
+                {(currentUserRole === "superadmin" || isSuperAdmin) && (
+                  <option value="superadmin">Super Admin</option>
+                )}
+                <option value="admin">Branch Admin</option>
+                <option value="registrar">Registrar</option> 
                 <option value="instructor">Instructor</option>
                 <option value="staff">Staff</option>
               </select>
             </div>
 
-            {/* Actions (Hidden until Hover) */}
+            {/* ACTIONS */}
             <div className="flex items-center justify-end flex-wrap gap-1 opacity-60 group-hover:opacity-100 transition-opacity duration-200">
+              <ActionIconButton icon={Eye} onClick={() => onViewProfile(employee)} title="View Profile" variant="neutral" />
               <ActionIconButton
-                icon={Eye}
-                onClick={() => onViewProfile(employee)}
-                title="View Profile"
-                variant="neutral"
-              />
-
-              <ActionIconButton
-                icon={isDownloading ? Loader2 : Award}
+                icon={downloadingId === employee._id ? Loader2 : Award}
                 variant="neutral"
                 onClick={() => handleDownloadIDCard(employee)}
-                disabled={isDownloading}
-                loading={isDownloading}
+                disabled={downloadingId === employee._id}
+                loading={downloadingId === employee._id}
                 title="Download ID Card"
               />
-
-              <ActionIconButton
-                icon={QrCode}
-                variant="neutral"
-                onClick={() => onGenerateQR(employee)}
-                title="Digital QR"
-              />
-
+              <ActionIconButton icon={QrCode} variant="neutral" onClick={() => onGenerateQR(employee)} title="Digital QR" />
               <ActionIconButton
                 icon={employee.status === "Active" ? PowerOff : Power}
                 variant="neutral"
@@ -232,18 +217,11 @@ const EmployeesTable = ({
                 onClick={() => onToggleStatus(employee._id, employee.status)}
                 title="Toggle Status"
               />
-
-              <ActionIconButton
-                icon={Edit}
-                variant="neutral"
-                onClick={() => onEdit(employee._id)}
-                title="Edit"
-              />
-
+              <ActionIconButton icon={Edit} variant="neutral" onClick={() => onEdit(employee._id)} title="Edit" />
               <ActionIconButton
                 icon={Trash2}
                 variant="danger"
-                disabled={isSelf}
+                disabled={isSelf || (currentUserRole !== "superadmin" && isSuperAdmin)}
                 onClick={() => onDelete(employee._id, employee.full_name)}
                 title="Delete"
               />

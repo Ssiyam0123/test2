@@ -3,41 +3,35 @@ import User from "../models/user.js";
 
 export const register = async (req, res) => {
   try {
+    // req.body is already 100% validated by Joi middleware
     const { 
       username, email, password, full_name, 
-      employee_id, phone, designation, department 
+      employee_id, phone, designation, department, branch, role 
     } = req.body;
 
-    // 1. Validation
-    if (!username || !email || !password || !full_name || !employee_id || !phone) {
-      return res.status(400).json({ message: "Required fields are missing" });
-    }
 
-    if (password.length < 6) {
-      return res.status(400).json({ message: "Password should be at least 6 characters long" });
-    }
-
-    // 2. Optimized Duplicate Check (Single DB call)
     const existingUser = await User.findOne({ 
-      $or: [{ email }, { username }] 
-    }).select("email username");
+      $or: [{ email }, { username }, { employee_id }] 
+    }).select("email username employee_id");
 
     if (existingUser) {
       if (existingUser.email === email) return res.status(400).json({ message: "Email already exists" });
       if (existingUser.username === username) return res.status(400).json({ message: "Username already exists" });
+      if (existingUser.employee_id === employee_id) return res.status(400).json({ message: "Employee ID already exists" });
     }
 
-    // 3. Create User (Secure Default Role)
+    // 2. Create User
     const user = new User({
       email,
       username,
-      password, // Assuming you have a pre-save hook in the User model to hash this!
+      password, 
       full_name,
       employee_id,
       phone,
       designation: designation || "Staff",
       department: department || "General",
-      role: "instructor", // SECURITY FIX: Default to lowest privilege
+      branch, 
+      role: role || "instructor", // SECURITY FIX: Default to lowest privilege if not provided
       status: "Active"
     });
 
@@ -62,13 +56,9 @@ export const register = async (req, res) => {
 
 export const login = async (req, res) => {
   try {
+    // req.body is already validated by Joi loginSchema
     const { email, password } = req.body;
 
-    if (!email || !password) {
-      return res.status(400).json({ message: "Email and password are required" });
-    }
-
-    // Explicitly select the password for comparison
     const user = await User.findOne({ email }).select("+password");
     
     if (!user) {

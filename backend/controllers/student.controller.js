@@ -1,307 +1,186 @@
 import Student from "../models/student.js";
-import Course from "../models/course.js";
 import Batch from "../models/batch.js";
+import Course from "../models/course.js"; // ADDED
+import Fee from "../models/fee.js";       // ADDED
 import { deleteLocalFile } from "../middlewares/multer.js";
 import mongoose from "mongoose";
 
+const getSessionInfo = async () => {
+  const session = await mongoose.startSession();
+  const isReplicaSet = mongoose.connection
+    .getClient()
+    .topology.description.type.includes("ReplicaSet");
+  return { session, isReplicaSet };
+};
 
 export const addStudent = async (req, res) => {
+  const { session, isReplicaSet } = await getSessionInfo();
   try {
-    // 1. Create the student
-    const student = await Student.create(req.body);
-
-    // 2. Automatically push the new student's ID into the Batch's students array
-    if (student.batch) {
-      await Batch.findByIdAndUpdate(
-        student.batch,
-        {
-          $push: {
-            students: student._id,
-          },
-        },
-        { new: true }, // returns updated document
-      );
+    if (isReplicaSet) session.startTransaction();
+    
+    // 1. Fetch Course to grab the base sticker price
+    const course = await Course.findById(req.body.course).session(session);
+    if (!course) {
+      throw new Error("Selected course not found");
     }
 
-    res
-      .status(201)
-      .json({ message: "Student created successfully", data: student });
+    if (req.file) req.body.photo_url = `/uploads/students/${req.file.filename}`;
+
+    // 2. Create the Student
+    const [student] = await Student.create([req.body], { session });
+
+    // 3. Update Batch
+    await Batch.findByIdAndUpdate(
+      student.batch,
+      { $push: { students: student._id } },
+      { session },
+    );
+
+    // 4. Generate Financial Ledger (Master Invoice)
+    const baseFee = course.base_fee || 0;
+    const discount = Number(req.body.discount_amount) || 0;
+    const netPayable = Math.max(0, baseFee - discount); // Prevent negative dues
+
+    await Fee.create([{
+      student: student._id,
+      branch: student.branch,
+      course: student.course,
+      total_amount: baseFee,
+      discount: discount,
+      net_payable: netPayable,
+      paid_amount: 0,
+      status: netPayable === 0 ? "Paid" : "Unpaid" // Auto-clears if 100% scholarship
+    }], { session });
+
+    if (isReplicaSet) await session.commitTransaction();
+    res.status(201).json({ success: true, data: student });
   } catch (error) {
-    if (req.file) deleteLocalFile(`/uploads/students/${req.file.filename}`);
-    if (error.code === 11000)
-      return res.status(400).json({ message: `Duplicate key error` });
-    res.status(500).json({ message: error.message });
+    if (isReplicaSet && session.inTransaction())
+      await session.abortTransaction();
+    if (req.file) deleteLocalFile(req.file.path);
+    res
+      .status(error.code === 11000 ? 400 : 500)
+      .json({ success: false, message: error.message });
+  } finally {
+    session.endSession();
   }
 };
 
 export const updateStudent = async (req, res) => {
+  const { session, isReplicaSet } = await getSessionInfo();
   try {
-    const student = await Student.findById(req.params.id);
-    if (!student) {
-      if (req.file) deleteLocalFile(`/uploads/students/${req.file.filename}`);
-      return res.status(404).json({ message: "Student not found" });
-    }
-
-    // Capture the old batch ID before applying updates
-    const oldBatchId = student.batch?.toString();
-    const newBatchId = req.body.batch?.toString();
-
-    // If a new file was uploaded, delete the old one from the server
-    if (req.file && student.photo_url) {
-      deleteLocalFile(student.photo_url);
-    }
-
-    // Apply updates and save
-    Object.assign(student, req.body);
-    await student.save();
-
-    // Handle Batch Transfer Logic
-    if (newBatchId && oldBatchId !== newBatchId) {
-      // 1. Remove student ID from the old batch
-      if (oldBatchId) {
-        await Batch.findByIdAndUpdate(oldBatchId, {
-          $pull: { students: student._id },
-        });
-      }
-      // 2. Add student ID to the new batch
-      await Batch.findByIdAndUpdate(newBatchId, {
-        $push: { students: student._id },
-      });
-    }
-
-    res
-      .status(200)
-      .json({ message: "Student updated successfully", data: student });
-  } catch (error) {
-    if (req.file) deleteLocalFile(`/uploads/students/${req.file.filename}`);
-    if (error.code === 11000)
-      return res.status(400).json({ message: `Duplicate key error` });
-    res.status(500).json({ message: error.message });
-  }
-};
-
-export const deleteStudent = async (req, res) => {
-  try {
+    if (isReplicaSet) session.startTransaction();
     const student = await Student.findById(req.params.id);
     if (!student) return res.status(404).json({ message: "Student not found" });
 
-    const batchId = student.batch;
+    const oldBatchId = student.batch?.toString();
+    const newBatchId = req.body.batch?.toString();
 
-    // 1. Delete the photo
-    if (student.photo_url) deleteLocalFile(student.photo_url);
+    if (req.file && student.photo_url) deleteLocalFile(student.photo_url);
+    if (req.file) req.body.photo_url = `/uploads/students/${req.file.filename}`;
 
-    // 2. Delete the student document
-    await student.deleteOne();
+    Object.assign(student, req.body);
+    await student.save({ session });
 
-    // 3. Remove the student ID from the associated Batch
-    if (batchId) {
-      await Batch.findByIdAndUpdate(batchId, {
-        $pull: { students: student._id },
-      });
+    if (newBatchId && oldBatchId !== newBatchId) {
+      if (oldBatchId)
+        await Batch.findByIdAndUpdate(
+          oldBatchId,
+          { $pull: { students: student._id } },
+          { session },
+        );
+      await Batch.findByIdAndUpdate(
+        newBatchId,
+        { $push: { students: student._id } },
+        { session },
+      );
     }
 
-    res.status(200).json({ message: "Student deleted permanently" });
+    if (isReplicaSet) await session.commitTransaction();
+    res.status(200).json({ success: true, data: student });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    if (isReplicaSet && session.inTransaction())
+      await session.abortTransaction();
+    res.status(500).json({ success: false, message: error.message });
+  } finally {
+    session.endSession();
   }
 };
-
-// export const getAllStudents = async (req, res) => {
-//   try {
-//     const page = parseInt(req.query.page) || 1;
-//     const limit = parseInt(req.query.limit) || 30;
-//     const skip = (page - 1) * limit;
-
-//     const {
-//       search,
-//       status,
-//       batch,
-//       course,
-//       is_active,
-//       competency,
-//       date_from,
-//       date_to,
-//     } = req.query;
-//     let filter = {};
-
-//     if (search) {
-//       const searchRegex = { $regex: search, $options: "i" };
-//       filter.$or = [
-//         { student_name: searchRegex },
-//         { student_id: searchRegex },
-//         { registration_number: searchRegex },
-//         { fathers_name: searchRegex },
-//         { email: searchRegex },
-//         { contact_number: searchRegex },
-//       ];
-//     }
-
-//     // 2. Exact Match Filters
-//     if (status && status !== "all") filter.status = status;
-//     if (competency && competency !== "all") filter.competency = competency;
-//     if (is_active && is_active !== "all")
-//       filter.is_active = is_active === "true";
-
-//     // Validate ObjectIds before assigning them to the filter to prevent CastErrors
-//     if (batch && batch !== "all") {
-//       if (mongoose.Types.ObjectId.isValid(batch)) filter.batch = batch;
-//     }
-//     if (course && course !== "all") {
-//       if (mongoose.Types.ObjectId.isValid(course)) filter.course = course;
-//     }
-
-//     // 3. Date Filters
-//     if (date_from || date_to) {
-//       filter.issue_date = {};
-//       if (date_from) filter.issue_date.$gte = new Date(date_from);
-//       if (date_to) filter.issue_date.$lte = new Date(date_to);
-//     }
-
-
-//     const [
-//       students,
-//       total,
-//       rawDistinctBatches,
-//       distinctCourses,
-//       distinctStatuses,
-//       distinctCompetencies,
-//     ] = await Promise.all([
-//       Student.find(filter)
-//         .populate("course", "course_name course_code duration fee")
-//         .populate("batch", "batch_name batch_type time_slot")
-//         .sort({ createdAt: -1 })
-//         .skip(skip)
-//         .limit(limit),
-//       Student.countDocuments(filter),
-//       Student.distinct("batch"), 
-//       Course.find().select("_id course_name"),
-//       Student.distinct("status"),
-//       Student.distinct("competency"),
-//     ]);
-
-//     const validBatchIds = rawDistinctBatches.filter((id) =>
-//       mongoose.Types.ObjectId.isValid(id),
-//     );
-
-//     // Only query Batch model with valid ObjectIds
-//     const distinctBatches =
-//       validBatchIds.length > 0
-//         ? await Batch.find({ _id: { $in: validBatchIds } }).select(
-//             "_id batch_name",
-//           )
-//         : [];
-
-//         console.log(distinctBatches)
-
-//     res.status(200).json({
-//       data: students,
-//       pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
-//       filters: {
-//         batches: distinctBatches,
-//         courses: distinctCourses,
-//         statuses: distinctStatuses.filter(Boolean).sort(),
-//         competencies: distinctCompetencies.filter(Boolean).sort(),
-//       },
-//     });
-//   } catch (error) {
-//     // Log the actual error to your terminal so you can see exactly what failed
-//     console.error("GET_ALL_STUDENTS ERROR:", error);
-//     res.status(500).json({ message: error.message });
-//   }
-// };
-
-
-
-
 
 export const getAllStudents = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 30;
-    const skip = (page - 1) * limit;
+    const { search, status, batch, course, branch } = req.query;
 
-    // 1. Destructure 'branch' from the query parameters
-    const { search, status, batch, course, is_active, competency, branch } = req.query;
-
-    // 2. Initialize filter with branch isolation (from your middleware)
-    let filter = { ...req.branchFilter }; 
-
-    // ==========================================
-    // 3. SECURE BRANCH FILTERING LOGIC
-    // ==========================================
-    if (req.user.role === "admin") {
-      // If Super Admin selects a specific branch, apply it. 
-      // Otherwise, stay global (filter stays empty or uses branch query).
-      if (branch && branch !== "all" && mongoose.Types.ObjectId.isValid(branch)) {
-        filter.branch = branch;
-      }
-    } else {
-      // Registrar/Instructor: Forced to their own branch via middleware
-      filter.branch = req.user.branch;
-    }
+    let filter = {};
+    if (req.user.role !== "admin") filter.branch = req.user.branch;
+    else if (branch && branch !== "all") filter.branch = branch;
 
     if (search) {
-      const searchRegex = { $regex: search, $options: "i" };
+      const regex = { $regex: search, $options: "i" };
       filter.$or = [
-        { student_name: searchRegex },
-        { student_id: searchRegex },
-        { registration_number: searchRegex },
-        { email: searchRegex },
+        { student_name: regex },
+        { student_id: regex },
+        { email: regex },
       ];
     }
-
-    // Apply exact match filters
     if (status && status !== "all") filter.status = status;
-    if (competency && competency !== "all") filter.competency = competency;
-    if (is_active && is_active !== "all") filter.is_active = is_active === "true";
 
-    // Validate and apply Batch/Course filters
-    if (batch && batch !== "all" && mongoose.Types.ObjectId.isValid(batch)) filter.batch = batch;
-    if (course && course !== "all" && mongoose.Types.ObjectId.isValid(course)) filter.course = course;
-
-    // 4. Database Queries
-    const [
-      students,
-      total,
-      rawDistinctBatches,
-      distinctCourses,
-    ] = await Promise.all([
+    const [students, total] = await Promise.all([
       Student.find(filter)
-        .populate("course", "course_name course_code duration fee")
-        .populate("batch", "batch_name batch_type time_slot")
-        .populate("branch", "branch_name branch_code") // Ensure branch info is available for the table
+        .populate("course batch branch")
         .sort({ createdAt: -1 })
-        .skip(skip)
+        .skip((page - 1) * limit)
         .limit(limit)
         .lean(),
       Student.countDocuments(filter),
-      // Only get distinct batches for the currently filtered set of students
-      Student.distinct("batch", filter), 
-      Course.find({ is_active: true }).select("_id course_name").lean(),
     ]);
 
-    const validBatchIds = rawDistinctBatches.filter(id => mongoose.Types.ObjectId.isValid(id));
-    const distinctBatches = validBatchIds.length > 0
-      ? await Batch.find({ _id: { $in: validBatchIds } }).select("_id batch_name").lean()
-      : [];
-
-    res.status(200).json({
-      success: true,
-      data: students,
-      pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
-      filters: {
-        batches: distinctBatches.map(b => ({ _id: b._id.toString(), batch_name: b.batch_name })),
-        courses: distinctCourses.map(c => ({ _id: c._id.toString(), course_name: c.course_name })),
-      },
-    });
+    res
+      .status(200)
+      .json({
+        success: true,
+        data: students,
+        pagination: { total, page, limit },
+      });
   } catch (error) {
-    console.error("GET_ALL_STUDENTS ERROR:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
+export const deleteStudent = async (req, res) => {
+  const { session, isReplicaSet } = await getSessionInfo();
+  try {
+    if (isReplicaSet) session.startTransaction();
+    
+    const student = await Student.findById(req.params.id);
+    if (!student) return res.status(404).json({ message: "Student not found" });
+    
+    if (student.photo_url) deleteLocalFile(student.photo_url);
+    const batchId = student.batch;
+    
+    await student.deleteOne({ session });
+    
+    if (batchId)
+      await Batch.findByIdAndUpdate(batchId, {
+        $pull: { students: student._id },
+      }, { session });
 
+    // Optional: Delete associated fee/payment records to clean up DB
+    await Fee.deleteMany({ student: student._id }, { session });
+    // await Payment.deleteMany({ student: student._id }, { session }); // Uncomment when Payment is imported
 
+    if (isReplicaSet) await session.commitTransaction();
+    res.status(200).json({ success: true, message: "Student deleted" });
+  } catch (error) {
+    if (isReplicaSet && session.inTransaction())
+      await session.abortTransaction();
+    res.status(500).json({ success: false, message: error.message });
+  } finally {
+    session.endSession();
+  }
+};
 
 export const removeStudentImage = async (req, res) => {
   try {
@@ -458,5 +337,3 @@ export const getAdminStudentById = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
-
-

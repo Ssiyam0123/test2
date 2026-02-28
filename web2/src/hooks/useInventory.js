@@ -50,19 +50,23 @@ export const useAddStockPurchase = (branchId) => {
   });
 };
 
-export const useDeductClassRequisition = (branchId, classId) => {
+// frontend/hooks/useInventory.js
+
+export const useDeductClassRequisition = (branchId) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (itemsPayload) => InventoryAPI.deductClassRequisition(branchId, classId, itemsPayload),
+    // Notice how we pass classId inside an object here now!
+    mutationFn: ({ classId, itemsPayload }) => 
+      InventoryAPI.deductClassRequisition(branchId, classId, itemsPayload),
+    
     onSuccess: async () => {
-      // Refresh the pantry and ledger to show the stock was removed
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["inventory", branchId] }),
         queryClient.invalidateQueries({ queryKey: ["inventory-transactions", branchId] })
+        // You should also invalidate the pending requisitions list here once you build it!
       ]);
-      
-      toast.success("Requisition items deducted from branch inventory.");
+      toast.success("Requisition approved and stock deducted.");
     },
     onError: (error) => {
       toast.error(error?.response?.data?.message || "Failed to deduct inventory.");

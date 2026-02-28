@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import { Trash2 } from "lucide-react";
-import { useUpdateClassContent, useDeleteClass } from "../../hooks/useBatches";
+import { useUpdateClassContent, useDeleteClass } from "../../hooks/useClasses";
 import EntityForm from "../common/EntityForm"; // Adjust path if your EntityForm is located elsewhere
 
 export default function EditSyllabusModal({ batchId, classData, onClose }) {

@@ -10,7 +10,7 @@ const StudentFilters = ({
   isLoading = false,
 }) => {
   const [filters, setFilters] = useState({
-    branch: "all", // NEW
+    branch: "all",
     status: "all",
     batch: "all",
     course: "all",
@@ -28,13 +28,21 @@ const StudentFilters = ({
 
   const handleFilterChange = (key, value) => {
     const newFilters = { ...filters, [key]: value };
+    
+    // IMPORTANT: If superadmin changes the branch, reset the batch and course filters!
+    // Otherwise, it might try to search for a Dhaka batch inside Cumilla.
+    if (key === "branch") {
+      newFilters.batch = "all";
+      newFilters.course = "all";
+    }
+    
     setFilters(newFilters);
     onFilterChange(newFilters);
   };
 
   const clearFilters = () => {
     const cleared = {
-      branch: "all", // NEW
+      branch: "all",
       status: "all",
       batch: "all",
       course: "all",
@@ -57,7 +65,7 @@ const StudentFilters = ({
   };
 
   const filterConfig = [
-    // CONDITIONAL BRANCH FILTER (Only shows if parent passes branches)
+    // 🚀 DYNAMIC BRANCH FILTER (Only renders if array has items)
     ...(filterOptions?.branches?.length > 0 ? [{
       key: "branch",
       label: "Campus / Branch",

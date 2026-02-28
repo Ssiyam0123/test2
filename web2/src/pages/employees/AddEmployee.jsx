@@ -1,19 +1,22 @@
 import React, { useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useOutletContext } from "react-router-dom";
 import { useAddUser, useUpdateUser } from "../../hooks/useUser.js";
-import { useBranches } from "../../hooks/useBranches.js"; // IMPORT THIS
+import { useBranches } from "../../hooks/useBranches.js"; 
 import EntityForm from "../../components/common/EntityForm.jsx";
-import useAuth from "../../store/useAuth"; // IMPORT THIS
+import useAuth from "../../store/useAuth"; 
+import Loader from "../../components/Loader.jsx";
 
 const AddEmployeeForm = ({ mode = "add", data = null }) => {
   const navigate = useNavigate();
-  const { authUser } = useAuth(); // Get current user
+  const { authUser } = useAuth(); 
   
+  const context = useOutletContext() || {};
+  const { branchId } = context;
+
   const addUserMutation = useAddUser();
   const updateUserMutation = useUpdateUser();
-  const { data: branchesResponse } = useBranches(); // Fetch branches
+  const { data: branchesResponse } = useBranches(); 
 
-  // Format Branch Options
   const branchOptions = useMemo(() => {
     if (!branchesResponse?.data) return [];
     return branchesResponse.data.map(b => ({ 
@@ -22,7 +25,6 @@ const AddEmployeeForm = ({ mode = "add", data = null }) => {
     }));
   }, [branchesResponse]);
 
-  // Populate initial data safely
   const initialData = mode === "edit" && data ? {
     employee_id: data.employee_id || "",
     full_name: data.full_name || "",
@@ -35,18 +37,19 @@ const AddEmployeeForm = ({ mode = "add", data = null }) => {
     username: data.username || "",
     password: "", 
     role: data.role || "staff",
-    branch: data.branch?._id || data.branch || "", // ADDED THIS
     facebook: data.social_links?.facebook || "",
     linkedin: data.social_links?.linkedin || "",
     twitter: data.social_links?.twitter || "",
     instagram: data.social_links?.instagram || "",
     others: data.social_links?.others || "", 
-    photo_url: data.photo_url || "" 
+    photo_url: data.photo_url || "",
+    branch: data.branch?._id || data.branch || branchId 
   } : {
     employee_id: "", full_name: "", email: "", phone: "", designation: "", department: "",
     joining_date: "", status: "Active", username: "", 
     password: mode === "add" ? "123456" : "", 
-    role: "staff", branch: "", facebook: "", linkedin: "", twitter: "", instagram: "", others: "",
+    role: "staff", facebook: "", linkedin: "", twitter: "", instagram: "", others: "",
+    branch: branchId 
   };
 
   const employeeConfig = [
@@ -58,15 +61,14 @@ const AddEmployeeForm = ({ mode = "add", data = null }) => {
 
     { divider: true, name: "div-job", title: "Job Details" },
     
-    // CONDITIONAL BRANCH FIELD
-    ...(authUser?.role === "admin" ? [{
-      name: "branch",
-      label: "Assigned Campus / Branch",
-      type: "select",
-      options: branchOptions,
+    { 
+      name: "branch", 
+      label: authUser?.role === "superadmin" ? "Assigned Campus" : "Assigned Campus (Locked)", 
+      type: "select", 
+      options: branchOptions, 
       required: true,
-      defaultOption: "Select Primary Campus",
-    }] : []),
+      disabled: authUser?.role !== "superadmin" 
+    },
 
     { name: "department", label: "Department", type: "select", defaultOption: "Select Department...", required: true, options: [
       { value: "Faculty", label: "Faculty / Instructor" }, { value: "Administration", label: "Administration" }, { value: "Management", label: "Management" }, { value: "Support Staff", label: "Support Staff" }
@@ -86,9 +88,20 @@ const AddEmployeeForm = ({ mode = "add", data = null }) => {
       placeholder: mode === "add" ? "123456" : "Leave blank to keep current",
       required: mode === "add" 
     },
-    { name: "role", label: "System Role", type: "select", required: true, options: [
-      { value: "staff", label: "General Staff" }, { value: "instructor", label: "Instructor" }, { value: "registrar", label: "Registrar" }, { value: "admin", label: "Branch Admin" }
-    ]},
+    // 🚀 DYNAMIC ROLE CHOICES IN FORM
+    { 
+      name: "role", 
+      label: "System Role", 
+      type: "select", 
+      required: true, 
+      options: [
+        { value: "staff", label: "General Staff" }, 
+        { value: "instructor", label: "Instructor" }, 
+        { value: "registrar", label: "Registrar" }, 
+        { value: "admin", label: "Branch Admin" },
+        ...(authUser?.role === "superadmin" ? [{ value: "superadmin", label: "Super Admin" }] : [])
+      ]
+    },
 
     { divider: true, name: "div-social", title: "Social Links (Optional)" },
     { name: "facebook", label: "Facebook URL", placeholder: "https://facebook.com/..." },
@@ -104,7 +117,15 @@ const AddEmployeeForm = ({ mode = "add", data = null }) => {
     if (mode === "edit" && !formData.get("password")) {
       formData.delete("password");
     }
+    
+    if (authUser?.role !== "superadmin" && branchId) {
+      formData.set("branch", branchId);
+    } else if (!formData.get("branch") && branchId) {
+      formData.set("branch", branchId); 
+    }
+    
     const mutationConfig = { onSuccess: () => navigate("/admin/all-employees") };
+    
     if (mode === "edit") {
       updateUserMutation.mutate({ id: data._id, formData }, mutationConfig);
     } else {
@@ -113,6 +134,8 @@ const AddEmployeeForm = ({ mode = "add", data = null }) => {
   };
 
   const isMutating = addUserMutation.isPending || updateUserMutation.isPending;
+
+  if (!branchId) return <Loader />;
 
   return (
     <div className="min-h-screen py-8 px-4">

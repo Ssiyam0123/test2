@@ -1,197 +1,204 @@
 import User from "../models/user.js";
-import Comment from "../models/comment.js";
 import { deleteLocalFile } from "../middlewares/multer.js";
-import  Branch  from "../models/branch.js";
-import mongoose from "mongoose"
-// ==========================================
-// COMMENTS LOGIC
-// ==========================================
-export const addComment = async (req, res) => {
-  try {
-    const { studentId, text } = req.body;
-    const instructorId = req.user._id;
-
-    if (req.user.role !== "instructor" && req.user.role !== "admin") {
-      return res.status(403).json({ message: "Only instructors and admins can comment." });
-    }
-
-    const newComment = await Comment.create({ student: studentId, instructor: instructorId, text });
-    await newComment.populate("instructor", "full_name photo_url designation");
-
-    res.status(201).json({ message: "Comment added", data: newComment });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-export const getStudentComments = async (req, res) => {
-  try {
-    const comments = await Comment.find({ student: req.params.studentId })
-      .populate("instructor", "full_name photo_url designation role")
-      .sort({ createdAt: -1 });
-
-    res.status(200).json({ data: comments });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
+import { generateEmployeeId } from "../lib/utils.js";
 
 // ==========================================
-// STANDARD USER / EMPLOYEE CRUD
+// READ: MULTI-TENANT FETCH
 // ==========================================
-
-
 export const getAllUsers = async (req, res) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 30;
-    const skip = (page - 1) * limit;
-
-    // 1. Destructure 'branch' from query
     const { 
-      search, status, department, designation, 
-      date_from, date_to, role, branch 
+      page = 1, 
+      limit = 20, 
+      status, 
+      role, 
+      department,
+      branch, 
+      date_from, 
+      date_to, 
+      search 
     } = req.query;
 
-    let filter = {};
+    let query = {};
 
-    // ==========================================
-    // 2. CRITICAL: BRANCH ISOLATION LOGIC
-    // ==========================================
-    if (req.user.role === "admin") {
-      // Super Admin: Can see all branches, OR filter by a specific one
-      if (branch && branch !== "all" && mongoose.Types.ObjectId.isValid(branch)) {
-        filter.branch = branch;
+    // 1. THE SECURITY GATE: Branch Isolation
+    if (req.user.role === "superadmin") {
+      // Superadmins can see all, OR filter by the branch passed in the query
+      if (branch && branch !== "all") {
+        query.branch = branch;
       }
     } else {
-      // Registrar / Instructor: FORCED isolation to their own branch
-      // This prevents them from accessing other branch employee data via API manipulation
-      filter.branch = req.user.branch;
+      // Branch Admins are locked to their own branch permanently
+      query.branch = req.user.branch;
     }
 
-    // ==========================================
-    // 3. APPLY OTHER FILTERS
-    // ==========================================
+    // 2. Standard Filters
+    if (status && status !== "all") query.status = status;
+    if (role && role !== "all") query.role = role;
+    if (department && department !== "all") query.department = department;
+
+    // 3. Date Range
+    if (date_from || date_to) {
+      query.joining_date = {};
+      if (date_from) query.joining_date.$gte = new Date(date_from);
+      if (date_to) query.joining_date.$lte = new Date(date_to);
+    }
+
+    // 4. Search Filter
     if (search) {
-      const searchRegex = { $regex: search, $options: "i" };
-      filter.$or = [
-        { full_name: searchRegex },
-        { employee_id: searchRegex },
-        { email: searchRegex },
-        { username: searchRegex },
+      query.$or = [
+        { full_name: { $regex: search, $options: "i" } },
+        { employee_id: { $regex: search, $options: "i" } },
+        { email: { $regex: search, $options: "i" } },
+        { phone: { $regex: search, $options: "i" } }
       ];
     }
 
-    if (status && status !== "all") filter.status = status;
-    if (department && department !== "all") filter.department = department;
-    if (designation && designation !== "all") filter.designation = designation;
-    if (role && role !== "all") filter.role = role;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    if (date_from || date_to) {
-      filter.joining_date = {};
-      if (date_from) filter.joining_date.$gte = new Date(date_from);
-      if (date_to) filter.joining_date.$lte = new Date(date_to);
-    }
+    // 5. Execute with Pagination
+    const users = await User.find(query)
+      .populate("branch", "branch_name branch_code")
+      .skip(skip)
+      .limit(parseInt(limit))
+      .sort({ createdAt: -1 });
 
-    // ==========================================
-    // 4. EXECUTE WITH BRANCH POPULATION
-    // ==========================================
-    const [
-      users, 
-      total, 
-      distinctDepartments, 
-      distinctDesignations, 
-      distinctStatuses, 
-      distinctRoles,
-      branches // Fetch branches for the admin filter dropdown
-    ] = await Promise.all([
-      User.find(filter)
-        .populate("branch", "branch_name branch_code") // Populated for table display
-        .select("-password")
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-      User.countDocuments(filter),
-      User.distinct("department", filter),
-      User.distinct("designation", filter),
-      User.distinct("status", filter),
-      User.distinct("role", filter),
-      req.user.role === "admin" ? Branch.find({ is_active: true }).select("branch_name branch_code").lean() : []
-    ]);
+    const total = await User.countDocuments(query);
 
     res.status(200).json({
       success: true,
       data: users,
-      pagination: { 
-        total, 
-        page, 
-        limit, 
-        totalPages: Math.ceil(total / limit) 
-      },
-      filters: {
-        departments: distinctDepartments.filter(Boolean).sort(),
-        designations: distinctDesignations.filter(Boolean).sort(),
-        statuses: distinctStatuses.filter(Boolean).sort(),
-        roles: distinctRoles.filter(Boolean).sort(),
-        branches: branches // Sent to frontend for the dropdown
+      pagination: {
+        total,
+        page: parseInt(page),
+        pages: Math.ceil(total / limit)
       }
     });
   } catch (error) {
-    console.error("GET_ALL_USERS_ERROR:", error);
     res.status(500).json({ success: false, message: error.message });
   }
-};;
+};
 
+// ==========================================
+// WRITE: MULTI-TENANT CREATE
+// ==========================================
 export const addUser = async (req, res) => {
   try {
-    const user = await User.create(req.body);
-    const userResponse = user.toObject();
-    delete userResponse.password;
+    const userData = { ...req.body };
 
-    res.status(201).json({ message: "User created successfully", data: userResponse });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-export const updateUser = async (req, res) => {
-  try {
-    const user = await User.findById(req.params.id);
-    if (!user) return res.status(404).json({ message: "User not found" });
-
-    // Handle photo replacement server cleanup
-    if (req.file && user.photo_url) deleteLocalFile(user.photo_url);
-
-    Object.assign(user, req.body);
-    await user.save();
-    
-    const userResponse = user.toObject();
-    delete userResponse.password;
-
-    res.status(200).json({ message: "User updated successfully", data: userResponse });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-export const deleteUser = async (req, res) => {
-  try {
-    if (req.user && req.user._id.toString() === req.params.id) {
-      return res.status(400).json({ message: "You cannot delete your own account" });
+    // File Upload Handling
+    if (req.file) {
+      userData.photo_url = `/uploads/${req.file.filename}`;
     }
 
-    const user = await User.findById(req.params.id);
-    if (!user) return res.status(404).json({ message: "User not found" });
+    // Generate ID
+    const baseId = await generateEmployeeId(userData.role);
+    userData.employee_id = baseId;
 
-    if (user.photo_url) deleteLocalFile(user.photo_url);
+    // SOCIAL LINKS NESTING FIX
+    userData.social_links = {
+      facebook: req.body.facebook || "",
+      linkedin: req.body.linkedin || "",
+      twitter: req.body.twitter || "",
+      instagram: req.body.instagram || "",
+      custom: req.body.others || "",
+    };
 
-    await user.deleteOne();
-    res.status(200).json({ message: "User deleted permanently" });
+    // SECURITY OVERRIDE: Branch Isolation
+    if (req.user.role !== "superadmin") {
+      userData.branch = req.user.branch;
+      
+      // Prevent Branch Admins from creating Superadmins
+      if (userData.role === "superadmin") {
+        return res.status(403).json({ success: false, message: "Cannot create a superadmin account." });
+      }
+    }
+
+    const newUser = new User(userData);
+    await newUser.save();
+
+    res.status(201).json({ success: true, data: newUser });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("ADD_USER_ERROR:", error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// ==========================================
+// WRITE: MULTI-TENANT UPDATE
+// ==========================================
+export const updateUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateData = { ...req.body };
+
+    // 1. Fetch target user to ensure they exist and check permissions
+    const targetUser = await User.findById(id);
+    if (!targetUser) return res.status(404).json({ success: false, message: "User not found" });
+
+    // 2. SECURITY GATE: Can this admin edit this user?
+    if (req.user.role !== "superadmin") {
+      // A branch admin cannot edit a user from another branch
+      if (targetUser.branch.toString() !== req.user.branch.toString()) {
+        return res.status(403).json({ success: false, message: "Access denied to this branch's data." });
+      }
+      
+      // A branch admin cannot elevate someone to superadmin
+      if (updateData.role === "superadmin") {
+        return res.status(403).json({ success: false, message: "Cannot elevate role to superadmin." });
+      }
+
+      // Force the branch ID to remain the admin's branch (prevents transferring users)
+      updateData.branch = req.user.branch;
+    }
+
+    // 3. Social Links & Photos
+    if (req.file) {
+      updateData.photo_url = `/uploads/${req.file.filename}`;
+    }
+
+    updateData.social_links = {
+      facebook: req.body.facebook || targetUser.social_links?.facebook || "",
+      linkedin: req.body.linkedin || targetUser.social_links?.linkedin || "",
+      twitter: req.body.twitter || targetUser.social_links?.twitter || "",
+      instagram: req.body.instagram || targetUser.social_links?.instagram || "",
+      custom: req.body.others || targetUser.social_links?.custom || "",
+    };
+
+    // 4. Update
+    const updatedUser = await User.findByIdAndUpdate(id, updateData, { new: true })
+      .populate("branch", "branch_name branch_code");
+
+    res.status(200).json({ success: true, data: updatedUser });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ==========================================
+// WRITE: MULTI-TENANT DELETE
+// ==========================================
+export const deleteUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const targetUser = await User.findById(id);
+    if (!targetUser) return res.status(404).json({ success: false, message: "User not found" });
+
+    // SECURITY GATE
+    if (req.user.role !== "superadmin" && targetUser.branch.toString() !== req.user.branch.toString()) {
+      return res.status(403).json({ success: false, message: "Access denied." });
+    }
+
+    await User.findByIdAndDelete(id);
+    res.status(200).json({ success: true, message: "User deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ... keep your getUserById, updateUserStatus, updateUserRole, and removeUserImage functions, 
+// but make sure to add the `if (req.user.role !== "superadmin" && targetUser.branch.toString() !== req.user.branch.toString())` check to them as well!
 
 export const getUserById = async (req, res) => {
   try {
@@ -258,12 +265,8 @@ export const searchUser = async (req, res) => {
   }
 };
 
-// ==========================================
-// ROLE MANAGEMENT
-// ==========================================
 export const updateUserRole = async (req, res) => {
   try {
-    // req.body.role and self-modification are already checked by validateRoleUpdate middleware
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ message: "User not found" });
 

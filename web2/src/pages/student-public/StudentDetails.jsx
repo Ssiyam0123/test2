@@ -8,7 +8,7 @@ import {
 import useAuth from "../../store/useAuth.js";
 import LogoLoader from "../../components/LogoLoader.jsx";
 import { usePublicStudentProfile, useStudent } from "../../hooks/useStudents.js";
-import { useBatchClasses } from "../../hooks/useBatches.js"; // Added Batch Hook
+import { useBatchClasses } from "../../hooks/useClasses.js"; // Added Batch Hook
 import { InfoItem, SectionCard } from "../../components/ProfileLayout.jsx";
 import { apiURL } from "../../../Constant.js";
 

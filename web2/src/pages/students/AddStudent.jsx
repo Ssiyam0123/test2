@@ -1,10 +1,10 @@
 import React, { useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useOutletContext } from "react-router-dom"; 
 import { useAddStudent, useUpdateStudent } from "../../hooks/useStudents.js";
 import { useActiveCourses } from "../../hooks/useCourses.js";
-import { useActiveBatches } from "../../hooks/useBatches.js"; 
-import { useBranches } from "../../hooks/useBranches.js"; // IMPORT THIS
-import useAuth from "../../store/useAuth"; // IMPORT THIS
+import { useBatches } from "../../hooks/useBatches.js"; 
+import { useBranches } from "../../hooks/useBranches.js"; 
+import useAuth from "../../store/useAuth"; 
 import Loader from "../../components/Loader.jsx";
 import EntityForm from "../../components/common/EntityForm.jsx";
 
@@ -30,9 +30,12 @@ const AddStudentForm = ({ mode = "add", data = null }) => {
   const navigate = useNavigate();
   const { authUser } = useAuth();
   
-  const { data: coursesData, isLoading: coursesLoading, error: coursesError } = useActiveCourses();
-  const { data: batchesData, isLoading: batchesLoading, error: batchesError } = useActiveBatches();
-  const { data: branchesResponse, isLoading: branchesLoading } = useBranches(); // Fetch branches
+  const context = useOutletContext() || {};
+  const { branchId } = context;
+
+  const { data: coursesData, isLoading: coursesLoading, error: coursesError } = useActiveCourses({ branch: branchId });
+  const { data: batchesData, isLoading: batchesLoading, error: batchesError } = useBatches({ branch: branchId });
+  const { data: branchesResponse } = useBranches(); 
   
   const addStudentMutation = useAddStudent();
   const editStudentMutation = useUpdateStudent();
@@ -62,14 +65,15 @@ const AddStudentForm = ({ mode = "add", data = null }) => {
     ...data,
     course: data.course?._id || data.course || "", 
     batch: data.batch?._id || data.batch || "", 
-    branch: data.branch?._id || data.branch || "", // ADDED THIS
     issue_date: data.issue_date?.split("T")[0] || "",
     completion_date: data.completion_date?.split("T")[0] || "",
+    branch: data.branch?._id || data.branch || branchId 
   } : {
     student_name: "", fathers_name: "", student_id: "", registration_number: "",
-    gender: "male", course: "", competency: "not_assessed", batch: "", branch: "", status: "active",
+    gender: "male", course: "", competency: "not_assessed", batch: "", status: "active",
     issue_date: "", completion_date: "", contact_number: "", email: "", address: "",
     is_active: true, is_verified: false,
+    branch: branchId 
   };
 
   const studentConfig = [
@@ -81,15 +85,15 @@ const AddStudentForm = ({ mode = "add", data = null }) => {
     
     { divider: true, name: "divider-academic", title: "Academic Information" }, 
 
-    // CONDITIONAL BRANCH FIELD
-    ...(authUser?.role === "admin" ? [{
-      name: "branch",
-      label: "Assigned Campus",
-      type: "select",
-      options: branchOptions,
+    // 🚀 THE SMART DROPDOWN
+    { 
+      name: "branch", 
+      label: authUser?.role === "superadmin" ? "Assigned Campus" : "Assigned Campus (Locked)", 
+      type: "select", 
+      options: branchOptions, 
       required: true,
-      defaultOption: "Select Campus",
-    }] : []),
+      disabled: authUser?.role !== "superadmin" // SUPERADMIN CAN CLICK IT!
+    },
 
     { name: "student_id", label: "Student ID", required: true },
     { name: "registration_number", label: "Registration Number" },
@@ -120,6 +124,16 @@ const AddStudentForm = ({ mode = "add", data = null }) => {
 
   const handleSubmit = (formData, jsonPayload) => {
     const finalPayload = buildStudentPayload(formData, jsonPayload, coursesData);
+    
+    // 🚀 THE SECURITY LOCK
+    // If NOT a superadmin, forcefully overwrite the branch to prevent tampering.
+    // If Superadmin, leave their selection alone!
+    if (authUser?.role !== "superadmin" && branchId) {
+      finalPayload.set("branch", branchId);
+    } else if (!finalPayload.get("branch") && branchId) {
+      finalPayload.set("branch", branchId); // Fallback just in case
+    }
+
     const mutationConfig = { onSuccess: () => navigate("/admin/all-students") };
     
     if (mode === "edit") {
@@ -130,9 +144,9 @@ const AddStudentForm = ({ mode = "add", data = null }) => {
   };
 
   const isMutating = addStudentMutation.isPending || editStudentMutation.isPending;
-  const isLoading = coursesLoading || batchesLoading || branchesLoading;
 
-  if (isLoading) return <Loader />;
+  if (!branchId) return <Loader />;
+  if (coursesLoading || batchesLoading) return <Loader />;
   if (coursesError || batchesError) return <div className="p-6 text-red-600">Error loading data. Please refresh.</div>;
 
   return (

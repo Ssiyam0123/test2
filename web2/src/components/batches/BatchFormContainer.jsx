@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import EntityForm from "../../components/common/EntityForm";
-import { useAddBatch, useBatchById, useUpdateBatch } from "../../hooks/useBatches";
+import { useCreateBatch, useBatchById, useUpdateBatch } from "../../hooks/useBatches";
 import { useCourses } from "../../hooks/useCourses";
 import Loader from "../../components/Loader";
 
@@ -13,7 +13,7 @@ const BatchFormContainer = () => {
   const { data: batchResponse, isLoading: batchLoading } = useBatchById(id);
   const { data: coursesResponse, isLoading: coursesLoading } = useCourses();
   
-  const { mutate: addBatch, isPending: isAdding } = useAddBatch();
+  const { mutate: addBatch, isPending: isAdding } = useCreateBatch();
   const { mutate: updateBatch, isPending: isUpdating } = useUpdateBatch();
 
   const currentBatch = batchResponse?.data;

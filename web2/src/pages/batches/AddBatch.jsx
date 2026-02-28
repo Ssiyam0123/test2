@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import EntityForm from "../../components/common/EntityForm";
-import { useAddBatch } from "../../hooks/useBatches";
+import { useCreateBatch } from "../../hooks/useBatches";
 import { useCourses } from "../../hooks/useCourses";
 import { useBranches } from "../../hooks/useBranches"; 
 import { useUsers } from "../../hooks/useUser"; 
@@ -18,7 +18,7 @@ const AddBatch = () => {
     authUser?.role !== "admin" ? authUser?.branch : ""
   );
   
-  const { mutate, isPending } = useAddBatch();
+  const { mutate, isPending } = useCreateBatch();
   const { data: coursesResponse, isLoading: coursesLoading } = useCourses();
   const { data: branchesResponse, isLoading: branchesLoading } = useBranches();
   
@@ -134,9 +134,25 @@ const AddBatch = () => {
     },
   ];
 
-  const handleSubmit = (formData, jsonPayload) => {
-    mutate(jsonPayload, { onSuccess: () => navigate("/admin/manage-batches") });
+ const handleSubmit = (formData, jsonPayload) => {
+  // 1. Extract the flat time fields
+  const { start_time, end_time, ...restOfPayload } = jsonPayload;
+
+  // 2. Reconstruct the payload to match the Backend Joi Schema
+  const finalPayload = {
+    ...restOfPayload,
+    time_slot: {
+      start_time,
+      end_time
+    },
+    // Ensure branch is included if the user is not an admin
+    branch: authUser?.role !== "admin" ? authUser?.branch : restOfPayload.branch
   };
+
+  mutate(finalPayload, { 
+    onSuccess: () => navigate("/admin/manage-batches") 
+  });
+};
 
   if (coursesLoading || branchesLoading) return <Loader />;
 

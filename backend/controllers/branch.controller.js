@@ -8,18 +8,8 @@ import Student from "../models/student.js";
 
 export const createBranch = async (req, res) => {
   try {
-    const { branch_name, branch_code, address, contact_email, contact_phone } = req.body;
-
-    // Standardize the code to uppercase
-    const cleanCode = branch_code?.trim().toUpperCase();
-
-    const newBranch = await Branch.create({
-      branch_name: branch_name?.trim(),
-      branch_code: cleanCode,
-      address,
-      contact_email,
-      contact_phone,
-    });
+    // req.body is already trimmed, formatted, and validated by Joi
+    const newBranch = await Branch.create(req.body);
 
     res.status(201).json({ 
       success: true, 
@@ -27,8 +17,10 @@ export const createBranch = async (req, res) => {
       data: newBranch 
     });
   } catch (error) {
+    // Rely on MongoDB's native unique index to catch duplicates
     if (error.code === 11000) {
-      return res.status(400).json({ success: false, message: "Branch name or code already exists." });
+      const field = Object.keys(error.keyValue)[0];
+      return res.status(400).json({ success: false, message: `This ${field} already exists.` });
     }
     res.status(500).json({ success: false, message: error.message });
   }
@@ -38,15 +30,9 @@ export const updateBranch = async (req, res) => {
   try {
     const { id } = req.params;
     
-    // Prevent overriding the branch code easily as it breaks ID generation formats
-    const updateData = { ...req.body };
-    if (updateData.branch_code) {
-      updateData.branch_code = updateData.branch_code.trim().toUpperCase();
-    }
-
     const updatedBranch = await Branch.findByIdAndUpdate(
       id, 
-      updateData, 
+      req.body, 
       { new: true, runValidators: true }
     );
 
@@ -61,7 +47,8 @@ export const updateBranch = async (req, res) => {
     });
   } catch (error) {
     if (error.code === 11000) {
-      return res.status(400).json({ success: false, message: "Branch name or code already exists." });
+      const field = Object.keys(error.keyValue)[0];
+      return res.status(400).json({ success: false, message: `This ${field} already exists.` });
     }
     res.status(500).json({ success: false, message: error.message });
   }
@@ -108,9 +95,7 @@ export const getBranchById = async (req, res) => {
   }
 };
 
-// ==========================================
-// DANGER ZONE: STATE MANAGEMENT
-// ==========================================
+
 
 export const toggleBranchStatus = async (req, res) => {
   try {
@@ -135,7 +120,6 @@ export const deleteBranch = async (req, res) => {
     const { id } = req.params;
 
     // SECURITY: Prevent deletion if there are associated records
-    // Hard-deleting a branch that has students will corrupt the database
     const [userCount, studentCount] = await Promise.all([
       User.countDocuments({ branch: id }),
       Student.countDocuments({ branch: id })

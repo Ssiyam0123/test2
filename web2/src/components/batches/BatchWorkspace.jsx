@@ -13,7 +13,7 @@ import Loader from "../../components/Loader";
 
 import CostSummaryWidget from "../costs/CostSummaryWidget";
 import MarkClassCompleteModal from "./MarkClassCompleteModal";
-import { useUpdateClassAttendance } from "../../hooks/useBatches";
+import { useUpdateClassAttendance } from "../../hooks/useClasses";
 import ClassRequisitionModal from "./ClassRequisitionModal";
 
 export default function BatchWorkspace({

@@ -18,21 +18,24 @@ const expenseSchema = new mongoose.Schema(
       default: Date.now 
     },
     
+    // ⚠️ CHANGED: These are now OPTIONAL. 
+    // General inventory purchases won't have these, but class usages will.
     class_content: { 
       type: mongoose.Schema.Types.ObjectId, 
       ref: "ClassContent",
-      required: true 
+      required: false 
     },
     batch: { 
       type: mongoose.Schema.Types.ObjectId, 
       ref: "Batch",
-      required: true,
+      required: false,
       index: true 
     },
+
     branch: { 
       type: mongoose.Schema.Types.ObjectId, 
       ref: "Branch",
-      required: true,
+      required: true, // Every expense MUST belong to a branch
       index: true 
     },
     

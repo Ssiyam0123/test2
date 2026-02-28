@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useOutletContext } from "react-router-dom";
 import {
   useUsers,
   useDeleteUser,
@@ -15,12 +15,10 @@ import TableSkeleton from "../../components/common/TableSkeleton.jsx";
 import DataErrorState from "../../components/common/DataErrorState.jsx";
 import EmployeeFilters from "../../components/Search_filter/EmployeeFilters.jsx";
 import EmployeesTable from "../../components/table/EmployeesTable.jsx";
-
-// Import Branches Hook
 import { useBranches } from "../../hooks/useBranches.js";
 
 const INITIAL_FILTERS = {
-  branch: "all", // ADDED BRANCH
+  branch: "all",
   status: "all",
   department: "all",
   role: "all",
@@ -33,7 +31,10 @@ const AllEmployees = () => {
   const { authUser } = useAuth();
   const currentUserId = authUser?.id || authUser?._id;
 
-  // Fetch Branches
+  // GATEKEEPER CONTEXT
+  const context = useOutletContext() || {}; 
+  const { branchId } = context; 
+
   const { data: branchesRes } = useBranches();
 
   const [filters, setFilters] = useState(INITIAL_FILTERS);
@@ -49,22 +50,31 @@ const AllEmployees = () => {
   }, [searchTerm]);
 
   const queryFilters = useMemo(() => {
-    const activeFilters = {};
+    const activeFilters = { ...filters };
+
+    if (authUser?.role !== "superadmin") {
+      activeFilters.branch = branchId;
+    } else {
+      if (activeFilters.branch === "all") delete activeFilters.branch;
+    }
 
     if (debouncedSearch) {
       activeFilters.search = debouncedSearch;
     }
 
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value !== "all" && value !== "") {
-        activeFilters[key] = value;
+    Object.entries(activeFilters).forEach(([key, value]) => {
+      if (value === "all" || value === "") {
+        delete activeFilters[key];
       }
     });
 
     return activeFilters;
-  }, [filters, debouncedSearch]);
+  }, [filters, debouncedSearch, branchId, authUser?.role]);
 
-  const { data, isLoading, error, refetch, isRefetching } = useUsers(page, limit, queryFilters);
+  const { data, isLoading, error, refetch, isRefetching } = useUsers(page, limit, queryFilters, {
+    enabled: authUser?.role === "superadmin" ? true : !!branchId 
+  });
+  
   const deleteUserMutation = useDeleteUser();
   const updateStatusMutation = useUpdateUserStatus();
   const updateRoleMutation = useUpdateUserRole();
@@ -72,13 +82,9 @@ const AllEmployees = () => {
   const employees = data?.data || [];
   const pagination = data?.pagination;
 
-  // ==========================================
-  // INJECT BRANCHES INTO FILTER OPTIONS
-  // ==========================================
   const combinedFilterOptions = useMemo(() => {
     return {
-      // Only Super Admins see the branch filter dropdown
-      branches: authUser?.role === "admin" ? branchesRes?.data || [] : []
+      branches: authUser?.role === "superadmin" ? (branchesRes?.data || []) : []
     };
   }, [branchesRes?.data, authUser?.role]);
 
@@ -102,6 +108,8 @@ const AllEmployees = () => {
     updateRoleMutation.mutate({ id, role: newRole });
   };
 
+  if (authUser?.role !== "superadmin" && !branchId) return <div className="p-6"><TableSkeleton rows={8} /></div>;
+
   return (
     <div className="p-6 max-w-[1600px] mx-auto min-h-screen relative">
       <PageHeader
@@ -119,18 +127,14 @@ const AllEmployees = () => {
           searchTerm={searchTerm}
           onSearchChange={setSearchTerm}
           onFilterChange={setFilters}
-          filterOptions={combinedFilterOptions} // <--- PASSING THE BRANCHES HERE
+          filterOptions={combinedFilterOptions} 
           initialFilters={INITIAL_FILTERS}
           isLoading={isLoading}
         />
       </div>
 
       {error ? (
-        <DataErrorState
-          error={error}
-          onRetry={refetch}
-          isRetrying={isRefetching}
-        />
+        <DataErrorState error={error} onRetry={refetch} isRetrying={isRefetching} />
       ) : (
         <>
           {isLoading ? (
@@ -139,6 +143,7 @@ const AllEmployees = () => {
             <EmployeesTable
               employees={employees}
               currentUserId={currentUserId}
+              currentUserRole={authUser?.role} // 🚀 CRITICAL FIX: Passed the role down!
               pagination={pagination}
               onDelete={handleDelete}
               onToggleStatus={handleToggleStatus}

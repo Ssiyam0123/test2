@@ -1,16 +1,13 @@
 import { API } from "./axios";
 
-// ==============================
-// BATCH ENDPOINTS
-// ==============================
+// ==========================================
+// BATCH ENDPOINTS (/api/batches)
+// ==========================================
 
-export const fetchBatches = async () => {
-  const { data } = await API.get("/batches");
-  return data;
-};
-
-export const fetchBatchesByStatus = async (status = "all") => {
-  const { data } = await API.get(`/batches?status=${status}`);
+export const fetchBatches = async (filters = {}) => {
+  // Merge default status with any incoming filters (like branch)
+  const params = new URLSearchParams({ status: "all", ...filters });
+  const { data } = await API.get(`/batches?${params}`);
   return data;
 };
 
@@ -31,61 +28,5 @@ export const updateBatch = async (id, updateData) => {
 
 export const deleteBatch = async (id) => {
   const { data } = await API.delete(`/batches/${id}`);
-  return data;
-};
-
-export const autoScheduleBatch = async (batchId) => {
-  const { data } = await API.post(`/batches/${batchId}/auto-schedule`);
-  return data;
-};
-
-// ==============================
-// CLASS / SYLLABUS ENDPOINTS
-// ==============================
-
-export const fetchBatchClasses = async (batchId) => {
-  const { data } = await API.get(`/batches/${batchId}/classes`);
-  return data;
-};
-
-export const addSyllabusItem = async (batchId, syllabusData) => {
-  const { data } = await API.post(`/batches/${batchId}/syllabus`, syllabusData);
-  return data;
-};
-
-export const updateClassContent = async (classId, updateData) => {
-  const { data } = await API.put(`/batches/classes/${classId}`, updateData);
-  return data;
-};
-
-export const deleteClassContent = async (classId) => {
-  const { data } = await API.delete(`/batches/classes/${classId}`);
-  return data;
-};
-
-export const scheduleClass = async (classContentId, date_scheduled) => {
-  const { data } = await API.put(`/batches/classes/${classContentId}/schedule`, { date_scheduled });
-  return data;
-};
-
-// ==============================
-// ATTENDANCE ENDPOINTS
-// ==============================
-
-// ==============================
-// ATTENDANCE ENDPOINTS
-// ==============================
-
-// For updating attendance AND financials on a specific class
-export const updateClassAttendance = async (classId, payload) => {
-  // ⚠️ Notice we removed the {} brackets around payload!
-  // This sends the data directly so the backend can read it.
-  const { data } = await API.put(`/batches/classes/${classId}/attendance`, payload);
-  return data;
-};
-
-// Legacy/Alternative endpoint based on your original code
-export const updateBatchAttendance = async (batchId, attendanceData) => {
-  const { data } = await API.post(`/batches/${batchId}/attendance`, attendanceData);
   return data;
 };

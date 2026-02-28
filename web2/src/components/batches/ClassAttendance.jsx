@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Check, XCircle, Users, CheckSquare, Loader2 } from "lucide-react";
-import { useUpdateClassAttendance } from "../../hooks/useBatches";
+import { useUpdateClassAttendance } from "../../hooks/useClasses";
 
 export default function ClassAttendance({ classData, students = [] }) {
   const [attendance, setAttendance] = useState({});

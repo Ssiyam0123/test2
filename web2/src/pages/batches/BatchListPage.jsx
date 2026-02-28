@@ -1,14 +1,14 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus, Clock, BookOpen, Edit3, Trash2, LayoutGrid, Search, Layers } from "lucide-react";
-import { useActiveBatches, useDeleteBatch } from "../../hooks/useBatches";
+import { useBatches, useDeleteBatch } from "../../hooks/useBatches";
 import Loader from "../../components/Loader";
 import Swal from "sweetalert2";
 import DataTable from "../../components/common/DataTable.jsx";
 
 export default function BatchListPage() {
   const navigate = useNavigate();
-  const { data: batchesResponse, isLoading } = useActiveBatches();
+  const { data: batchesResponse, isLoading } = useBatches();
   const { mutate: deleteBatch } = useDeleteBatch();
   const [searchTerm, setSearchTerm] = useState("");
   

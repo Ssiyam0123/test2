@@ -1,9 +1,9 @@
 import React, { useState } from "react";
 import { Plus, Trash2, X } from "lucide-react";
-import { useAddSyllabusItem } from "../../hooks/useBatches";
+import { useAddSyllabusItems } from "../../hooks/useClasses";
 
 const AddSyllabusModal = ({ batchId, onClose }) => {
-  const { mutate, isPending } = useAddSyllabusItem(batchId);
+  const { mutate, isPending } = useAddSyllabusItems(batchId);
 
   // Array state to hold multiple class objects
   const [rows, setRows] = useState([

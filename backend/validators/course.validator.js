@@ -2,13 +2,18 @@ import Course from "../models/course.js";
 
 // 1. Check Required Fields
 export const validateCourseFields = (req, res, next) => {
-  const { course_name, course_code, duration_value } = req.body;
+  const { course_name, course_code, duration_value,base_fee } = req.body;
   const isPost = req.method === "POST";
 
   const missing = [];
   if (isPost && !course_name) missing.push("course_name");
   if (isPost && !course_code) missing.push("course_code");
   if (isPost && duration_value === undefined) missing.push("duration_value");
+  // Add to the checks:
+if (isPost && base_fee === undefined) missing.push("base_fee");
+if (base_fee !== undefined && isNaN(Number(base_fee))) {
+  return res.status(400).json({ message: "Base fee must be a valid number." });
+}
 
   if (missing.length > 0) {
     return res.status(400).json({ message: `Missing required fields: ${missing.join(", ")}` });
