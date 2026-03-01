@@ -8,6 +8,12 @@ import useAuth from "../../store/useAuth";
 import Loader from "../../components/Loader.jsx";
 import EntityForm from "../../components/common/EntityForm.jsx";
 
+// ==========================================
+// ROLE-BASED ACCESS ARRAYS
+// ==========================================
+const CAN_CHANGE_CAMPUS = ["superadmin"];
+
+// Utility to extract course details for payload
 const buildStudentPayload = (baseFormData, jsonPayload, coursesData) => {
   const selectedCourseId = jsonPayload.course;
   const courseDetails = coursesData?.data?.find(c => c._id === selectedCourseId);
@@ -30,9 +36,11 @@ const AddStudentForm = ({ mode = "add", data = null }) => {
   const navigate = useNavigate();
   const { authUser } = useAuth();
   
+  // Gatekeeper Context
   const context = useOutletContext() || {};
   const { branchId } = context;
 
+  // Fetch contextual data based on active branch
   const { data: coursesData, isLoading: coursesLoading, error: coursesError } = useActiveCourses({ branch: branchId });
   const { data: batchesData, isLoading: batchesLoading, error: batchesError } = useBatches({ branch: branchId });
   const { data: branchesResponse } = useBranches(); 
@@ -40,13 +48,26 @@ const AddStudentForm = ({ mode = "add", data = null }) => {
   const addStudentMutation = useAddStudent();
   const editStudentMutation = useUpdateStudent();
 
+  // Security Boolean
+  const canChangeCampus = CAN_CHANGE_CAMPUS.includes(authUser?.role);
+
+  // ==========================================
+  // OPTIONS BUILDERS
+  // ==========================================
   const branchOptions = useMemo(() => {
     if (!branchesResponse?.data) return [];
-    return branchesResponse.data.map(b => ({ 
+    
+    // If Admin/Registrar, ONLY show their specific branch in the dropdown visually
+    let availableBranches = branchesResponse.data;
+    if (!canChangeCampus && branchId) {
+      availableBranches = availableBranches.filter(b => b._id === branchId);
+    }
+
+    return availableBranches.map(b => ({ 
       value: b._id, 
       label: `${b.branch_name} (${b.branch_code})` 
     }));
-  }, [branchesResponse]);
+  }, [branchesResponse, canChangeCampus, branchId]);
 
   const courseOptions = useMemo(() => {
     const activeCourses = coursesData?.data || [];
@@ -61,6 +82,11 @@ const AddStudentForm = ({ mode = "add", data = null }) => {
     }));
   }, [batchesData]);
 
+  // ==========================================
+  // INITIAL DATA (WITH TODAY'S DATE DEFAULT)
+  // ==========================================
+  const today = new Date().toISOString().split("T")[0];
+
   const initialData = mode === "edit" && data ? {
     ...data,
     course: data.course?._id || data.course || "", 
@@ -71,11 +97,15 @@ const AddStudentForm = ({ mode = "add", data = null }) => {
   } : {
     student_name: "", fathers_name: "", student_id: "", registration_number: "",
     gender: "male", course: "", competency: "not_assessed", batch: "", status: "active",
-    issue_date: "", completion_date: "", contact_number: "", email: "", address: "",
+    issue_date: today, // 🚀 Defaulted to Today's Date
+    completion_date: "", contact_number: "", email: "", address: "",
     is_active: true, is_verified: false,
-    branch: branchId 
+    branch: branchId // Pre-fills with the active Gatekeeper branch
   };
 
+  // ==========================================
+  // FORM CONFIGURATION
+  // ==========================================
   const studentConfig = [
     { name: "student_name", label: "Student Name", required: true },
     { name: "fathers_name", label: "Father's Name", required: true },
@@ -85,14 +115,14 @@ const AddStudentForm = ({ mode = "add", data = null }) => {
     
     { divider: true, name: "divider-academic", title: "Academic Information" }, 
 
-    // 🚀 THE SMART DROPDOWN
+    // 🚀 DYNAMIC CAMPUS FIELD
     { 
       name: "branch", 
-      label: authUser?.role === "superadmin" ? "Assigned Campus" : "Assigned Campus (Locked)", 
+      label: canChangeCampus ? "Assigned Campus" : "Assigned Campus (Locked)", 
       type: "select", 
       options: branchOptions, 
       required: true,
-      disabled: authUser?.role !== "superadmin" // SUPERADMIN CAN CLICK IT!
+      disabled: !canChangeCampus // Disables interaction for non-superadmins
     },
 
     { name: "student_id", label: "Student ID", required: true },
@@ -126,12 +156,11 @@ const AddStudentForm = ({ mode = "add", data = null }) => {
     const finalPayload = buildStudentPayload(formData, jsonPayload, coursesData);
     
     // 🚀 THE SECURITY LOCK
-    // If NOT a superadmin, forcefully overwrite the branch to prevent tampering.
-    // If Superadmin, leave their selection alone!
-    if (authUser?.role !== "superadmin" && branchId) {
+    // Double-check: If they somehow bypassed the disabled HTML attribute, force it back.
+    if (!canChangeCampus && branchId) {
       finalPayload.set("branch", branchId);
     } else if (!finalPayload.get("branch") && branchId) {
-      finalPayload.set("branch", branchId); // Fallback just in case
+      finalPayload.set("branch", branchId); // Fallback mapping
     }
 
     const mutationConfig = { onSuccess: () => navigate("/admin/all-students") };
@@ -147,10 +176,10 @@ const AddStudentForm = ({ mode = "add", data = null }) => {
 
   if (!branchId) return <Loader />;
   if (coursesLoading || batchesLoading) return <Loader />;
-  if (coursesError || batchesError) return <div className="p-6 text-red-600">Error loading data. Please refresh.</div>;
+  if (coursesError || batchesError) return <div className="p-6 text-red-600 font-bold bg-red-50 rounded-xl text-center">Error loading academic records. Please refresh the page.</div>;
 
   return (
-    <div className="min-h-screen bg-[#e8f0f2] py-8 px-4">
+    <div className="min-h-screen bg-[#e8f0f2] py-8 px-4 animate-in fade-in duration-300">
       <EntityForm
         key={data?._id || "new"}
         title={mode === "edit" ? "Edit Student Profile" : "Register New Student"}

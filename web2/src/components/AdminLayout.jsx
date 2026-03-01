@@ -9,13 +9,18 @@ import useAuth from "../store/useAuth";
 import { apiURL } from "../../Constant.js";
 import { useBranches } from "../hooks/useBranches"; 
 
+// ==========================================
+// ROLE-BASED ACCESS ARRAYS
+// ==========================================
+const CAN_SWITCH_BRANCHES = ["superadmin"];
+
 const AdminLayout = () => {
   const location = useLocation();
   const navigate = useNavigate(); 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const { logout, authUser } = useAuth();
-  const isSuperAdmin = authUser?.role === "superadmin";
+  const isSuperAdmin = CAN_SWITCH_BRANCHES.includes(authUser?.role);
 
   const [activeBranch, setActiveBranch] = useState(null);
   const { data: branchRes, isLoading: branchesLoading } = useBranches();
@@ -114,7 +119,7 @@ const AdminLayout = () => {
         </div>
 
         {/* PROFILE */}
-        <div className={`p-4 border-b border-white/5 shrink-0 bg-white/5 mt-4 rounded-2xl transition-all duration-300 ${isCollapsed ? "mx-2 flex justify-center" : "mx-4"}`}>
+        <div className={`p-4 shrink-0 bg-white/5 mt-4 rounded-2xl transition-all duration-300 ${isCollapsed ? "mx-2 flex justify-center" : "mx-4"}`}>
           {authUser && (
             <div className="flex items-center space-x-3">
               {authUser.photo_url ? (
@@ -132,25 +137,21 @@ const AdminLayout = () => {
           )}
         </div>
 
-        {/* WORKSPACE DROPDOWN (SUPERADMIN ONLY) */}
+        {/* RBAC: SUPERADMIN GATEKEEPER SWITCHER */}
         {isSuperAdmin && !isCollapsed && (
-          <div className="px-4 mt-4 relative group">
-            <div className="flex flex-col text-left overflow-hidden bg-slate-800 p-3 rounded-xl border border-amber-500/20 relative">
-              <span className="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-1">Viewing Workspace</span>
-              <div className="flex items-center justify-between">
-                <select 
-                  value={activeBranch?._id || ""} 
-                  onChange={handleBranchChange}
-                  className="w-full bg-transparent text-sm font-black text-amber-500 outline-none cursor-pointer appearance-none z-10"
-                >
-                  {branches.map(b => (
-                    <option key={b._id} value={b._id} className="text-slate-800">
-                      {b.branch_name}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown size={16} className="text-amber-500 absolute right-3 pointer-events-none" />
-              </div>
+          <div className="px-4 mt-2 mb-2">
+            <div className="relative">
+              <select
+                value={activeBranch?._id || ""}
+                onChange={handleBranchChange}
+                className="w-full appearance-none bg-slate-800 border border-slate-700 text-teal-400 text-xs font-bold py-2.5 pl-3 pr-8 rounded-xl focus:outline-none focus:border-teal-500 transition-colors cursor-pointer"
+              >
+                {branchesLoading && <option>Loading Branches...</option>}
+                {branches.map(b => (
+                  <option key={b._id} value={b._id}>{b.branch_name}</option>
+                ))}
+              </select>
+              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             </div>
           </div>
         )}
@@ -171,7 +172,7 @@ const AdminLayout = () => {
         </nav>
 
         {/* LOGOUT */}
-        <div className={`shrink-0 mt-auto ${isCollapsed ? "p-2 mb-2" : "p-4"}`}>
+        <div className={`shrink-0 mt-auto border-t border-white/5 ${isCollapsed ? "p-2 mb-2" : "p-4"}`}>
           <button onClick={logout} title={isCollapsed ? "Logout" : ""} className={`flex items-center justify-center w-full rounded-xl text-slate-400 font-bold hover:bg-red-500/10 hover:text-red-400 border border-transparent hover:border-red-500/20 transition-all group ${isCollapsed ? "space-x-0 px-0 py-3" : "space-x-2 px-4 py-3"}`}>
             <LogOut size={18} className="text-slate-500 group-hover:text-red-400 transition-colors shrink-0" />
             {!isCollapsed && <span>Logout</span>}
@@ -181,7 +182,7 @@ const AdminLayout = () => {
 
       {sidebarOpen && <div className="fixed inset-0 z-30 bg-slate-900/60 backdrop-blur-sm lg:hidden transition-opacity" onClick={() => setSidebarOpen(false)} />}
 
-      {/* MAIN CONTENT AREA (Grid Removed, Renders Immediately) */}
+      {/* MAIN CONTENT AREA */}
       <div className={`relative z-0 flex flex-col min-h-screen w-full transition-all duration-300 ease-in-out ${isCollapsed ? "lg:pl-[112px]" : "lg:pl-[288px]"}`}>
         <div className="pt-20 lg:pt-4 px-4 pb-4 lg:pr-6 lg:pb-6 flex-1">
           <Outlet context={{ branchId: activeBranch?._id }} />

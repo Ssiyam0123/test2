@@ -19,6 +19,12 @@ import CommentModal from "../../components/modal/CommentModal.jsx";
 
 const StudentsTable = React.lazy(() => import("../../components/table/StudentsTable.jsx"));
 
+// ==========================================
+// ROLE-BASED ACCESS ARRAYS
+// ==========================================
+const IS_SUPERADMIN = ["superadmin"];
+const CAN_ADD_STUDENT = ["superadmin", "admin", "registrar"];
+
 const INITIAL_FILTERS = {
   branch: "all",
   status: "all", 
@@ -47,18 +53,20 @@ const AllStudents = () => {
   // MODAL STATES
   const [selectedStudentForQr, setSelectedStudentForQr] = useState(null);
   const [selectedStudentForComment, setSelectedStudentForComment] = useState(null);
-  
-  // CHANGED: Now only tracks the Student ID and Name for the new modal architecture
   const [paymentData, setPaymentData] = useState(null); 
   
   const limit = 20;
 
+  // Role booleans for cleaner ternary checks
+  const isSuperadmin = IS_SUPERADMIN.includes(authUser?.role);
+  const canAddStudent = CAN_ADD_STUDENT.includes(authUser?.role);
+
   const effectiveBranchId = useMemo(() => {
-    if (authUser?.role === "superadmin") {
+    if (isSuperadmin) {
       return filters.branch === "all" ? null : filters.branch; 
     }
     return branchId;
-  }, [authUser?.role, filters.branch, branchId]);
+  }, [isSuperadmin, filters.branch, branchId]);
 
   const { data: batchesRes } = useBatches(effectiveBranchId ? { branch: effectiveBranchId } : {});
   const { data: coursesRes } = useActiveCourses(effectiveBranchId ? { branch: effectiveBranchId } : {});
@@ -71,7 +79,7 @@ const AllStudents = () => {
 
   const queryFilters = useMemo(() => {
     const activeFilters = { ...filters };
-    if (authUser?.role !== "superadmin") {
+    if (!isSuperadmin) {
       activeFilters.branch = branchId; 
     } else if (activeFilters.branch === "all") {
       delete activeFilters.branch;
@@ -84,19 +92,19 @@ const AllStudents = () => {
     });
     
     return activeFilters;
-  }, [filters, debouncedSearch, branchId, authUser?.role]);
+  }, [filters, debouncedSearch, branchId, isSuperadmin]);
 
   const { data, isLoading, error, refetch, isRefetching } = useStudents(page, limit, queryFilters, {
-    enabled: authUser?.role === "superadmin" ? true : !!branchId 
+    enabled: isSuperadmin ? true : !!branchId 
   });
 
   const combinedFilterOptions = useMemo(() => {
     return {
       batches: batchesRes?.data || [],
       courses: coursesRes?.data || [],
-      branches: authUser?.role === "superadmin" ? (branchesRes?.data || []) : []
+      branches: isSuperadmin ? (branchesRes?.data || []) : []
     };
-  }, [batchesRes, coursesRes, branchesRes, authUser?.role]);
+  }, [batchesRes, coursesRes, branchesRes, isSuperadmin]);
 
   const deleteStudentMutation = useDeleteStudent();
   const toggleStatusMutation = useToggleStudentStatus();
@@ -110,7 +118,7 @@ const AllStudents = () => {
     });
   };
 
-  if (authUser?.role !== "superadmin" && !branchId) return <div className="p-6"><TableSkeleton rows={8} /></div>;
+  if (!isSuperadmin && !branchId) return <div className="p-6"><TableSkeleton rows={8} /></div>;
   if (error) return <DataErrorState error={error} onRetry={refetch} isRetrying={isRefetching} />;
 
   return (
@@ -118,8 +126,9 @@ const AllStudents = () => {
       <PageHeader 
         title="Student Directory" 
         subtitle="Manage academic and financial records." 
-        onAdd={() => navigate("/admin/add-student")} 
-        addText="Add Student" 
+        // RBAC applied to the Add button logic
+        onAdd={canAddStudent ? () => navigate("/admin/add-student") : undefined} 
+        addText={canAddStudent ? "Add Student" : undefined} 
       />
       
       <div className="mb-6">
@@ -143,7 +152,6 @@ const AllStudents = () => {
             onToggleStatus={(id) => toggleStatusMutation.mutate(id)}
             onGenerateQR={setSelectedStudentForQr} 
             onAddComment={setSelectedStudentForComment}
-            // CHANGED: Pass only the required identity data
             onPay={(student) => setPaymentData({
               studentId: student._id,
               studentName: student.student_name
@@ -170,7 +178,6 @@ const AllStudents = () => {
         />
       )}
 
-      {/* CHANGED: Passing studentId instead of feeId */}
       {paymentData && (
         <CollectPaymentModal
           isOpen={!!paymentData}

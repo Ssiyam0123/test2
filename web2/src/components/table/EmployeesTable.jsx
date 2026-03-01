@@ -9,10 +9,18 @@ import DataTable from "../common/DataTable.jsx";
 import ActionIconButton from "../common/ActionIconButton.jsx";
 import Avatar from "../common/Avatar.jsx";
 
+// ==========================================
+// ROLE-BASED ACCESS ARRAYS
+// ==========================================
+const CAN_EDIT_EMPLOYEE = ["superadmin", "admin"];
+const CAN_DELETE_EMPLOYEE = ["superadmin"]; // Highly restricted
+const CAN_TOGGLE_STATUS = ["superadmin", "admin"];
+const CAN_CHANGE_ROLES = ["superadmin", "admin"];
+
 const EmployeesTable = ({
   employees,
   currentUserId,
-  currentUserRole, // 🚀 READS THE PROP HERE
+  currentUserRole, 
   pagination,
   onDelete,
   onToggleStatus,
@@ -69,9 +77,10 @@ const EmployeesTable = ({
     const isSelf = employee._id === currentUserId;
     const isRoleUpdating = roleLoadingId === employee._id;
 
-    // Security UI checks
+    // Security Logic
     const isSuperAdmin = employee.role === "superadmin";
-    const canEditRole = !isSelf && !isRoleUpdating && (currentUserRole === "superadmin" || !isSuperAdmin);
+    // Can only edit role if permitted by RBAC, not targeting self, and not trying to demote a superadmin (unless user is superadmin)
+    const canEditRole = CAN_CHANGE_ROLES.includes(currentUserRole) && !isSelf && !isRoleUpdating && (currentUserRole === "superadmin" || !isSuperAdmin);
 
     return (
       <tr
@@ -200,6 +209,8 @@ const EmployeesTable = ({
 
             {/* ACTIONS */}
             <div className="flex items-center justify-end flex-wrap gap-1 opacity-60 group-hover:opacity-100 transition-opacity duration-200">
+              
+              {/* Always visible to logged-in users viewing the table */}
               <ActionIconButton icon={Eye} onClick={() => onViewProfile(employee)} title="View Profile" variant="neutral" />
               <ActionIconButton
                 icon={downloadingId === employee._id ? Loader2 : Award}
@@ -210,21 +221,32 @@ const EmployeesTable = ({
                 title="Download ID Card"
               />
               <ActionIconButton icon={QrCode} variant="neutral" onClick={() => onGenerateQR(employee)} title="Digital QR" />
-              <ActionIconButton
-                icon={employee.status === "Active" ? PowerOff : Power}
-                variant="neutral"
-                disabled={isSelf}
-                onClick={() => onToggleStatus(employee._id, employee.status)}
-                title="Toggle Status"
-              />
-              <ActionIconButton icon={Edit} variant="neutral" onClick={() => onEdit(employee._id)} title="Edit" />
-              <ActionIconButton
-                icon={Trash2}
-                variant="danger"
-                disabled={isSelf || (currentUserRole !== "superadmin" && isSuperAdmin)}
-                onClick={() => onDelete(employee._id, employee.full_name)}
-                title="Delete"
-              />
+
+              {/* RBAC Protected Actions */}
+              {CAN_TOGGLE_STATUS.includes(currentUserRole) && (
+                <ActionIconButton
+                  icon={employee.status === "Active" ? PowerOff : Power}
+                  variant="neutral"
+                  disabled={isSelf}
+                  onClick={() => onToggleStatus(employee._id, employee.status)}
+                  title="Toggle Status"
+                />
+              )}
+
+              {CAN_EDIT_EMPLOYEE.includes(currentUserRole) && (
+                <ActionIconButton icon={Edit} variant="neutral" onClick={() => onEdit(employee._id)} title="Edit" />
+              )}
+
+              {CAN_DELETE_EMPLOYEE.includes(currentUserRole) && (
+                <ActionIconButton
+                  icon={Trash2}
+                  variant="danger"
+                  disabled={isSelf || isSuperAdmin} // Even superadmins shouldn't delete other superadmins easily
+                  onClick={() => onDelete(employee._id, employee.full_name)}
+                  title="Delete"
+                />
+              )}
+              
             </div>
           </div>
         </td>

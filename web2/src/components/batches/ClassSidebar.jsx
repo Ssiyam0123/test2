@@ -32,7 +32,7 @@ export default function ClassSidebar({
 
   // Role Checks
   const isInstructor = authUser?.role === "instructor";
-  const isStaff = ["admin", "registrar"].includes(authUser?.role);
+  const isStaff = ["superadmin","admin", "registrar"].includes(authUser?.role);
 
   // ==========================================
   // INLINE ATTENDANCE VIEW

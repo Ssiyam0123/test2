@@ -10,14 +10,17 @@ const userSchema = new mongoose.Schema(
       unique: true,
       trim: true,
       lowercase: true,
-      match: [/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/, "Please fill a valid email address"],
+      match: [
+        /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/,
+        "Please fill a valid email address",
+      ],
     },
     password: { type: String, required: true, minlength: 6, select: false },
-    
+
     role: {
-      type: String,
-      enum: ["superadmin", "admin", "instructor", "registrar", "staff", "user"],
-      default: "user",
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Role",
+      required: true,
     },
     employee_id: { type: String, unique: true, sparse: true, trim: true },
     full_name: {
@@ -36,14 +39,14 @@ const userSchema = new mongoose.Schema(
       enum: ["Active", "On Leave", "Resigned"],
       default: "Active",
     },
-    
+
     branch: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Branch",
       required: function () {
         return this.role !== "superadmin";
       },
-      index: true, 
+      index: true,
     },
     social_links: {
       facebook: { type: String, default: "" },
@@ -55,7 +58,6 @@ const userSchema = new mongoose.Schema(
   },
   { timestamps: true, minimize: false },
 );
-
 
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();

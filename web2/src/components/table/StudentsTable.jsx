@@ -8,6 +8,13 @@ import DataTable from "../common/DataTable.jsx";
 import ActionIconButton from "../common/ActionIconButton.jsx";
 import Avatar from "../common/Avatar.jsx";
 
+// ==========================================
+// ROLE-BASED ACCESS ARRAYS
+// ==========================================
+const CAN_MANAGE_FINANCE = ["superadmin", "admin", "registrar"];
+const CAN_ADD_COMMENT = ["superadmin", "admin", "registrar", "instructor"];
+const CAN_MANAGE_STUDENT = ["superadmin", "admin", "registrar"]; // Edit, Delete, Toggle, QR
+
 const StudentsTable = ({
   students, currentUser, pagination, onDelete, onToggleStatus, 
   onGenerateQR, onAddComment, onViewDetails, onEdit, 
@@ -101,7 +108,8 @@ const StudentsTable = ({
         <td className="px-6 py-4 text-right align-middle">
           <div className="flex items-center justify-end gap-1 opacity-60 group-hover:opacity-100 transition-opacity duration-200">
             
-            {(currentUser?.role === "superadmin" || currentUser?.role === "admin" || currentUser?.role === "registrar") && (
+            {/* RBAC: Finance Ledger */}
+            {CAN_MANAGE_FINANCE.includes(currentUser?.role) && (
               <ActionIconButton 
                 icon={Wallet} 
                 variant="neutral" 
@@ -112,11 +120,13 @@ const StudentsTable = ({
 
             <ActionIconButton icon={Eye} onClick={() => onViewDetails(student._id)} title="View" />
             
-            {(currentUser?.role === "admin" || currentUser?.role === "instructor") && (
+            {/* RBAC: Add Comment */}
+            {CAN_ADD_COMMENT.includes(currentUser?.role) && (
               <ActionIconButton icon={MessageSquare} variant="neutral" onClick={() => onAddComment(student)} title="Comment" />
             )}
             
-            {currentUser?.role !== "instructor" && (
+            {/* RBAC: Manage Student Actions */}
+            {CAN_MANAGE_STUDENT.includes(currentUser?.role) && (
               <>
                 <ActionIconButton icon={Edit} variant="neutral" onClick={() => onEdit(student._id)} title="Edit" />
                 <ActionIconButton icon={student.is_active ? PowerOff : Power} variant="neutral" onClick={() => onToggleStatus(student._id)} disabled={toggleLoading} title="Toggle" />
@@ -125,6 +135,7 @@ const StudentsTable = ({
               </>
             )}
             
+            {/* Allowed for all logged-in users viewing the table */}
             {currentUser && (
               <ActionIconButton
                 icon={isDownloadingThis ? Loader2 : Award}

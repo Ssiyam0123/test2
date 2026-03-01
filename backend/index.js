@@ -24,7 +24,7 @@ import batchRoutes from "./routes/batchRoutes.js";
 import financeRoutes from "./routes/finance.routes.js"; 
 import classRoutes from "./routes/class.route.js"; 
 import requisitionRoutes from "./routes/requisition.route.js"; 
-
+import roleRoutes from "./routes/role.routes.js";
 const app = express();
 const __dirname = path.resolve();
 
@@ -73,6 +73,8 @@ app.use("/api/expenses", expenseRoutes);
 app.use("/api/dashboard", dashbordRoutes);
 app.use("/api/generate-certificate", certificateRoutes);
 app.use("/api/finance", financeRoutes);
+
+app.use("/api/roles", roleRoutes);
 // ==========================================
 // SERVER INITIALIZATION
 // ==========================================
