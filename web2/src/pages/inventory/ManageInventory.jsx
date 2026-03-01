@@ -10,6 +10,7 @@ import AddStockModal from "../../components/inventory/AddStockModal";
 import { useBranches } from "../../hooks/useBranches";
 import { useBranchInventory, useBranchTransactions, useDeductClassRequisition } from "../../hooks/useInventory";
 import Loader from "../../components/Loader";
+import toast from "react-hot-toast";
 
 // ==========================================
 // UTILITY: INDUSTRY STANDARD ICONS
@@ -291,28 +292,33 @@ const HistoryView = ({ branchId }) => {
 // VIEW 4: PENDING REQUISITIONS
 // ==========================================
 const RequisitionsView = ({ branchId }) => {
+  // 1. Fetch real dynamic data from backend
+  const { data: reqRes, isLoading } = useDeductClassRequisition(branchId);
   const deductMutation = useDeductClassRequisition(branchId);
+  
+  // 2. Track the "Actual Bazar Cost" input for each requisition
+  const [actualCosts, setActualCosts] = useState({});
 
-  const pendingClasses = [
-    { 
-      _id: "65e4a3b2c1d0e9f8a7b6c5d4", 
-      topic: "French Baking Basics", 
-      instructor: { full_name: "Chef Remy" }, 
-      requisition: [{ name: "Flour", qty: 5, unit: "kg" }, { name: "Butter", qty: 2, unit: "kg" }] 
+  const pendingRequisitions = reqRes?.data || [];
+
+  if (isLoading) return <div className="py-20 flex justify-center"><Loader /></div>;
+
+  const handleApprove = async (reqId) => {
+    const cost = Number(actualCosts[reqId]);
+    if (!cost || cost <= 0) {
+      return toast.error("Please enter the actual bazar cost to approve.");
     }
-  ];
 
-  const handleApprove = async (classId, reqItems) => {
-    const itemsPayload = {
-      items: reqItems.map(item => ({
-        name: item.name.toLowerCase().trim(),
-        qty: Number(item.qty),
-        unit: item.unit
-      }))
-    };
     try {
-      await deductMutation.mutateAsync({ classId, itemsPayload });
-    } catch (error) { console.error("Approval failed", error); }
+      // Sends the Requisition ID and the Actual Cost to fulfill it
+      await deductMutation.mutateAsync({ reqId, actual_cost: cost });
+      toast.success("Requisition fulfilled and stock deducted!");
+      
+      // Clear the cost input on success
+      setActualCosts(prev => ({ ...prev, [reqId]: "" }));
+    } catch (error) { 
+      console.error("Approval failed", error); 
+    }
   };
 
   return (
@@ -321,34 +327,61 @@ const RequisitionsView = ({ branchId }) => {
         <ClipboardList size={20} />
         <h2 className="text-base font-black uppercase tracking-widest">Pending Chef Requisitions</h2>
       </div>
-      <div className="p-6 space-y-6">
-        {pendingClasses.length === 0 ? (
+      <div className="p-6 space-y-6 max-h-[600px] overflow-y-auto custom-scrollbar">
+        {pendingRequisitions.length === 0 ? (
           <div className="flex flex-col items-center justify-center text-slate-400 py-12">
             <CheckCircle2 size={64} className="mb-4 opacity-20 text-emerald-500" />
-            <p className="text-lg font-bold">All caught up!</p>
+            <p className="text-lg font-bold">All caught up! No pending bazar lists.</p>
           </div>
         ) : (
-          pendingClasses.map((cls) => (
-            <div key={cls._id} className="p-5 border border-slate-200 rounded-2xl bg-slate-50 hover:border-amber-200 transition-colors">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+          pendingRequisitions.map((req) => (
+            <div key={req._id} className="p-5 border border-slate-200 rounded-2xl bg-slate-50 hover:border-amber-200 transition-colors">
+              <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-4">
+                
+                {/* TOPIC & INSTRUCTOR INFO */}
                 <div>
-                  <h3 className="text-lg font-black text-slate-800">{cls.topic}</h3>
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-1">Requested by: <span className="text-amber-600">{cls.instructor?.full_name}</span></p>
+                  <h3 className="text-lg font-black text-slate-800">
+                    {req.class_content?.topic || "Unknown Class"}
+                  </h3>
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-1">
+                    Requested by: <span className="text-amber-600">{req.class_content?.instructor?.full_name || "Instructor"}</span>
+                  </p>
+                  {req.budget > 0 && (
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">
+                      Estimated Budget: ৳{req.budget}
+                    </p>
+                  )}
                 </div>
-                <button 
-                  onClick={() => handleApprove(cls._id, cls.requisition)}
-                  disabled={deductMutation.isPending}
-                  className="px-5 py-2.5 bg-amber-500 text-white text-xs font-black uppercase tracking-widest rounded-xl hover:bg-amber-600 transition-all flex items-center gap-2 disabled:opacity-50"
-                >
-                  {deductMutation.isPending ? <Loader size={16} color="white" /> : <><CheckCircle2 size={16} /> Approve & Fulfill</>}
-                </button>
+
+                {/* APPROVAL ACTION (WITH COST INPUT) */}
+                <div className="flex items-center gap-3 w-full xl:w-auto">
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-black text-sm">৳</span>
+                    <input 
+                      type="number"
+                      placeholder="Actual Cost"
+                      value={actualCosts[req._id] || ""}
+                      onChange={(e) => setActualCosts({ ...actualCosts, [req._id]: e.target.value })}
+                      className="w-32 pl-7 pr-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-amber-500 transition-colors"
+                    />
+                  </div>
+                  <button 
+                    onClick={() => handleApprove(req._id)}
+                    disabled={deductMutation.isPending}
+                    className="px-5 py-2.5 bg-amber-500 text-white text-xs font-black uppercase tracking-widest rounded-xl hover:bg-amber-600 transition-all flex items-center gap-2 disabled:opacity-50 whitespace-nowrap"
+                  >
+                    {deductMutation.isPending ? <Loader size={16} color="white" /> : <><CheckCircle2 size={16} /> Approve & Fulfill</>}
+                  </button>
+                </div>
               </div>
+
+              {/* DYNAMIC ITEMS MAP */}
               <div className="bg-white p-4 rounded-xl border border-slate-100">
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Bazar List Requirements</p>
                 <div className="flex flex-wrap gap-2">
-                  {cls.requisition.map((item, idx) => (
-                    <span key={idx} className="px-3 py-1.5 bg-slate-50 text-slate-700 text-sm font-bold rounded-lg border border-slate-200">
-                      {item.name} <span className="text-slate-300 mx-1">|</span> <span className="text-amber-600 font-black">{item.qty} {item.unit}</span>
+                  {req.items?.map((item, idx) => (
+                    <span key={idx} className="px-3 py-1.5 bg-slate-50 text-slate-700 text-sm font-bold rounded-lg border border-slate-200 capitalize">
+                      {item.item_name} <span className="text-slate-300 mx-1">|</span> <span className="text-amber-600 font-black">{item.quantity} {item.unit}</span>
                     </span>
                   ))}
                 </div>

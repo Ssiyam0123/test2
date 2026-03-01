@@ -24,14 +24,12 @@ export const useCollectPayment = () => {
 
   return useMutation({
     mutationFn: PaymentAPI.collectPayment,
-    onSuccess: async (res) => { // <-- MUST BE ASYNC
+    onSuccess: async (res) => { 
       toast.success(res.message || "Payment collected successfully!");
       
-      // WAIT for the fresh data to download before letting the UI proceed
       await queryClient.invalidateQueries({ queryKey: ["student-finance"] });
       await queryClient.invalidateQueries({ queryKey: ["campus-fees"] });
       
-      // Force the background Student Directory table to update its "Balance" column
       await queryClient.invalidateQueries({ queryKey: ["students"] }); 
     },
     onError: (err) => {
@@ -45,14 +43,13 @@ export const useUpdateFeeDiscount = () => {
 
   return useMutation({
     mutationFn: PaymentAPI.updateFeeDiscount,
-    onSuccess: async () => { // <-- MUST BE ASYNC
+    onSuccess: async () => { 
       toast.success("Scholarship/Discount applied!");
       
-      // CRITICAL FIX: The `await` pauses the modal from switching tabs until the new math is ready
+
       await queryClient.invalidateQueries({ queryKey: ["student-finance"] });
       await queryClient.invalidateQueries({ queryKey: ["campus-fees"] });
       
-      // Force the background Student Directory table to update its "Balance" column
       await queryClient.invalidateQueries({ queryKey: ["students"] }); 
     },
     onError: (err) => {

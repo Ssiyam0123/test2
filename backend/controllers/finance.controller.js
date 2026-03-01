@@ -114,33 +114,31 @@ export const getCampusFees = async (req, res) => {
 };
 
 // ==========================================
-// 4. UPDATE STUDENT DISCOUNT 
+// 4. UPDATE STUDENT DISCOUNT (BULLETPROOF DB WRITE)
 // ==========================================
 export const updateFeeDiscount = async (req, res) => {
   try {
     const { feeId } = req.params;
-    const { discount } = req.body;
-    const newDiscount = Number(discount);
+    const newDiscount = Number(req.body.discount);
 
-    // 1. Fetch the exact fee record
+    // 1. Fetch current data
     const fee = await Fee.findById(feeId);
     if (!fee) return res.status(404).json({ success: false, message: "Fee record not found." });
 
-    // 2. Gatekeeper Check
+    // Gatekeeper Security
     if (req.user.role !== "superadmin" && req.user.role !== "admin" && req.user.branch.toString() !== fee.branch.toString()) {
       return res.status(403).json({ success: false, message: "Unauthorized campus access." });
     }
 
-    // ⭐ THE FIX: Check if the discount is actually different!
+    // 2. Prevent identical saves
     if (fee.discount === newDiscount) {
       return res.status(200).json({ 
         success: true, 
-        message: "Discount is already set to this amount. No changes made.", 
-        data: fee 
+        message: "Discount is already set to this amount. No changes made." 
       });
     }
 
-    // 3. The Math
+    // 3. Mathematical Validations
     const newNetPayable = fee.total_amount - newDiscount;
     if (newNetPayable < fee.paid_amount) {
       return res.status(400).json({ 
@@ -149,42 +147,40 @@ export const updateFeeDiscount = async (req, res) => {
       });
     }
 
-    // 4. Safe History Logging 
-    if (!fee.discount_history) {
-      fee.discount_history = []; 
-    }
-    
-    // Now this ONLY pushes if the discount genuinely changed
-    fee.discount_history.push({
-      previous_discount: fee.discount || 0,
-      new_discount: newDiscount,
-      updated_by: req.user._id
+    // 4. Recalculate Payment Status
+    let newStatus = "Unpaid";
+    if (fee.paid_amount >= newNetPayable) newStatus = "Paid";
+    else if (fee.paid_amount > 0) newStatus = "Partial";
+
+    // 5. DIRECT DB INJECTION ($set and $push guarantee it saves)
+    const updatedFee = await Fee.findByIdAndUpdate(
+      feeId,
+      {
+        $set: {
+          discount: newDiscount,
+          net_payable: newNetPayable,
+          status: newStatus
+        },
+        $push: {
+          discount_history: {
+            previous_discount: fee.discount || 0,
+            new_discount: newDiscount,
+            updated_by: req.user._id,
+            updated_at: new Date()
+          }
+        }
+      },
+      { new: true } // Returns the updated document immediately
+    );
+
+    res.status(200).json({ 
+      success: true, 
+      message: "Discount applied and audit log updated.", 
+      data: updatedFee 
     });
-
-    // 5. Apply the Math
-    fee.discount = newDiscount;
-    fee.net_payable = newNetPayable;
-
-    // 6. Recalculate Status
-    if (fee.paid_amount >= fee.net_payable) {
-      fee.status = "Paid";
-    } else if (fee.paid_amount > 0) {
-      fee.status = "Partial";
-    } else {
-      fee.status = "Unpaid";
-    }
-
-    // 7. Force Mongoose to save the math changes
-    fee.markModified("discount");
-    fee.markModified("net_payable");
-    fee.markModified("status");
-    fee.markModified("discount_history");
-
-    await fee.save();
-
-    res.status(200).json({ success: true, message: "Discount updated successfully.", data: fee });
+    
   } catch (error) {
-    console.error("Discount Update Error:", error);
-    res.status(500).json({ success: false, message: error.message });
+    console.error("Discount DB Write Error:", error);
+    res.status(500).json({ success: false, message: "Server error applying discount." });
   }
 };

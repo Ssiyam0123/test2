@@ -95,6 +95,9 @@ export const addStockPurchase = async (req, res) => {
 };
 
 
+// ==========================================
+// DEDUCT CLASS REQUISITION (FIXED)
+// ==========================================
 export const deductClassRequisition = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -104,40 +107,49 @@ export const deductClassRequisition = async (req, res) => {
     const { items } = req.body; 
     const userId = req.user._id;
 
-    const inventoryBulkOps = [];
+    const processedInventoryItems = [];
 
-    // 1. Prepare Bulk Deductions
+    // 1. Validate Stock Levels BEFORE making any deductions
     for (const item of items) {
       if (!item.name || !item.qty) continue;
-      inventoryBulkOps.push({
-        updateOne: {
-          filter: { branch: branchId, item_name: item.name.toLowerCase().trim() },
-          update: { 
-            $inc: { quantity_in_stock: -Math.abs(Number(item.qty)) },
-            $setOnInsert: { unit: item.unit, category: "Other" } 
-          },
-          upsert: true
-        }
+      
+      const requestedQty = Math.abs(Number(item.qty));
+
+      // Fetch the item within the active transaction session
+      const invItem = await Inventory.findOne({ 
+        branch: branchId, 
+        item_name: item.name.toLowerCase().trim() 
+      }).session(session);
+
+      // ERROR: Item doesn't exist at all
+      if (!invItem) {
+        throw new Error(`Item '${item.name}' does not exist in the pantry.`);
+      }
+
+      // ERROR: Not enough stock
+      if (invItem.quantity_in_stock < requestedQty) {
+        throw new Error(`Insufficient stock for '${item.name}'. Required: ${requestedQty}, Available: ${invItem.quantity_in_stock}`);
+      }
+
+      // 2. Safe Deduction (Mongoose schema min:0 validation will also protect this)
+      invItem.quantity_in_stock -= requestedQty;
+      await invItem.save({ session });
+      
+      // Push to an array so we can easily create the ledger records below
+      processedInventoryItems.push({
+        _id: invItem._id,
+        item_name: item.name.toLowerCase().trim(),
+        deducted_qty: requestedQty
       });
     }
 
-    // Execute Bulk Update
-    await Inventory.bulkWrite(inventoryBulkOps, { session });
-
-    // 2. Fetch the updated Inventory IDs
-    const updatedInventoryItems = await Inventory.find({
-      branch: branchId,
-      item_name: { $in: items.map(i => i.name.toLowerCase().trim()) }
-    }).session(session);
-
-    // 3. Log usage in ledger
-    const transactionsToInsert = updatedInventoryItems.map(invItem => {
-      const originalReqItem = items.find(i => i.name.toLowerCase().trim() === invItem.item_name);
+    // 3. Log usage in the Stock Transaction Ledger
+    const transactionsToInsert = processedInventoryItems.map(invItem => {
       return {
         inventory_item: invItem._id,
         branch: branchId,
         transaction_type: "CLASS_USAGE",
-        quantity: -Math.abs(Number(originalReqItem.qty)), 
+        quantity: -invItem.deducted_qty, // Negative because it's a deduction
         performed_by: userId,
         reference_class: classId
       };
@@ -146,11 +158,13 @@ export const deductClassRequisition = async (req, res) => {
     await StockTransaction.insertMany(transactionsToInsert, { session });
 
     await session.commitTransaction();
-    res.status(200).json({ success: true, message: "Requisition deducted from inventory" });
+    res.status(200).json({ success: true, message: "Requisition fulfilled and stock updated." });
 
   } catch (error) {
     await session.abortTransaction();
-    res.status(500).json({ success: false, message: error.message });
+    
+    // Changing to 400 Bad Request so the frontend toast displays the specific error message
+    res.status(400).json({ success: false, message: error.message });
   } finally {
     session.endSession();
   }
