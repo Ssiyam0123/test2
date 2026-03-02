@@ -4,7 +4,6 @@ import toast from "react-hot-toast";
 
 const useAuth = create((set) => ({
   authUser: null,
-  role: null, // <-- Added role explicitly to top-level state
   isCheckingAuth: true,
   isSigningUp: false,
   isLoggingIn: false,
@@ -13,12 +12,9 @@ const useAuth = create((set) => ({
   checkAuth: async () => {
     try {
       const res = await API.get("/auth/check");
-      set({ 
-        authUser: res.data, 
-        role: res.data?.role || null // Extract role
-      });
+      set({ authUser: res.data });
     } catch (error) {
-      set({ authUser: null, role: null }); // Clear on fail
+      set({ authUser: null }); 
     } finally {
       set({ isCheckingAuth: false });
     }
@@ -27,13 +23,8 @@ const useAuth = create((set) => ({
   signup: async (data) => {
     set({ isSigningUp: true });
     try {
-      const res = await API.post("/auth/signup", data);
-      
-      set({ 
-        authUser: res.data.user,
-        role: res.data.user?.role || null // Extract role
-      }); 
-
+      const res = await API.post("/auth/register", data);
+      set({ authUser: res.data.user }); 
       toast.success("Account created successfully!");
     } catch (error) {
       toast.error(error.response?.data?.message || "Failed to create account");
@@ -46,12 +37,7 @@ const useAuth = create((set) => ({
     set({ isLoggingIn: true });
     try {
       const res = await API.post("/auth/login", data);
-      
-      set({ 
-        authUser: res.data.user,
-        role: res.data.user?.role || null // Extract role
-      });
-
+      set({ authUser: res.data.user });
       toast.success("Logged in successfully");
     } catch (error) {
       toast.error(error.response?.data?.message || "Invalid credentials");
@@ -63,7 +49,7 @@ const useAuth = create((set) => ({
   logout: async () => {
     try {
       await API.post("/auth/logout");
-      set({ authUser: null, role: null }); // Clear role on logout
+      set({ authUser: null }); 
       toast.success("Logged out successfully");
     } catch (error) {
       toast.error(error.response?.data?.message || "Error logging out");
@@ -74,12 +60,7 @@ const useAuth = create((set) => ({
     try {
       const res = await API.put("/auth/update-profile", data);
       const updatedUser = res.data.user || res.data;
-      
-      set({ 
-        authUser: updatedUser,
-        role: updatedUser?.role || null // Maintain role in case of updates
-      }); 
-      
+      set({ authUser: updatedUser }); 
       toast.success("Profile updated successfully");
     } catch (error) {
       toast.error(error.response?.data?.message || "Failed to update profile");

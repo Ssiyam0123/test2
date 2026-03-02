@@ -9,6 +9,11 @@ const getSessionInfo = async () => {
   return { session, isReplicaSet };
 };
 
+// 🚀 Helper to easily check administrative override
+const isGlobalAdmin = (user) => {
+  return user.role?.name === "superadmin" || user.role?.name === "admin" || user.role?.permissions?.includes("all_access");
+};
+
 export const collectPayment = async (req, res) => {
   const { session, isReplicaSet } = await getSessionInfo();
   try {
@@ -20,7 +25,8 @@ export const collectPayment = async (req, res) => {
     const fee = await Fee.findById(fee_record).session(session);
     if (!fee) throw new Error("Ledger not found.");
 
-    if (req.user.role !== "superadmin" && req.user.role !== "admin" && req.user.branch.toString() !== fee.branch.toString()) {
+    // 🚀 PBAC Security Gate
+    if (!isGlobalAdmin(req.user) && req.user.branch.toString() !== fee.branch.toString()) {
       throw new Error("Unauthorized branch access.");
     }
 
@@ -60,11 +66,8 @@ export const getStudentFinance = async (req, res) => {
       return res.status(404).json({ success: false, message: "Financial record not found for this student." });
     }
 
-    if (
-      req.user.role !== "superadmin" && 
-      req.user.role !== "admin" && 
-      req.user.branch?.toString() !== fee_summary.branch.toString()
-    ) {
+    // 🚀 PBAC Security Gate
+    if (!isGlobalAdmin(req.user) && req.user.branch?.toString() !== fee_summary.branch.toString()) {
       return res.status(403).json({ success: false, message: "Unauthorized campus access." });
     }
 
@@ -84,7 +87,8 @@ export const getCampusFees = async (req, res) => {
     const { branch, status, search } = req.query;
     const filter = {};
     
-    if (req.user.role !== "superadmin" && req.user.role !== "admin") {
+    // 🚀 PBAC Security Gate
+    if (!isGlobalAdmin(req.user)) {
       filter.branch = req.user.branch; 
     } else if (branch && branch !== "all") {
       filter.branch = branch; 
@@ -113,24 +117,19 @@ export const getCampusFees = async (req, res) => {
   }
 };
 
-// ==========================================
-// 4. UPDATE STUDENT DISCOUNT (BULLETPROOF DB WRITE)
-// ==========================================
 export const updateFeeDiscount = async (req, res) => {
   try {
     const { feeId } = req.params;
     const newDiscount = Number(req.body.discount);
 
-    // 1. Fetch current data
     const fee = await Fee.findById(feeId);
     if (!fee) return res.status(404).json({ success: false, message: "Fee record not found." });
 
-    // Gatekeeper Security
-    if (req.user.role !== "superadmin" && req.user.role !== "admin" && req.user.branch.toString() !== fee.branch.toString()) {
+    // 🚀 PBAC Security Gate
+    if (!isGlobalAdmin(req.user) && req.user.branch.toString() !== fee.branch.toString()) {
       return res.status(403).json({ success: false, message: "Unauthorized campus access." });
     }
 
-    // 2. Prevent identical saves
     if (fee.discount === newDiscount) {
       return res.status(200).json({ 
         success: true, 
@@ -138,7 +137,6 @@ export const updateFeeDiscount = async (req, res) => {
       });
     }
 
-    // 3. Mathematical Validations
     const newNetPayable = fee.total_amount - newDiscount;
     if (newNetPayable < fee.paid_amount) {
       return res.status(400).json({ 
@@ -147,20 +145,14 @@ export const updateFeeDiscount = async (req, res) => {
       });
     }
 
-    // 4. Recalculate Payment Status
     let newStatus = "Unpaid";
     if (fee.paid_amount >= newNetPayable) newStatus = "Paid";
     else if (fee.paid_amount > 0) newStatus = "Partial";
 
-    // 5. DIRECT DB INJECTION ($set and $push guarantee it saves)
     const updatedFee = await Fee.findByIdAndUpdate(
       feeId,
       {
-        $set: {
-          discount: newDiscount,
-          net_payable: newNetPayable,
-          status: newStatus
-        },
+        $set: { discount: newDiscount, net_payable: newNetPayable, status: newStatus },
         $push: {
           discount_history: {
             previous_discount: fee.discount || 0,
@@ -170,15 +162,10 @@ export const updateFeeDiscount = async (req, res) => {
           }
         }
       },
-      { new: true } // Returns the updated document immediately
+      { new: true } 
     );
 
-    res.status(200).json({ 
-      success: true, 
-      message: "Discount applied and audit log updated.", 
-      data: updatedFee 
-    });
-    
+    res.status(200).json({ success: true, message: "Discount applied and audit log updated.", data: updatedFee });
   } catch (error) {
     console.error("Discount DB Write Error:", error);
     res.status(500).json({ success: false, message: "Server error applying discount." });

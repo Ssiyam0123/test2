@@ -1,30 +1,25 @@
 import React, { useState } from "react";
 import {
   Edit, Trash2, Briefcase, Mail, Phone, Power, PowerOff, 
-  Eye, RefreshCw, QrCode, Award, Loader2, Building2
+  Eye, QrCode, Award, Loader2, Building2, Shield
 } from "lucide-react";
 import { API } from "../../api/axios.js";
 import toast from "react-hot-toast";
 import DataTable from "../common/DataTable.jsx";
 import ActionIconButton from "../common/ActionIconButton.jsx";
 import Avatar from "../common/Avatar.jsx";
-
-// ==========================================
-// ROLE-BASED ACCESS ARRAYS
-// ==========================================
-const CAN_EDIT_EMPLOYEE = ["superadmin", "admin"];
-const CAN_DELETE_EMPLOYEE = ["superadmin"]; // Highly restricted
-const CAN_TOGGLE_STATUS = ["superadmin", "admin"];
-const CAN_CHANGE_ROLES = ["superadmin", "admin"];
+import CanAccess from "../common/CanAccess.jsx"; 
+import { PERMISSIONS } from "../../utils/permissions.js";
 
 const EmployeesTable = ({
   employees,
+  roles = [], // 🚀 Accepting roles prop for the dropdown
   currentUserId,
   currentUserRole, 
   pagination,
   onDelete,
   onToggleStatus,
-  onUpdateRole,
+  onUpdateRole, 
   onGenerateQR,
   onViewProfile,
   onEdit,
@@ -75,12 +70,24 @@ const EmployeesTable = ({
   const renderEmployeeRow = (employee) => {
     const isInactive = employee.status !== "Active";
     const isSelf = employee._id === currentUserId;
-    const isRoleUpdating = roleLoadingId === employee._id;
 
-    // Security Logic
-    const isSuperAdmin = employee.role === "superadmin";
-    // Can only edit role if permitted by RBAC, not targeting self, and not trying to demote a superadmin (unless user is superadmin)
-    const canEditRole = CAN_CHANGE_ROLES.includes(currentUserRole) && !isSelf && !isRoleUpdating && (currentUserRole === "superadmin" || !isSuperAdmin);
+    // PBAC Data Extraction
+    const roleName = employee.role?.name || "Unassigned";
+    const isSuperAdmin = roleName.toLowerCase() === "superadmin";
+
+    // Static Badge UI for fallbacks or uneditable roles (Self/Superadmin)
+    const StaticRoleBadge = () => (
+      <div className={`px-2.5 py-1 text-[10px] font-black uppercase tracking-widest rounded-md border flex items-center gap-1.5 ${
+        isSuperAdmin 
+          ? "bg-amber-50 border-amber-200 text-amber-600" 
+          : employee.role?.is_system_role
+            ? "bg-indigo-50 border-indigo-100 text-indigo-600"
+            : "bg-slate-100 border-slate-200 text-slate-600"
+      }`}>
+        {isSuperAdmin && <Shield size={10} />}
+        {roleName}
+      </div>
+    );
 
     return (
       <tr
@@ -179,39 +186,42 @@ const EmployeesTable = ({
         <td className="px-6 py-4 text-right align-middle">
           <div className="flex flex-col items-end gap-2">
             
-            {/* ROLE SELECTOR */}
+            {/* 🚀 ROLE DROPDOWN VIA CanAccess */}
             <div className="flex items-center gap-2">
-              {isRoleUpdating && (
-                <RefreshCw size={13} className="animate-spin text-blue-500" />
-              )}
-              <select
-                value={employee.role}
-                disabled={!canEditRole}
-                onChange={(e) => onUpdateRole(employee._id, e.target.value, employee.full_name)}
-                className={`px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide rounded-md border outline-none transition-colors ${
-                  isSuperAdmin 
-                    ? "bg-slate-800 border-slate-900 text-amber-400" 
-                    : employee.role === "admin"
-                      ? "bg-purple-50 border-purple-100 text-purple-600"
-                      : "bg-slate-50 border-slate-200 text-slate-600"
-                } ${!canEditRole ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-white"}`}
-              >
-                {/* 🚀 CONDITIONAL SUPER ADMIN OPTION */}
-                {(currentUserRole === "superadmin" || isSuperAdmin) && (
-                  <option value="superadmin">Super Admin</option>
+              {roleLoadingId === employee._id && <Loader2 size={12} className="animate-spin text-indigo-500" />}
+              
+              <CanAccess permission={PERMISSIONS.EDIT_EMPLOYEE} fallback={<StaticRoleBadge />}>
+                {isSelf || isSuperAdmin ? (
+                  <StaticRoleBadge /> // Cannot edit own role or superadmin's role
+                ) : (
+                  <select
+                    value={employee.role?._id || ""}
+                    onChange={(e) => onUpdateRole(employee._id, e.target.value)}
+                    disabled={roleLoadingId === employee._id}
+                    className="cursor-pointer appearance-none px-2.5 py-1 text-[10px] font-black uppercase tracking-widest rounded-md border bg-slate-50 border-slate-200 text-slate-600 outline-none focus:ring-2 focus:ring-indigo-500/30 transition-all hover:bg-slate-100"
+                    style={{
+                      paddingRight: '1.75rem',
+                      backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
+                      backgroundPosition: 'right 0.25rem center',
+                      backgroundRepeat: 'no-repeat',
+                      backgroundSize: '1.2em 1.2em',
+                    }}
+                  >
+                    <option value="" disabled>Select Role</option>
+                    {roles.map((r) => (
+                      <option key={r._id} value={r._id}>
+                        {r.name}
+                      </option>
+                    ))}
+                  </select>
                 )}
-                <option value="admin">Branch Admin</option>
-                <option value="registrar">Registrar</option> 
-                <option value="instructor">Instructor</option>
-                <option value="staff">Staff</option>
-              </select>
+              </CanAccess>
             </div>
 
-            {/* ACTIONS */}
+            {/* 🚀 DYNAMIC PBAC ACTIONS */}
             <div className="flex items-center justify-end flex-wrap gap-1 opacity-60 group-hover:opacity-100 transition-opacity duration-200">
-              
-              {/* Always visible to logged-in users viewing the table */}
               <ActionIconButton icon={Eye} onClick={() => onViewProfile(employee)} title="View Profile" variant="neutral" />
+              
               <ActionIconButton
                 icon={downloadingId === employee._id ? Loader2 : Award}
                 variant="neutral"
@@ -222,8 +232,7 @@ const EmployeesTable = ({
               />
               <ActionIconButton icon={QrCode} variant="neutral" onClick={() => onGenerateQR(employee)} title="Digital QR" />
 
-              {/* RBAC Protected Actions */}
-              {CAN_TOGGLE_STATUS.includes(currentUserRole) && (
+              <CanAccess permission={PERMISSIONS.EDIT_EMPLOYEE}>
                 <ActionIconButton
                   icon={employee.status === "Active" ? PowerOff : Power}
                   variant="neutral"
@@ -231,22 +240,18 @@ const EmployeesTable = ({
                   onClick={() => onToggleStatus(employee._id, employee.status)}
                   title="Toggle Status"
                 />
-              )}
-
-              {CAN_EDIT_EMPLOYEE.includes(currentUserRole) && (
                 <ActionIconButton icon={Edit} variant="neutral" onClick={() => onEdit(employee._id)} title="Edit" />
-              )}
+              </CanAccess>
 
-              {CAN_DELETE_EMPLOYEE.includes(currentUserRole) && (
+              <CanAccess permission={PERMISSIONS.DELETE_EMPLOYEE}>
                 <ActionIconButton
                   icon={Trash2}
                   variant="danger"
-                  disabled={isSelf || isSuperAdmin} // Even superadmins shouldn't delete other superadmins easily
+                  disabled={isSelf || isSuperAdmin} 
                   onClick={() => onDelete(employee._id, employee.full_name)}
                   title="Delete"
                 />
-              )}
-              
+              </CanAccess>
             </div>
           </div>
         </td>

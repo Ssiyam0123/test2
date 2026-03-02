@@ -5,6 +5,7 @@ import { useCreateBatch } from "../../hooks/useBatches";
 import { useCourses } from "../../hooks/useCourses";
 import { useBranches } from "../../hooks/useBranches"; 
 import { useUsers } from "../../hooks/useUser"; 
+import { useRoles } from "../../hooks/useRoles"; // 🚀 Import roles hook
 import useAuth from "../../store/useAuth"; 
 import Loader from "../../components/Loader";
 
@@ -12,23 +13,35 @@ const AddBatch = () => {
   const navigate = useNavigate();
   const { authUser } = useAuth();
   
-  // 1. STATE: Track the currently selected campus
-  // If Admin: Starts empty. If Staff: Starts with their assigned branch.
+  // 🚀 1. Robust PBAC Check
+  const roleName = typeof authUser?.role === 'string' ? authUser.role : authUser?.role?.name;
+  const isMaster = roleName === "superadmin" || authUser?.permissions?.includes("all_access");
+  
+  // If Master: Starts empty. If Staff: Starts with their assigned branch.
   const [selectedBranch, setSelectedBranch] = useState(
-    authUser?.role !== "admin" ? authUser?.branch : ""
+    !isMaster ? (typeof authUser?.branch === 'object' ? authUser?.branch?._id : authUser?.branch) : ""
   );
   
   const { mutate, isPending } = useCreateBatch();
   const { data: coursesResponse, isLoading: coursesLoading } = useCourses();
   const { data: branchesResponse, isLoading: branchesLoading } = useBranches();
   
-  // 2. DYNAMIC FETCH: Only fetch instructors for the selected branch!
+  // 🚀 2. Fetch Roles to get the actual ObjectId for "Instructor"
+  const { data: rolesResponse } = useRoles();
+  const instructorRoleId = useMemo(() => {
+     if (!rolesResponse?.data) return null;
+     const instructorRole = rolesResponse.data.find(r => r.name.toLowerCase() === "instructor");
+     return instructorRole?._id;
+  }, [rolesResponse]);
+
+  // 3. DYNAMIC FETCH: Only fetch instructors for the selected branch using the true Role ID!
   const { data: instructorsResponse, isLoading: instructorsLoading } = useUsers(
     1, 100, 
     { 
-      role: "instructor", 
+      ...(instructorRoleId ? { role: instructorRoleId } : {}), 
       ...(selectedBranch ? { branch: selectedBranch } : {}) 
-    }
+    },
+    { enabled: !!instructorRoleId && !!selectedBranch } // Only fetch when both IDs are ready
   );
 
   const branchOptions = useMemo(() => {
@@ -44,7 +57,7 @@ const AddBatch = () => {
     return coursesArray?.map((c) => ({ value: c._id, label: c.course_name })) || [];
   }, [coursesResponse]);
 
-  // 3. MAP INSTRUCTORS: Format them for the checkbox-group
+  // 4. MAP INSTRUCTORS: Format them for the checkbox-group
   const instructorOptions = useMemo(() => {
     let instructorsArray = instructorsResponse?.data || [];
     
@@ -57,7 +70,7 @@ const AddBatch = () => {
 
     return instructorsArray.map((inst) => ({
       value: inst._id,
-      label: inst.full_name, // This will show their name next to the checkbox
+      label: inst.full_name, 
     }));
   }, [instructorsResponse, selectedBranch]);
 
@@ -69,15 +82,14 @@ const AddBatch = () => {
       required: true,
     },
     
-    // ADMIN BRANCH SELECTOR
-    ...(authUser?.role === "admin" ? [{
+    // 🚀 5. MASTER BRANCH SELECTOR
+    ...(isMaster ? [{
       name: "branch",
       label: "Campus / Location",
       type: "select",
       options: branchOptions,
       required: true,
       defaultOption: "Select Campus",
-      // 4. TRIGGER: When Admin changes branch, update state to reveal teachers
       onChange: (e) => {
         const val = e?.target ? e.target.value : e; 
         setSelectedBranch(val);
@@ -93,9 +105,7 @@ const AddBatch = () => {
       defaultOption: "Select Course",
     },
 
-    // 5. CONDITIONAL INSTRUCTORS LIST (MULTIPLE SELECT)
-    // This ONLY appears after a branch is selected. 
-    // "checkbox-group" allows selecting multiple teachers one by one on a new line.
+    // 6. CONDITIONAL INSTRUCTORS LIST (MULTIPLE SELECT)
     ...(selectedBranch ? [{
       name: "instructors",
       label: "Assign Instructors (Select all that apply)",
@@ -134,25 +144,23 @@ const AddBatch = () => {
     },
   ];
 
- const handleSubmit = (formData, jsonPayload) => {
-  // 1. Extract the flat time fields
-  const { start_time, end_time, ...restOfPayload } = jsonPayload;
+  const handleSubmit = (formData, jsonPayload) => {
+    const { start_time, end_time, ...restOfPayload } = jsonPayload;
 
-  // 2. Reconstruct the payload to match the Backend Joi Schema
-  const finalPayload = {
-    ...restOfPayload,
-    time_slot: {
-      start_time,
-      end_time
-    },
-    // Ensure branch is included if the user is not an admin
-    branch: authUser?.role !== "admin" ? authUser?.branch : restOfPayload.branch
+    const finalPayload = {
+      ...restOfPayload,
+      time_slot: {
+        start_time,
+        end_time
+      },
+      // Ensure branch is included if the user is not a master admin
+      branch: !isMaster ? (typeof authUser?.branch === 'object' ? authUser?.branch?._id : authUser?.branch) : restOfPayload.branch
+    };
+
+    mutate(finalPayload, { 
+      onSuccess: () => navigate("/admin/manage-batches") 
+    });
   };
-
-  mutate(finalPayload, { 
-    onSuccess: () => navigate("/admin/manage-batches") 
-  });
-};
 
   if (coursesLoading || branchesLoading) return <Loader />;
 

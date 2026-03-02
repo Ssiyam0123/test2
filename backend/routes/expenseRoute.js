@@ -1,11 +1,10 @@
 import express from "express";
 import { getExpenses } from "../controllers/expenses.controller.js";
-import protectRoute from "../middlewares/auth.middleware.js";
-import { authorize } from "../middlewares/auth.js";
+import { verifyToken, requirePermission, branchGuard } from "../middlewares/auth.js";
 
 const router = express.Router();
 
-// SECURED: Added auth and roles to protect financial data
-router.get("/", protectRoute, authorize("superadmin", "admin", "registrar"), getExpenses);
+// SECURED: Tied to view_finance, and strictly locked to user's branch
+router.get("/", verifyToken, requirePermission("view_finance"), branchGuard, getExpenses);
 
 export default router;

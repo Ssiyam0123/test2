@@ -1,13 +1,13 @@
 import express from "express";
 import { getBranchStats, getDashboardStats } from "../controllers/dashboard.controller.js";
-import protectRoute from "../middlewares/auth.middleware.js";
-import { authorize } from "../middlewares/auth.js";
+import { verifyToken, requirePermission, branchGuard } from "../middlewares/auth.js";
 
 const router = express.Router();
 
-router.get("/stats", protectRoute, authorize("superadmin", "admin", "registrar"), getDashboardStats);
+router.use(verifyToken);
 
-// FIXED TYPO: "register" -> "registrar"
-router.get("/branch-stats/:branchId", protectRoute, authorize("superadmin", "admin", "registrar", "instructor"), getBranchStats);
+// Require a basic 'view_dashboard' permission to see stats
+router.get("/stats", requirePermission("view_dashboard"), getDashboardStats);
+router.get("/branch-stats/:branchId", requirePermission("view_dashboard"), branchGuard, getBranchStats);
 
 export default router;

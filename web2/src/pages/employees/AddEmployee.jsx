@@ -2,6 +2,7 @@ import React, { useMemo } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { useAddUser, useUpdateUser } from "../../hooks/useUser.js";
 import { useBranches } from "../../hooks/useBranches.js"; 
+import { useRoles } from "../../hooks/useRoles.js"; // 🚀 1. IMPORT ROLE HOOK
 import EntityForm from "../../components/common/EntityForm.jsx";
 import useAuth from "../../store/useAuth"; 
 import Loader from "../../components/Loader.jsx";
@@ -15,7 +16,10 @@ const AddEmployeeForm = ({ mode = "add", data = null }) => {
 
   const addUserMutation = useAddUser();
   const updateUserMutation = useUpdateUser();
+  
+  // 🚀 2. FETCH DATA
   const { data: branchesResponse } = useBranches(); 
+  const { data: rolesResponse } = useRoles(); 
 
   const branchOptions = useMemo(() => {
     if (!branchesResponse?.data) return [];
@@ -24,6 +28,22 @@ const AddEmployeeForm = ({ mode = "add", data = null }) => {
       label: b.branch_name 
     }));
   }, [branchesResponse]);
+
+  // 🚀 3. GENERATE DYNAMIC ROLE OPTIONS
+  const roleOptions = useMemo(() => {
+    if (!rolesResponse?.data) return [];
+    
+    // Check if current user is a master admin
+    const isMaster = authUser?.permissions?.includes("all_access") || authUser?.role === "superadmin" || authUser?.role?.name === "superadmin";
+
+    return rolesResponse.data
+      // Security Check: Hide Master/Superadmin roles from standard Branch Admins in the dropdown
+      .filter(role => isMaster ? true : (!role.permissions.includes("all_access") && role.name !== "superadmin"))
+      .map(role => ({
+        value: role._id, // We must send the ObjectId to the backend!
+        label: role.name.charAt(0).toUpperCase() + role.name.slice(1) // Capitalizes the name nicely
+      }));
+  }, [rolesResponse, authUser]);
 
   const initialData = mode === "edit" && data ? {
     employee_id: data.employee_id || "",
@@ -36,7 +56,8 @@ const AddEmployeeForm = ({ mode = "add", data = null }) => {
     status: data.status || "Active",
     username: data.username || "",
     password: "", 
-    role: data.role || "staff",
+    // 🚀 4. EXTRACT OBJECT ID SAFELY
+    role: data.role?._id || data.role || "", 
     facebook: data.social_links?.facebook || "",
     linkedin: data.social_links?.linkedin || "",
     twitter: data.social_links?.twitter || "",
@@ -48,7 +69,8 @@ const AddEmployeeForm = ({ mode = "add", data = null }) => {
     employee_id: "", full_name: "", email: "", phone: "", designation: "", department: "",
     joining_date: "", status: "Active", username: "", 
     password: mode === "add" ? "123456" : "", 
-    role: "staff", facebook: "", linkedin: "", twitter: "", instagram: "", others: "",
+    role: "", // Blank default forces them to select from the dropdown
+    facebook: "", linkedin: "", twitter: "", instagram: "", others: "",
     branch: branchId 
   };
 
@@ -63,11 +85,11 @@ const AddEmployeeForm = ({ mode = "add", data = null }) => {
     
     { 
       name: "branch", 
-      label: authUser?.role === "superadmin" ? "Assigned Campus" : "Assigned Campus (Locked)", 
+      label: authUser?.role === "superadmin" || authUser?.role?.name === "superadmin" ? "Assigned Campus" : "Assigned Campus (Locked)", 
       type: "select", 
       options: branchOptions, 
       required: true,
-      disabled: authUser?.role !== "superadmin" 
+      disabled: authUser?.role !== "superadmin" && authUser?.role?.name !== "superadmin"
     },
 
     { name: "department", label: "Department", type: "select", defaultOption: "Select Department...", required: true, options: [
@@ -88,19 +110,15 @@ const AddEmployeeForm = ({ mode = "add", data = null }) => {
       placeholder: mode === "add" ? "123456" : "Leave blank to keep current",
       required: mode === "add" 
     },
-    // 🚀 DYNAMIC ROLE CHOICES IN FORM
+    
+    // 🚀 5. USE THE DYNAMIC OPTIONS IN THE FORM
     { 
       name: "role", 
-      label: "System Role", 
+      label: "System Access Role", 
       type: "select", 
       required: true, 
-      options: [
-        { value: "staff", label: "General Staff" }, 
-        { value: "instructor", label: "Instructor" }, 
-        { value: "registrar", label: "Registrar" }, 
-        { value: "admin", label: "Branch Admin" },
-        ...(authUser?.role === "superadmin" ? [{ value: "superadmin", label: "Super Admin" }] : [])
-      ]
+      defaultOption: "Select Access Level...",
+      options: roleOptions 
     },
 
     { divider: true, name: "div-social", title: "Social Links (Optional)" },
@@ -118,7 +136,9 @@ const AddEmployeeForm = ({ mode = "add", data = null }) => {
       formData.delete("password");
     }
     
-    if (authUser?.role !== "superadmin" && branchId) {
+    const isMaster = authUser?.permissions?.includes("all_access") || authUser?.role === "superadmin" || authUser?.role?.name === "superadmin";
+
+    if (!isMaster && branchId) {
       formData.set("branch", branchId);
     } else if (!formData.get("branch") && branchId) {
       formData.set("branch", branchId); 

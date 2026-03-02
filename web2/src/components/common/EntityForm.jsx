@@ -146,10 +146,13 @@ const EntityForm = ({
 
       <form onSubmit={handleSubmit} className="space-y-8">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {standardFields.map((field) => {
+          {/* 🚀 FIXED: Added the idx to map, and built a safe uniqueKey */}
+          {standardFields.map((field, idx) => {
+            const uniqueKey = field.name || `field-${idx}`;
+
             if (field.divider) {
               return (
-                <div key={field.name} className="col-span-full pt-4 mt-2 border-t border-gray-50">
+                <div key={uniqueKey} className="col-span-full pt-4 mt-2 border-t border-gray-50">
                   {field.title && <h2 className="text-sm font-black text-gray-400 uppercase tracking-widest mb-4">{field.title}</h2>}
                 </div>
               );
@@ -157,7 +160,7 @@ const EntityForm = ({
             
             if (field.type === "custom") {
               return (
-                <div key={field.name} className={field.fullWidth ? "col-span-full" : ""}>
+                <div key={uniqueKey} className={field.fullWidth ? "col-span-full" : ""}>
                   {field.render({
                     value: formData[field.name],
                     onChange: (val) => {
@@ -172,7 +175,7 @@ const EntityForm = ({
             if (field.type === "checkbox-group") {
               const currentValues = Array.isArray(formData[field.name]) ? formData[field.name] : [];
               return (
-                <div key={field.name} className="col-span-full">
+                <div key={uniqueKey} className="col-span-full">
                   <label className="block mb-4 text-[13px] font-bold text-gray-800 tracking-wide ml-1">
                     {field.label}
                   </label>
@@ -202,10 +205,9 @@ const EntityForm = ({
               );
             }
 
-            // 🚀 THE FIX: Use SelectGroup component for select fields
             if (field.type === "select") {
               return (
-                <div key={field.name} className={field.fullWidth ? "col-span-full" : ""}>
+                <div key={uniqueKey} className={field.fullWidth ? "col-span-full" : ""}>
                   <SelectGroup
                     label={field.label}
                     name={field.name}
@@ -213,7 +215,7 @@ const EntityForm = ({
                     options={field.options || []}
                     defaultOption={field.defaultOption}
                     required={field.required}
-                    disabled={field.disabled} // Passes the disabled prop!
+                    disabled={field.disabled}
                     onChange={(e) => {
                       handleChange(e);
                       if (field.onChange) field.onChange(e);
@@ -226,7 +228,7 @@ const EntityForm = ({
 
             if (field.type === "textarea") {
               return (
-                <div key={field.name} className={`flex flex-col ${field.fullWidth ? 'col-span-full' : ''}`}>
+                <div key={uniqueKey} className={`flex flex-col ${field.fullWidth ? 'col-span-full' : ''}`}>
                   <label className="block mb-1.5 text-xs font-bold text-gray-700 uppercase tracking-wide ml-1">{field.label}</label>
                   <textarea 
                     name={field.name} 
@@ -245,7 +247,7 @@ const EntityForm = ({
             }
 
             return (
-              <div key={field.name} className={field.fullWidth ? "col-span-full" : ""}>
+              <div key={uniqueKey} className={field.fullWidth ? "col-span-full" : ""}>
                 <InputGroup 
                   label={field.label} 
                   name={field.name} 

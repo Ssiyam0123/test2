@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { useOutletContext } from "react-router-dom"; // 🚀 IMPORT CONTEXT
+import { useOutletContext } from "react-router-dom"; 
 import { 
   Building2, MapPin, PackageSearch, Plus, 
   Search, Calculator, ArrowDownRight, ArrowUpRight, 
@@ -11,6 +11,10 @@ import { useBranches } from "../../hooks/useBranches";
 import { useBranchInventory, useBranchTransactions, useDeductClassRequisition } from "../../hooks/useInventory";
 import Loader from "../../components/Loader";
 import toast from "react-hot-toast";
+
+// 🚀 IMPORT PBAC UTILS
+import CanAccess from "../../components/common/CanAccess";
+import { PERMISSIONS } from "../../utils/permissions";
 
 // ==========================================
 // UTILITY: INDUSTRY STANDARD ICONS
@@ -292,11 +296,9 @@ const HistoryView = ({ branchId }) => {
 // VIEW 4: PENDING REQUISITIONS
 // ==========================================
 const RequisitionsView = ({ branchId }) => {
-  // 1. Fetch real dynamic data from backend
   const { data: reqRes, isLoading } = useDeductClassRequisition(branchId);
   const deductMutation = useDeductClassRequisition(branchId);
   
-  // 2. Track the "Actual Bazar Cost" input for each requisition
   const [actualCosts, setActualCosts] = useState({});
 
   const pendingRequisitions = reqRes?.data || [];
@@ -310,11 +312,8 @@ const RequisitionsView = ({ branchId }) => {
     }
 
     try {
-      // Sends the Requisition ID and the Actual Cost to fulfill it
       await deductMutation.mutateAsync({ reqId, actual_cost: cost });
       toast.success("Requisition fulfilled and stock deducted!");
-      
-      // Clear the cost input on success
       setActualCosts(prev => ({ ...prev, [reqId]: "" }));
     } catch (error) { 
       console.error("Approval failed", error); 
@@ -338,7 +337,6 @@ const RequisitionsView = ({ branchId }) => {
             <div key={req._id} className="p-5 border border-slate-200 rounded-2xl bg-slate-50 hover:border-amber-200 transition-colors">
               <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-4">
                 
-                {/* TOPIC & INSTRUCTOR INFO */}
                 <div>
                   <h3 className="text-lg font-black text-slate-800">
                     {req.class_content?.topic || "Unknown Class"}
@@ -353,7 +351,6 @@ const RequisitionsView = ({ branchId }) => {
                   )}
                 </div>
 
-                {/* APPROVAL ACTION (WITH COST INPUT) */}
                 <div className="flex items-center gap-3 w-full xl:w-auto">
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-black text-sm">৳</span>
@@ -365,17 +362,19 @@ const RequisitionsView = ({ branchId }) => {
                       className="w-32 pl-7 pr-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-amber-500 transition-colors"
                     />
                   </div>
-                  <button 
-                    onClick={() => handleApprove(req._id)}
-                    disabled={deductMutation.isPending}
-                    className="px-5 py-2.5 bg-amber-500 text-white text-xs font-black uppercase tracking-widest rounded-xl hover:bg-amber-600 transition-all flex items-center gap-2 disabled:opacity-50 whitespace-nowrap"
-                  >
-                    {deductMutation.isPending ? <Loader size={16} color="white" /> : <><CheckCircle2 size={16} /> Approve & Fulfill</>}
-                  </button>
+                  {/* 🚀 PBAC PROTECTION FOR APPROVAL BUTTON */}
+                  <CanAccess permission={PERMISSIONS.MANAGE_INVENTORY}>
+                    <button 
+                      onClick={() => handleApprove(req._id)}
+                      disabled={deductMutation.isPending}
+                      className="px-5 py-2.5 bg-amber-500 text-white text-xs font-black uppercase tracking-widest rounded-xl hover:bg-amber-600 transition-all flex items-center gap-2 disabled:opacity-50 whitespace-nowrap"
+                    >
+                      {deductMutation.isPending ? <Loader size={16} color="white" /> : <><CheckCircle2 size={16} /> Approve & Fulfill</>}
+                    </button>
+                  </CanAccess>
                 </div>
               </div>
 
-              {/* DYNAMIC ITEMS MAP */}
               <div className="bg-white p-4 rounded-xl border border-slate-100">
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Bazar List Requirements</p>
                 <div className="flex flex-wrap gap-2">
@@ -416,9 +415,12 @@ const BranchInventoryDashboard = ({ branch }) => {
           <p className="text-sm font-bold text-slate-400 mt-1 uppercase tracking-widest">Manage pantry and assets</p>
         </div>
         
-        <button onClick={() => setIsAddModalOpen(true)} className="px-6 py-3 bg-teal-600 text-white text-sm font-black uppercase tracking-widest rounded-xl hover:bg-teal-700 hover:shadow-lg hover:shadow-teal-600/20 active:scale-95 transition-all flex items-center gap-2">
-          <Plus size={18} /> Log Purchase
-        </button>
+        {/* 🚀 PBAC PROTECTION FOR PURCHASE BUTTON */}
+        <CanAccess permission={PERMISSIONS.MANAGE_INVENTORY}>
+          <button onClick={() => setIsAddModalOpen(true)} className="px-6 py-3 bg-teal-600 text-white text-sm font-black uppercase tracking-widest rounded-xl hover:bg-teal-700 hover:shadow-lg hover:shadow-teal-600/20 active:scale-95 transition-all flex items-center gap-2">
+            <Plus size={18} /> Log Purchase
+          </button>
+        </CanAccess>
       </div>
 
       <div className="flex flex-wrap gap-2 p-1.5 bg-slate-100/80 rounded-2xl w-full max-w-2xl mb-6 border border-slate-200/60 overflow-x-auto">
@@ -446,14 +448,12 @@ const BranchInventoryDashboard = ({ branch }) => {
 };
 
 // ==========================================
-// ROOT COMPONENT (REWRITTEN FOR GATEKEEPER)
+// ROOT COMPONENT 
 // ==========================================
 export default function ManageInventory() {
-  // 1. Grab the current active workspace straight from the Layout context
   const context = useOutletContext() || {};
   const { branchId } = context;
   
-  // 2. We only fetch branches here to get the NAME of the active branch for the header.
   const { data: branchRes, isLoading } = useBranches();
   
   const activeBranch = useMemo(() => {
@@ -461,14 +461,12 @@ export default function ManageInventory() {
     return branchRes.data.find(b => b._id === branchId) || { _id: branchId, branch_name: "Campus" };
   }, [branchId, branchRes]);
 
-  // Wait until the layout provides the ID and we fetch the name
   if (!branchId || isLoading || !activeBranch) {
     return <div className="h-full flex items-center justify-center min-h-[400px]"><Loader /></div>;
   }
 
   return (
     <div className="h-full p-4 md:p-8 max-w-7xl mx-auto">
-      {/* 3. The Grid is gone! We load the dashboard immediately based on Gatekeeper context */}
       <BranchInventoryDashboard branch={activeBranch} />
     </div>
   );

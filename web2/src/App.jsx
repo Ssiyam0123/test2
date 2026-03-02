@@ -1,13 +1,7 @@
 import React, { useEffect } from "react";
-import {
-  BrowserRouter as Router,
-  Routes,
-  Route,
-  Navigate,
-  Outlet,
-  useOutletContext, // <-- IMPORT THIS
-} from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Navigate, Outlet, useOutletContext } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import toast from "react-hot-toast";
 
 // STORE & LAYOUTS
 import useAuth from "./store/useAuth";
@@ -18,6 +12,7 @@ import PublicLayout from "./components/PublicLayout";
 // PUBLIC & AUTH PAGES
 import LoginPage from "./pages/LoginPage";
 import Dashboard from "./pages/Dashboard";
+import BranchDashboard from "./pages/BranchDashboard"; // 🚀 MUST IMPORT THIS
 import SearchStudent from "./pages/student-public/SearchStudent.jsx";
 import StudentDetails from "./pages/student-public/StudentDetails.jsx";
 import EmployeeDetails from "./pages/employee-public/EmployeeDetails.jsx";
@@ -32,6 +27,7 @@ import AllEmployees from "./pages/employees/AllEmployees.jsx";
 import AddEmployeeForm from "./pages/employees/AddEmployee.jsx";
 import UpdateEmployee from "./pages/employees/UpdateEmployee.jsx";
 import ManageAdmins from "./pages/ManageAdmins";
+import ManageRoles from "./pages/system/ManageRoles";
 import ManageBatchesTabs from "./pages/batches/ManageBatchesTabs.jsx";
 import ManageBatches from "./pages/batches/ManageBatches.jsx";
 import BatchListPage from "./pages/batches/BatchListPage.jsx";
@@ -51,35 +47,64 @@ const queryClient = new QueryClient({
 });
 
 // ==========================================
-// ROUTE GUARDS
+// PBAC ROUTE GUARDS
 // ==========================================
 const ProtectedRoute = ({ children }) => {
   const { authUser } = useAuth();
   return authUser ? children : <Navigate to="/login" replace />;
 };
 
-const RoleGuard = ({ allowedRoles }) => {
-  const { authUser } = useAuth(); // FIX: Extract from authUser
-  const role = authUser?.role || "user";
-  
-  // ⚠️ CRITICAL FIX: Grab the context from AdminLayout and forward it!
+const RoleGuard = ({ requiredPermission }) => {
+  const { authUser } = useAuth(); 
   const context = useOutletContext(); 
 
-  if (!allowedRoles.includes(role)) {
-    const fallback = role === "instructor" ? "/admin/all-students" : "/admin";
-    return <Navigate to={fallback} replace />;
+  const hasPerm = () => {
+    if (!authUser) return false;
+    
+    const roleName = typeof authUser.role === 'string' ? authUser.role : authUser.role?.name;
+    if (roleName?.toLowerCase().replace(/\s/g, '') === "superadmin") return true;
+
+    const userPermissions = authUser.role?.permissions || authUser.permissions || [];
+    if (userPermissions.includes("all_access")) return true;
+    
+    return userPermissions.includes(requiredPermission);
+  };
+
+  if (!hasPerm()) {
+    toast.error("You do not have permission to view this page.");
+    return <Navigate to="/admin" replace />;
   }
   
-  // Forward the context down to AllStudents, ManageInventory, etc.
   return <Outlet context={context} />;
 };
 
+// 🚀 TRAFFIC CONTROLLER FOR THE DASHBOARD
 const AdminIndex = () => {
   const { authUser } = useAuth();
-  if (authUser?.role === "instructor") {
+  
+  const roleName = typeof authUser?.role === 'string' ? authUser.role : authUser?.role?.name;
+  const userPermissions = authUser?.role?.permissions || authUser?.permissions || [];
+  const safeRoleName = roleName?.toLowerCase().replace(/\s/g, '');
+  
+  const isSuperAdmin = userPermissions.includes("all_access") || safeRoleName === "superadmin";
+  const isBranchAdmin = safeRoleName === "branchadmin" || safeRoleName === "admin";
+
+  // 1. Superadmins get global
+  if (isSuperAdmin) {
+    return <Dashboard />;
+  } 
+  
+  // 2. Branch Admins (or anyone with the specific permission) get branch dashboard
+  if (isBranchAdmin || userPermissions.includes("view_dashboard")) {
+    return <BranchDashboard />;
+  }
+
+  // 3. Fallback for staff/instructors
+  if (userPermissions.includes("view_students")) {
     return <Navigate to="/admin/all-students" replace />;
   }
-  return <Dashboard />;
+  
+  return <div className="p-8 text-center font-bold text-slate-500 mt-20">Access Denied: Please contact System Administrator.</div>;
 };
 
 // ==========================================
@@ -98,7 +123,6 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <Router>
         <Routes>
-          {/* PUBLIC ROUTES */}
           <Route element={<PublicLayout />}>
             <Route path="/" element={<SearchStudent />} />
             <Route path="/student/:id" element={<StudentDetails />} />
@@ -107,44 +131,69 @@ function App() {
 
           <Route path="/login" element={authUser ? <Navigate to="/admin" replace /> : <LoginPage />} />
 
-          {/* ADMIN ROUTES */}
           <Route path="/admin" element={<ProtectedRoute><AdminLayout /></ProtectedRoute>}>
             <Route index element={<AdminIndex />} />
 
-            {/* TIER 1 */}
-            <Route element={<RoleGuard allowedRoles={["superadmin","admin", "registrar", "instructor"]} />}>
+            <Route element={<RoleGuard requiredPermission="view_students" />}>
               <Route path="all-students" element={<AllStudents />} />
+            </Route>
+            <Route element={<RoleGuard requiredPermission="add_student" />}>
+              <Route path="add-student" element={<AddStudent />} />
+            </Route>
+            <Route element={<RoleGuard requiredPermission="edit_student" />}>
+              <Route path="update-student/:id" element={<UpdateStudent />} />
+            </Route>
+
+            <Route element={<RoleGuard requiredPermission="view_employees" />}>
+              <Route path="all-employees" element={<AllEmployees />} />
+              <Route path="employee/:id" element={<EmployeeDetails />} />
+            </Route>
+            <Route element={<RoleGuard requiredPermission="add_employee" />}>
+              <Route path="add-employee" element={<AddEmployeeForm mode="add" />} />
+            </Route>
+            <Route element={<RoleGuard requiredPermission="edit_employee" />}>
+              <Route path="update-employee/:id" element={<UpdateEmployee mode="edit" />} />
+            </Route>
+
+            <Route element={<RoleGuard requiredPermission="view_courses" />}>
               <Route path="all-courses" element={<AllCourses />} />
+            </Route>
+            <Route element={<RoleGuard requiredPermission="manage_courses" />}>
+              <Route path="add-course" element={<AddCourse />} />
+              <Route path="update-course/:id" element={<AddCourse mode="edit" />} />
+            </Route>
+
+            <Route element={<RoleGuard requiredPermission="view_classes" />}>
+              <Route path="all-batches" element={<BatchListPage />} />
+            </Route>
+            <Route element={<RoleGuard requiredPermission="manage_classes" />}>
               <Route path="manage-batches" element={<ManageBatchesTabs />} />
               <Route path="batches/:id" element={<ManageBatches />} />
+              <Route path="add-batch" element={<AddBatch />} />
+              <Route path="edit-batch/:id" element={<BatchFormContainer />} />
+            </Route>
+
+            <Route element={<RoleGuard requiredPermission="view_branches" />}>
               <Route path="branches" element={<AllBranches />} />
-              <Route path="update-branch/:id" element={<ManageBranchForm mode="edit" />} />
+              <Route path="branches/:id" element={<BranchDetails />} />
+            </Route>
+            <Route element={<RoleGuard requiredPermission="manage_branches" />}>
               <Route path="manage-branches" element={<ManageBranches />} />
               <Route path="manage-branches/:id" element={<BranchDetails />} />
-              <Route path="branches/:id" element={<BranchDetails />} />
+              <Route path="add-branch" element={<ManageBranchForm mode="add" />} />
+              <Route path="update-branch/:id" element={<ManageBranchForm mode="edit" />} />
+            </Route>
+
+            <Route element={<RoleGuard requiredPermission="view_inventory" />}>
               <Route path="inventory" element={<ManageInventory />} />
+            </Route>
+            <Route element={<RoleGuard requiredPermission="manage_inventory" />}>
               <Route path="add-inventory" element={<AddInventory />} />
             </Route>
 
-            {/* TIER 2 */}
-            <Route element={<RoleGuard allowedRoles={["superadmin", "admin", "registrar"]} />}>
-              <Route path="add-student" element={<AddStudent />} />
-              <Route path="update-student/:id" element={<UpdateStudent />} />
-              <Route path="add-course" element={<AddCourse />} />
-              <Route path="update-course/:id" element={<AddCourse mode="edit" />} />
-              <Route path="add-batch" element={<AddBatch />} />
-            </Route>
-
-            {/* TIER 3 */}
-            <Route element={<RoleGuard allowedRoles={["superadmin", "admin"]} />}>
+            <Route element={<RoleGuard requiredPermission="manage_roles" />}>
               <Route path="manage-admins" element={<ManageAdmins />} />
-              <Route path="all-employees" element={<AllEmployees />} />
-              <Route path="add-employee" element={<AddEmployeeForm mode="add" />} />
-              <Route path="update-employee/:id" element={<UpdateEmployee mode="edit" />} />
-              <Route path="employee/:id" element={<EmployeeDetails />} />
-              <Route path="all-batches" element={<BatchListPage />} />
-              <Route path="edit-batch/:id" element={<BatchFormContainer />} />
-              <Route path="add-branch" element={<ManageBranchForm mode="add" />} />
+              <Route path="manage-roles" element={<ManageRoles />} />
             </Route>
           </Route>
 

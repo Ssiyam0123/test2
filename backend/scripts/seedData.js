@@ -16,6 +16,7 @@ import Expense from "../models/expense.js";
 import Fee from "../models/fee.js";
 import Payment from "../models/payment.js";
 import StockTransaction from "../models/stockTransaction.js";
+import Role from "../models/role.js"; 
 
 dotenv.config();
 
@@ -45,10 +46,17 @@ const seedDatabase = async () => {
     console.log("🚀 Connecting to MongoDB...");
     await mongoose.connect(MONGO_URI);
 
-    console.log("🧹 Cleaning existing data (Keeping Superadmins)...");
+    // 🚀 FETCH THE INSTRUCTOR ROLE ID FIRST
+    const instructorRole = await Role.findOne({ name: "instructor" });
+    if (!instructorRole) {
+      throw new Error("Instructor role not found! Please run node scripts/migrateRoles.js first.");
+    }
+
+    console.log("🧹 Cleaning existing data (Keeping Superadmins & Roles)...");
+    // Notice we DO NOT delete the Roles collection here
     await Promise.all([
       Branch.deleteMany({}),
-      User.deleteMany({ role: { $ne: "superadmin" } }), 
+      User.deleteMany({ role: { $ne: await Role.findOne({ name: "superadmin" }).then(r => r?._id) } }), // Keep superadmins safe
       Course.deleteMany({}),
       Batch.deleteMany({}),
       Student.deleteMany({}),
@@ -98,7 +106,7 @@ const seedDatabase = async () => {
           username: faker.internet.username().toLowerCase(), 
           email: faker.internet.email().toLowerCase(),
           password: "password123", 
-          role: "instructor",
+          role: instructorRole._id, // 🚀 FIXED: Now passing the ObjectId!
           full_name: faker.person.fullName(),
           employee_id: `EMP-${branch.branch_code}-${faker.string.numeric(4)}`,
           designation: "Chef Instructor",
@@ -111,7 +119,8 @@ const seedDatabase = async () => {
     // 4. Seed Inventory & Log Purchase Expenses
     console.log("📦 Stocking Kitchens & Logging Expenses...");
     for (const branch of createdBranches) {
-      const branchInstructor = allInstructors.find(ins => ins.branch.equals(branch._id));
+      // ✅ NEW WAY
+const branchInstructor = allInstructors.find(ins => String(ins.branch) === String(branch._id));
       
       for (const item of CONFIG.INVENTORY_ITEMS) {
         const qty = faker.number.int({ min: 20, max: 100 });
@@ -150,8 +159,8 @@ const seedDatabase = async () => {
     for (let i = 0; i < createdBranches.length; i++) {
       const branch = createdBranches[i];
       const course = courses[i % courses.length];
-      const instructor = allInstructors.find(ins => ins.branch.equals(branch._id));
-
+// ✅ NEW WAY
+const instructor = allInstructors.find(ins => String(ins.branch) === String(branch._id));
       const batch = await Batch.create({
         batch_name: `B-${branch.branch_code}-${faker.string.numeric(3)}`,
         course: course._id,

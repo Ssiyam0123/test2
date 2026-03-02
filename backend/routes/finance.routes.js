@@ -1,32 +1,21 @@
 import express from "express";
 import { 
-  collectPayment, 
-  getStudentFinance, 
-  getCampusFees, 
-  updateFeeDiscount 
+  collectPayment, getStudentFinance, getCampusFees, updateFeeDiscount 
 } from "../controllers/finance.controller.js";
-import protectRoute from "../middlewares/auth.middleware.js";
-// FIXED: Correct path to validate.js and correct function name 'validate'
+import { verifyToken, requirePermission, branchGuard } from "../middlewares/auth.js";
 import { validate } from "../middlewares/validate.js"; 
 import { paymentCreateSchema, feeUpdateSchema } from "../validators/finance.validator.js";
 
 const router = express.Router();
 
-// Apply auth middleware to all finance routes
-router.use(protectRoute); 
+router.use(verifyToken); 
 
-// Global Dashboard List
-router.get("/fees", getCampusFees);
+// Read
+router.get("/fees", requirePermission("view_finance"), branchGuard, getCampusFees);
+router.get("/student/:studentId", requirePermission("view_finance"), getStudentFinance);
 
-// Single Student Finance Dashboard
-router.get("/student/:studentId", getStudentFinance);
-
-// Make a Payment
-// FIXED: Using 'validate' instead of 'validateRequest'
-router.post("/pay", validate(paymentCreateSchema), collectPayment);
-
-// Manually update a student's discount
-// FIXED: Using 'validate' instead of 'validateRequest'
-router.patch("/fee/:feeId/discount", validate(feeUpdateSchema), updateFeeDiscount);
+// Write
+router.post("/pay", requirePermission("collect_payment"), validate(paymentCreateSchema), collectPayment);
+router.patch("/fee/:feeId/discount", requirePermission("apply_discount"), validate(feeUpdateSchema), updateFeeDiscount);
 
 export default router;

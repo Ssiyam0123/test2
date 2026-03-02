@@ -25,8 +25,10 @@ export const getAllBatches = async (req, res) => {
     const { status, branch } = req.query;
     let query = {};
 
-    // SECURITY GATE: Branch Isolation
-    if (req.user.role === "superadmin") {
+    // 🚀 PBAC SECURITY GATE
+    const isMaster = req.user.role?.name === "superadmin" || req.user.role?.permissions?.includes("all_access");
+
+    if (isMaster) {
       if (branch && branch !== "all" && mongoose.Types.ObjectId.isValid(branch)) {
         query.branch = branch;
       }

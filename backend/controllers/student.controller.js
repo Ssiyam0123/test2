@@ -1,7 +1,7 @@
 import Student from "../models/student.js";
 import Batch from "../models/batch.js";
-import Course from "../models/course.js"; // ADDED
-import Fee from "../models/fee.js";       // ADDED
+import Course from "../models/course.js"; 
+import Fee from "../models/fee.js"; 
 import { deleteLocalFile } from "../middlewares/multer.js";
 import mongoose from "mongoose";
 import payment from "../models/payment.js";
@@ -15,7 +15,6 @@ const getSessionInfo = async () => {
   return { session, isReplicaSet };
 };
 
-// 1. ADD STUDENT (Atomic Transaction)
 export const addStudent = async (req, res) => {
   const { session, isReplicaSet } = await getSessionInfo();
   try {
@@ -28,22 +27,29 @@ export const addStudent = async (req, res) => {
 
     const [student] = await Student.create([req.body], { session });
 
-    await Batch.findByIdAndUpdate(student.batch, { $push: { students: student._id } }, { session });
+    await Batch.findByIdAndUpdate(
+      student.batch,
+      { $push: { students: student._id } },
+      { session },
+    );
 
     const baseFee = course.base_fee || 0;
     const discount = Number(req.body.discount_amount) || 0;
     const netPayable = Math.max(0, baseFee - discount);
 
-    await Fee.create([{
-      student: student._id,
-      branch: student.branch,
-      course: student.course,
-      total_amount: baseFee,
-      discount: discount,
-      net_payable: netPayable,
-      paid_amount: 0,
-      status: netPayable === 0 ? "Paid" : "Unpaid"
-    }], { session });
+    await Fee.create(
+      [{
+        student: student._id,
+        branch: student.branch,
+        course: student.course,
+        total_amount: baseFee,
+        discount: discount,
+        net_payable: netPayable,
+        paid_amount: 0,
+        status: netPayable === 0 ? "Paid" : "Unpaid",
+      }],
+      { session },
+    );
 
     if (isReplicaSet) await session.commitTransaction();
     res.status(201).json({ success: true, data: student });
@@ -55,8 +61,6 @@ export const addStudent = async (req, res) => {
     session.endSession();
   }
 };
-
-
 
 export const updateStudent = async (req, res) => {
   const { session, isReplicaSet } = await getSessionInfo();
@@ -76,23 +80,14 @@ export const updateStudent = async (req, res) => {
 
     if (newBatchId && oldBatchId !== newBatchId) {
       if (oldBatchId)
-        await Batch.findByIdAndUpdate(
-          oldBatchId,
-          { $pull: { students: student._id } },
-          { session },
-        );
-      await Batch.findByIdAndUpdate(
-        newBatchId,
-        { $push: { students: student._id } },
-        { session },
-      );
+        await Batch.findByIdAndUpdate(oldBatchId, { $pull: { students: student._id } }, { session });
+      await Batch.findByIdAndUpdate(newBatchId, { $push: { students: student._id } }, { session });
     }
 
     if (isReplicaSet) await session.commitTransaction();
     res.status(200).json({ success: true, data: student });
   } catch (error) {
-    if (isReplicaSet && session.inTransaction())
-      await session.abortTransaction();
+    if (isReplicaSet && session.inTransaction()) await session.abortTransaction();
     res.status(500).json({ success: false, message: error.message });
   } finally {
     session.endSession();
@@ -107,10 +102,27 @@ export const getAllStudents = async (req, res) => {
     const { search, status, branch } = req.query;
 
     let match = {};
-    if (req.user.role !== "superadmin") match.branch = new mongoose.Types.ObjectId(req.user.branch);
-    else if (branch && branch !== "all") match.branch = new mongoose.Types.ObjectId(branch);
+    
+    // 1. SAFELY HANDLE THE BRANCH GUARD
+    if (req.branchFilter && req.branchFilter.branch) {
+      match.branch = new mongoose.Types.ObjectId(req.branchFilter.branch.toString());
+    }
 
-    if (status && status !== "all") match.status = status;
+    // 2. SAFELY HANDLE THE SUPERADMIN DROPDOWN
+    const isMaster = req.user?.role?.name === "superadmin" || (Array.isArray(req.user?.role?.permissions) && req.user.role.permissions.includes("all_access"));
+    
+    if (isMaster && branch && branch !== "all" && branch !== "") {
+      if (mongoose.Types.ObjectId.isValid(branch)) {
+         match.branch = new mongoose.Types.ObjectId(branch);
+      }
+    }
+
+    // 3. STATUS FILTER
+    if (status && status !== "all") {
+        match.status = status;
+    }
+    
+    // 4. SEARCH FILTER
     if (search) {
       match.$or = [
         { student_name: { $regex: search, $options: "i" } },
@@ -123,6 +135,7 @@ export const getAllStudents = async (req, res) => {
       { $sort: { createdAt: -1 } },
       { $skip: (page - 1) * limit },
       { $limit: limit },
+      
       // JOIN FEE COLLECTION
       {
         $lookup: {
@@ -133,6 +146,7 @@ export const getAllStudents = async (req, res) => {
         }
       },
       { $unwind: { path: "$fee_summary", preserveNullAndEmptyArrays: true } },
+      
       // JOIN COURSE COLLECTION
       {
         $lookup: {
@@ -143,6 +157,18 @@ export const getAllStudents = async (req, res) => {
         }
       },
       { $unwind: { path: "$course", preserveNullAndEmptyArrays: true } },
+      
+      // JOIN BATCH COLLECTION
+      {
+        $lookup: {
+          from: "batches",
+          localField: "batch",
+          foreignField: "_id",
+          as: "batch"
+        }
+      },
+      { $unwind: { path: "$batch", preserveNullAndEmptyArrays: true } },
+
       // JOIN BRANCH COLLECTION
       {
         $lookup: {
@@ -156,18 +182,23 @@ export const getAllStudents = async (req, res) => {
     ]);
 
     const total = await Student.countDocuments(match);
+    const totalPages = Math.ceil(total / limit); // 🚀 FIXED: Added totalPages for frontend pagination
 
     res.status(200).json({
       success: true,
       data: students,
-      pagination: { total, page, limit }
+      pagination: { total, page, limit, totalPages } // 🚀 FIXED: Sent totalPages
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error("GET_ALL_STUDENTS_ERROR:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "API CRASHED", 
+      exact_error: error.message
+    });
   }
 };
 
-// 3. DELETE STUDENT (Prevents Orphan Fees/Payments)
 export const deleteStudent = async (req, res) => {
   const { session, isReplicaSet } = await getSessionInfo();
   try {
@@ -178,12 +209,11 @@ export const deleteStudent = async (req, res) => {
 
     if (student.photo_url) deleteLocalFile(student.photo_url);
 
-    // CLEANUP ALL RELATIONAL DATA
     await Promise.all([
       Student.deleteOne({ _id: student._id }, { session }),
       fee.deleteOne({ student: student._id }, { session }),
       payment.deleteMany({ student: student._id }, { session }),
-      Batch.findByIdAndUpdate(student.batch, { $pull: { students: student._id } }, { session })
+      Batch.findByIdAndUpdate(student.batch, { $pull: { students: student._id } }, { session }),
     ]);
 
     if (isReplicaSet) await session.commitTransaction();
@@ -199,21 +229,14 @@ export const deleteStudent = async (req, res) => {
 export const removeStudentImage = async (req, res) => {
   try {
     const student = await Student.findById(req.params.id);
-    if (!student) {
-      return res.status(404).json({ message: "Student not found" });
-    }
+    if (!student) return res.status(404).json({ message: "Student not found" });
 
-    if (student.photo_url) {
-      deleteLocalFile(student.photo_url);
-    }
+    if (student.photo_url) deleteLocalFile(student.photo_url);
 
     student.photo_url = "";
     await student.save();
 
-    res.status(200).json({
-      message: "Image removed successfully",
-      data: student,
-    });
+    res.status(200).json({ message: "Image removed successfully", data: student });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -222,18 +245,12 @@ export const removeStudentImage = async (req, res) => {
 export const toggleStudentStatus = async (req, res) => {
   try {
     const student = await Student.findById(req.params.id);
-
-    if (!student) {
-      return res.status(404).json({ message: "Student not found" });
-    }
+    if (!student) return res.status(404).json({ message: "Student not found" });
 
     student.is_active = !student.is_active;
     await student.save();
 
-    res.status(200).json({
-      message: `Student ${student.is_active ? "activated" : "deactivated"} successfully`,
-      data: student,
-    });
+    res.status(200).json({ message: `Student ${student.is_active ? "activated" : "deactivated"} successfully`, data: student });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -242,33 +259,19 @@ export const toggleStudentStatus = async (req, res) => {
 export const publicSearchStudent = async (req, res) => {
   try {
     const { query } = req.query;
-
-    if (!query || query.trim() === "") {
-      return res.status(400).json({ message: "Search query is required" });
-    }
+    if (!query || query.trim() === "") return res.status(400).json({ message: "Search query is required" });
 
     const student = await Student.findOne({
-      $or: [
-        { student_id: query.trim() },
-        { registration_number: query.trim() },
-      ],
+      $or: [{ student_id: query.trim() }, { registration_number: query.trim() }],
       is_active: true,
     })
       .populate("course", "course_name course_code duration additional_info")
       .populate("batch", "batch_name batch_type time_slot schedule_days")
       .select("-__v");
 
-    if (!student) {
-      return res.status(404).json({
-        message: "Student not found or not active",
-        data: null,
-      });
-    }
+    if (!student) return res.status(404).json({ message: "Student not found or not active", data: null });
 
-    res.status(200).json({
-      message: "Student found",
-      data: student,
-    });
+    res.status(200).json({ message: "Student found", data: student });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -277,15 +280,10 @@ export const publicSearchStudent = async (req, res) => {
 export const getPublicStudentById = async (req, res) => {
   try {
     const student = await Student.findById(req.params.id)
-      .populate(
-        "course",
-        "course_name course_code duration description additional_info",
-      )
+      .populate("course", "course_name course_code duration description additional_info")
       .populate("batch", "batch_name batch_type time_slot schedule_days");
 
-    if (!student || !student.is_active) {
-      return res.status(404).json({ message: "Student not found or inactive" });
-    }
+    if (!student || !student.is_active) return res.status(404).json({ message: "Student not found or inactive" });
 
     res.status(200).json(student);
   } catch (error) {
@@ -296,30 +294,19 @@ export const getPublicStudentById = async (req, res) => {
 export const searchStudent = async (req, res) => {
   try {
     const { query } = req.query;
-    if (!query || query.trim() === "") {
-      return res.status(400).json({ message: "Search query is required" });
-    }
+    if (!query || query.trim() === "") return res.status(400).json({ message: "Search query is required" });
 
     const students = await Student.find({
-      $or: [
-        { student_id: { $regex: query.trim(), $options: "i" } },
-        { registration_number: { $regex: query.trim(), $options: "i" } },
-      ],
+      ...req.branchFilter, 
+      $or: [{ student_id: { $regex: query.trim(), $options: "i" } }, { registration_number: { $regex: query.trim(), $options: "i" } }],
     })
       .populate("course", "course_name course_code duration")
       .populate("batch", "batch_name batch_type time_slot")
-      .populate({
-        path: "comments",
-        populate: { path: "instructor", select: "full_name photo_url" },
-      })
+      .populate({ path: "comments", populate: { path: "instructor", select: "full_name photo_url" } })
       .sort({ createdAt: -1 })
       .limit(20);
 
-    res.status(200).json({
-      message: "Search completed",
-      data: students,
-      count: students.length,
-    });
+    res.status(200).json({ message: "Search completed", data: students, count: students.length });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -328,26 +315,80 @@ export const searchStudent = async (req, res) => {
 export const getAdminStudentById = async (req, res) => {
   try {
     const student = await Student.findById(req.params.id)
-      .populate(
-        "course",
-        "course_name course_code duration description additional_info",
-      )
+      .populate("course", "course_name course_code duration description additional_info")
       .populate("batch", "batch_name batch_type time_slot")
       .populate({
         path: "comments",
         options: { sort: { createdAt: -1 } },
-        populate: {
-          path: "instructor",
-          select: "full_name photo_url designation",
-        },
+        populate: { path: "instructor", select: "full_name photo_url designation" },
+      });
+
+    if (!student) return res.status(404).json({ message: "Student not found" });
+    
+    const isMaster = req.user.role?.name === "superadmin" || req.user.role?.permissions?.includes("all_access");
+    if (!isMaster && student.branch.toString() !== req.user.branch.toString()) {
+       return res.status(403).json({ message: "Unauthorized access to student from another branch." });
+    }
+
+    res.status(200).json(student);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// 🚀 NEW: ADD STUDENT COMMENT FUNCTION
+export const addStudentComment = async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    const { text } = req.body;
+
+    if (!text || text.trim() === "") {
+      return res.status(400).json({ message: "Comment text is required" });
+    }
+
+    const student = await Student.findById(studentId);
+    if (!student) return res.status(404).json({ message: "Student not found" });
+
+    // Assuming your Student model has a 'comments' array
+    student.comments.push({
+      instructor: req.user._id, // Ensure your verifyToken middleware sets req.user
+      text: text,
+      createdAt: new Date()
+    });
+
+    await student.save();
+    res.status(201).json({ success: true, message: "Comment added successfully" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+
+// 🚀 NEW: GET STUDENT COMMENTS FUNCTION
+export const fetchStudentComments = async (req, res) => {
+  try {
+    const { studentId } = req.params;
+
+    // স্টুডেন্টকে খুঁজবে এবং শুধু কমেন্টগুলো আনবে (সাথে ইন্সট্রাক্টরের নাম ও ছবি)
+    const student = await Student.findById(studentId)
+      .select("comments")
+      .populate({
+        path: "comments.instructor",
+        select: "full_name photo_url designation"
       });
 
     if (!student) {
       return res.status(404).json({ message: "Student not found" });
     }
 
-    res.status(200).json(student);
+    // কমেন্টগুলো নতুন থেকে পুরানো হিসেবে সর্ট করা
+    const sortedComments = student.comments.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    res.status(200).json({ 
+      success: true, 
+      data: sortedComments 
+    });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ success: false, message: error.message });
   }
 };

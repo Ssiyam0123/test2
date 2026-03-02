@@ -7,17 +7,11 @@ import { useDownloadCertificate } from "../../hooks/useStudents.js";
 import DataTable from "../common/DataTable.jsx";
 import ActionIconButton from "../common/ActionIconButton.jsx";
 import Avatar from "../common/Avatar.jsx";
-
-// ==========================================
-// ROLE-BASED ACCESS ARRAYS
-// ==========================================
-const CAN_MANAGE_FINANCE = ["superadmin", "admin", "registrar"];
-const CAN_ADD_COMMENT = ["superadmin", "admin", "registrar", "instructor"];
-const CAN_MANAGE_STUDENT = ["superadmin", "admin", "registrar"]; // Edit, Delete, Toggle, QR
+import { useNavigate } from "react-router-dom";
 
 const StudentsTable = ({
   students, currentUser, pagination, onDelete, onToggleStatus, 
-  onGenerateQR, onAddComment, onViewDetails, onEdit, 
+  onGenerateQR, onAddComment,  onEdit, 
   onPay, 
   deleteLoading, toggleLoading, page, onPageChange, searchTerm, isLoading = false,
 }) => {
@@ -26,6 +20,21 @@ const StudentsTable = ({
   const handleDownloadCertificate = (student) => {
     downloadMutation.mutate(student);
   };
+
+  const navigate = useNavigate()
+
+  const permissions = currentUser?.role?.permissions || currentUser?.permissions || [];
+  const roleName = (typeof currentUser?.role === 'string' ? currentUser.role : currentUser?.role?.name || "").toLowerCase();
+  
+  // Normalizes strings to handle "Edit Student" or "edit_student" equally
+  const hasPerm = (p) => permissions.some(v => v.toLowerCase().replace(/\s/g, '_') === p);
+
+  // PBAC Flags (with fallback to your original role structure to prevent UI breakage)
+  const isSuper = roleName === "superadmin" || hasPerm("all_access");
+  const canManageFinance = isSuper || hasPerm("manage_finance") || hasPerm("manage_payments") || ["admin", "registrar"].includes(roleName);
+  const canAddComment = isSuper || hasPerm("add_comment") || hasPerm("edit_student") || ["admin", "registrar", "instructor"].includes(roleName);
+  const canEdit = isSuper || hasPerm("edit_student") || hasPerm("update_student") || ["admin", "registrar"].includes(roleName);
+  const canDelete = isSuper || hasPerm("delete_student") || ["admin", "registrar"].includes(roleName);
 
   const columns = [
     { label: "Student Name", className: "w-[25%]" },
@@ -71,7 +80,7 @@ const StudentsTable = ({
           <div className="flex items-center gap-1.5">
             <MapPin size={12} className="text-indigo-400" />
             <span className="text-[13px] font-bold text-slate-700">
-              {student.branch?.branch_code || "N/A"}
+              {student.branch?.branch_code || student.branch?.name || "N/A"}
             </span>
           </div>
         </td>
@@ -84,7 +93,7 @@ const StudentsTable = ({
 
         <td className="px-6 py-4 hidden lg:table-cell align-middle">
           <span className="text-[13px] font-medium text-slate-600 line-clamp-1" title={student.course?.course_name}>
-            {student.course?.course_name || "N/A"}
+            {student.course?.course_name || student.course?.course_code || "N/A"}
           </span>
         </td>
 
@@ -108,8 +117,8 @@ const StudentsTable = ({
         <td className="px-6 py-4 text-right align-middle">
           <div className="flex items-center justify-end gap-1 opacity-60 group-hover:opacity-100 transition-opacity duration-200">
             
-            {/* RBAC: Finance Ledger */}
-            {CAN_MANAGE_FINANCE.includes(currentUser?.role) && (
+            {/* PBAC: Finance Ledger */}
+            {canManageFinance && (
               <ActionIconButton 
                 icon={Wallet} 
                 variant="neutral" 
@@ -118,20 +127,29 @@ const StudentsTable = ({
               />
             )}
 
-            <ActionIconButton icon={Eye} onClick={() => onViewDetails(student._id)} title="View" />
+            <ActionIconButton icon={Eye} onClick={() => navigate(`/student/${student._id}`)} title="View" />
             
-            {/* RBAC: Add Comment */}
-            {CAN_ADD_COMMENT.includes(currentUser?.role) && (
+            {/* PBAC: Add Comment */}
+            {canAddComment && (
               <ActionIconButton icon={MessageSquare} variant="neutral" onClick={() => onAddComment(student)} title="Comment" />
             )}
             
-            {/* RBAC: Manage Student Actions */}
-            {CAN_MANAGE_STUDENT.includes(currentUser?.role) && (
+            {/* PBAC: Manage Student Actions */}
+            {(canEdit || canDelete) && (
               <>
-                <ActionIconButton icon={Edit} variant="neutral" onClick={() => onEdit(student._id)} title="Edit" />
-                <ActionIconButton icon={student.is_active ? PowerOff : Power} variant="neutral" onClick={() => onToggleStatus(student._id)} disabled={toggleLoading} title="Toggle" />
-                <ActionIconButton icon={QrCode} variant="neutral" onClick={() => onGenerateQR(student)} title="QR" />
-                <ActionIconButton icon={Trash2} variant="danger" onClick={() => onDelete(student._id, student.student_name)} disabled={deleteLoading} title="Delete" />
+                {canEdit && (
+                  <ActionIconButton icon={Edit} variant="neutral" onClick={() => onEdit(student._id)} title="Edit" />
+                )}
+                
+                {canEdit && (
+                  <ActionIconButton icon={student.is_active ? PowerOff : Power} variant="neutral" onClick={() => onToggleStatus(student._id)} disabled={toggleLoading} title="Toggle Status" />
+                )}
+                
+                <ActionIconButton icon={QrCode} variant="neutral" onClick={() => onGenerateQR(student)} title="Generate QR" />
+                
+                {canDelete && (
+                  <ActionIconButton icon={Trash2} variant="danger" onClick={() => onDelete(student._id, student.student_name)} disabled={deleteLoading} title="Delete" />
+                )}
               </>
             )}
             

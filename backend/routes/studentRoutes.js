@@ -1,34 +1,76 @@
 import express from "express";
-import {
-  addStudent, deleteStudent, getAllStudents, updateStudent, toggleStudentStatus, searchStudent,
-  publicSearchStudent, getAdminStudentById, getPublicStudentById, removeStudentImage
+import { 
+  addStudent, 
+  getAllStudents, 
+  deleteStudent, 
+  getAdminStudentById, 
+  updateStudent, 
+  toggleStudentStatus,
+  removeStudentImage,
+  searchStudent,
+  publicSearchStudent,
+  getPublicStudentById,
+
 } from "../controllers/student.controller.js";
-import protectRoute from "../middlewares/auth.middleware.js";
-import { authorize } from "../middlewares/auth.js";
 import { upload } from "../middlewares/multer.js";
-import { addComment, getStudentComments } from "../controllers/comment.controller.js";
 import { validate } from "../middlewares/validate.js";
 import { studentCreateSchema, studentUpdateSchema } from "../validators/student.validator.js";
+import { verifyToken, requirePermission, branchGuard } from "../middlewares/auth.js";
+import { addComment, getStudentComments } from "../controllers/comment.controller.js";
+
 
 const router = express.Router();
 
-// PUBLIC
+// ==========================================
+// 1. PUBLIC ROUTES (No Login Required)
+// Used for the student/certificate verification portal
+// ==========================================
 router.get("/public/search", publicSearchStudent);
 router.get("/public/:id", getPublicStudentById);
 
-// PROTECTED
-router.get("/all", protectRoute, authorize("superadmin", "admin", "registrar", "instructor"), getAllStudents);
-router.post("/:studentId/comments", protectRoute, authorize("superadmin", "admin", "instructor"), addComment);
-router.get("/:studentId/comments", protectRoute, authorize("superadmin", "admin", "instructor"), getStudentComments);
+// ==========================================
+// 2. PROTECTED ROUTES (Requires Login & Permissions)
+// ==========================================
+router.use(verifyToken);
 
-// REGISTRAR & ADMIN CRUD
-router.post("/create", protectRoute, authorize("superadmin", "admin", "registrar"), upload.single("photo"), validate(studentCreateSchema), addStudent);
-router.put("/update/:id", protectRoute, authorize("superadmin", "admin", "registrar"), upload.single("photo"), validate(studentUpdateSchema), updateStudent);
-router.patch("/toggle-status/:id", protectRoute, authorize("superadmin", "admin", "registrar"), toggleStudentStatus);
-router.delete("/remove-image/:id", protectRoute, authorize("superadmin", "admin", "registrar"), removeStudentImage);
-router.delete("/delete/:id", protectRoute, authorize("superadmin", "admin", "registrar"), deleteStudent);
+// ----- READ OPERATIONS -----
+router.get("/all", requirePermission("view_students"), branchGuard, getAllStudents);
+router.get("/search", requirePermission("view_students"), branchGuard, searchStudent);
 
-router.get("/search", protectRoute, authorize("superadmin", "admin", "registrar"), searchStudent);
-router.get("/admin/:id", protectRoute, authorize("superadmin", "admin", "registrar"), getAdminStudentById);
+// 🚀 FIXED: Matches frontend API.get(`/students/admin/${id}`)
+router.get("/admin/:id", requirePermission("view_students"), getAdminStudentById);
+
+// ----- WRITE OPERATIONS -----
+router.post(
+  "/create", 
+  requirePermission("add_student"), 
+  upload.single("photo"), 
+  validate(studentCreateSchema), 
+  addStudent
+);
+
+// 🚀 FIXED: Matches frontend API.put(`/students/update/${id}`)
+router.put(
+  "/update/:id", 
+  requirePermission("edit_student"), 
+  upload.single("photo"), 
+  validate(studentUpdateSchema), 
+  updateStudent
+);
+
+// ----- STATUS & MEDIA -----
+// 🚀 FIXED: Matches frontend API.patch(`/students/toggle-status/${id}`)
+router.patch("/toggle-status/:id", requirePermission("edit_student"), toggleStudentStatus);
+
+// 🚀 FIXED: Matches frontend API.delete(`/students/remove-image/${id}`)
+router.delete("/remove-image/:id", requirePermission("edit_student"), removeStudentImage);
+
+// ----- DELETE OPERATIONS -----
+// 🚀 FIXED: Matches frontend API.delete(`/students/delete/${id}`)
+router.delete("/delete/:id", requirePermission("delete_student"), deleteStudent);
+
+// Add these to your existing student.routes.js
+router.post("/:studentId/comments", verifyToken, requirePermission("add_comment"), addComment);
+router.get("/:studentId/comments", verifyToken, requirePermission("view_students"), getStudentComments);
 
 export default router;

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { X, Shield, CheckSquare, Square } from "lucide-react";
 import { useCreateRole, useUpdateRole } from "../../hooks/useRoles";
-import { PERMISSION_MODULES } from "../../utils/permissions";
+// 🚀 FIXED: Import the Array instead of the Object
+import { PERMISSION_MODULES } from "../../utils/permissions"; 
 import Loader from "../Loader";
 
 const RoleModal = ({ isOpen, onClose, roleData = null }) => {
@@ -122,6 +123,7 @@ const RoleModal = ({ isOpen, onClose, roleData = null }) => {
               </h3>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* 🚀 FIXED: Mapping over the UI Array */}
                 {PERMISSION_MODULES.map((mod, idx) => (
                   <div key={idx} className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
                     <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 pb-2 border-b border-slate-200">

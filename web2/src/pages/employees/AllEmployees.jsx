@@ -16,6 +16,7 @@ import DataErrorState from "../../components/common/DataErrorState.jsx";
 import EmployeeFilters from "../../components/Search_filter/EmployeeFilters.jsx";
 import EmployeesTable from "../../components/table/EmployeesTable.jsx";
 import { useBranches } from "../../hooks/useBranches.js";
+import { useRoles } from "../../hooks/useRoles.js";
 
 const INITIAL_FILTERS = {
   branch: "all",
@@ -30,10 +31,18 @@ const AllEmployees = () => {
   const navigate = useNavigate();
   const { authUser } = useAuth();
   const currentUserId = authUser?.id || authUser?._id;
+  const { data: rolesRes } = useRoles(); // 🚀 Fetching roles
+
+  // PBAC DYNAMIC SECURITY CHECKS
+  const isMaster =
+    authUser?.permissions?.includes("all_access") ||
+    authUser?.role === "superadmin" ||
+    authUser?.role?.name === "superadmin";
+  const canAddEmployee = isMaster || authUser?.permissions?.includes("add_employee");
 
   // GATEKEEPER CONTEXT
-  const context = useOutletContext() || {}; 
-  const { branchId } = context; 
+  const context = useOutletContext() || {};
+  const { branchId } = context;
 
   const { data: branchesRes } = useBranches();
 
@@ -52,7 +61,8 @@ const AllEmployees = () => {
   const queryFilters = useMemo(() => {
     const activeFilters = { ...filters };
 
-    if (authUser?.role !== "superadmin") {
+    // PBAC GATE: Branch Isolation
+    if (!isMaster) {
       activeFilters.branch = branchId;
     } else {
       if (activeFilters.branch === "all") delete activeFilters.branch;
@@ -69,12 +79,17 @@ const AllEmployees = () => {
     });
 
     return activeFilters;
-  }, [filters, debouncedSearch, branchId, authUser?.role]);
+  }, [filters, debouncedSearch, branchId, isMaster]);
 
-  const { data, isLoading, error, refetch, isRefetching } = useUsers(page, limit, queryFilters, {
-    enabled: authUser?.role === "superadmin" ? true : !!branchId 
-  });
-  
+  const { data, isLoading, error, refetch, isRefetching } = useUsers(
+    page,
+    limit,
+    queryFilters,
+    {
+      enabled: isMaster ? true : !!branchId,
+    },
+  );
+
   const deleteUserMutation = useDeleteUser();
   const updateStatusMutation = useUpdateUserStatus();
   const updateRoleMutation = useUpdateUserRole();
@@ -84,9 +99,9 @@ const AllEmployees = () => {
 
   const combinedFilterOptions = useMemo(() => {
     return {
-      branches: authUser?.role === "superadmin" ? (branchesRes?.data || []) : []
+      branches: isMaster ? branchesRes?.data || [] : [],
     };
-  }, [branchesRes?.data, authUser?.role]);
+  }, [branchesRes?.data, isMaster]);
 
   useEffect(() => {
     setPage(1);
@@ -108,7 +123,12 @@ const AllEmployees = () => {
     updateRoleMutation.mutate({ id, role: newRole });
   };
 
-  if (authUser?.role !== "superadmin" && !branchId) return <div className="p-6"><TableSkeleton rows={8} /></div>;
+  if (!isMaster && !branchId)
+    return (
+      <div className="p-6">
+        <TableSkeleton rows={8} />
+      </div>
+    );
 
   return (
     <div className="p-6 max-w-[1600px] mx-auto min-h-screen relative">
@@ -118,7 +138,7 @@ const AllEmployees = () => {
         showExport={true}
         disableExport={isLoading || employees.length === 0}
         onExport={() => { /* handleExport */ }}
-        onAdd={() => navigate("/admin/add-employee")}
+        onAdd={canAddEmployee ? () => navigate("/admin/add-employee") : null}
         addText="Add Employee"
       />
 
@@ -127,7 +147,7 @@ const AllEmployees = () => {
           searchTerm={searchTerm}
           onSearchChange={setSearchTerm}
           onFilterChange={setFilters}
-          filterOptions={combinedFilterOptions} 
+          filterOptions={combinedFilterOptions}
           initialFilters={INITIAL_FILTERS}
           isLoading={isLoading}
         />
@@ -142,8 +162,13 @@ const AllEmployees = () => {
           ) : (
             <EmployeesTable
               employees={employees}
+              roles={rolesRes?.data || []} // 🚀 Pasing roles array to Table
               currentUserId={currentUserId}
-              currentUserRole={authUser?.role} // 🚀 CRITICAL FIX: Passed the role down!
+              currentUserRole={
+                typeof authUser?.role === "string"
+                  ? authUser.role
+                  : authUser?.role?.name
+              }
               pagination={pagination}
               onDelete={handleDelete}
               onToggleStatus={handleToggleStatus}
@@ -153,7 +178,11 @@ const AllEmployees = () => {
               onEdit={(id) => navigate(`/admin/update-employee/${id}`)}
               deleteLoading={deleteUserMutation.isPending}
               toggleLoading={updateStatusMutation.isPending}
-              roleLoadingId={updateRoleMutation.isPending ? updateRoleMutation.variables?.id : null}
+              roleLoadingId={
+                updateRoleMutation.isPending
+                  ? updateRoleMutation.variables?.id
+                  : null
+              }
               page={page}
               onPageChange={setPage}
               searchTerm={debouncedSearch}

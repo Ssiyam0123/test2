@@ -1,12 +1,9 @@
 import React, { Suspense, useEffect, useState, useMemo } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { useStudents, useDeleteStudent, useToggleStudentStatus } from "../../hooks/useStudents.js";
-
-// FINANCE INTEGRATION
 import { useBatches } from "../../hooks/useBatches.js"; 
 import { useActiveCourses } from "../../hooks/useCourses.js";
 import { useBranches } from "../../hooks/useBranches.js"; 
-
 import { useConfirmToast } from "../../components/ConfirmToast.jsx";
 import StudentFilters from "../../components/Search_filter/StudentFilters.jsx";
 import QRCodeModal from "../../components/modal/QRCodeModal.jsx";
@@ -19,18 +16,11 @@ import CommentModal from "../../components/modal/CommentModal.jsx";
 
 const StudentsTable = React.lazy(() => import("../../components/table/StudentsTable.jsx"));
 
-// ==========================================
-// ROLE-BASED ACCESS ARRAYS
-// ==========================================
-const IS_SUPERADMIN = ["superadmin"];
-const CAN_ADD_STUDENT = ["superadmin", "admin", "registrar"];
-
 const INITIAL_FILTERS = {
   branch: "all",
   status: "all", 
   batch: "all", 
   course: "all", 
-  competency: "all",
   is_active: "all", 
   is_verified: "all", 
   date_from: "", 
@@ -42,35 +32,36 @@ const AllStudents = () => {
   const { showConfirmToast } = useConfirmToast();
   const { authUser } = useAuth();
   
+  // 🚀 GATEKEEPER CONTEXT (From AdminLayout)
   const context = useOutletContext() || {}; 
-  const { branchId } = context; 
+  const branchId = context.branchId || authUser?.branch?._id || authUser?.branch; 
 
   const [filters, setFilters] = useState(INITIAL_FILTERS);
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(1);
-  
-  // MODAL STATES
   const [selectedStudentForQr, setSelectedStudentForQr] = useState(null);
   const [selectedStudentForComment, setSelectedStudentForComment] = useState(null);
   const [paymentData, setPaymentData] = useState(null); 
   
   const limit = 20;
 
-  // Role booleans for cleaner ternary checks
-  const isSuperadmin = IS_SUPERADMIN.includes(authUser?.role);
-  const canAddStudent = CAN_ADD_STUDENT.includes(authUser?.role);
+  // 🚀 PBAC DYNAMIC SECURITY CHECKS
+  const permissions = authUser?.role?.permissions || authUser?.permissions || [];
+  const roleName = (typeof authUser?.role === 'string' ? authUser.role : authUser?.role?.name || "").toLowerCase();
+  
+  const isMaster = roleName === "superadmin" || permissions.includes("all_access");
+  const canAddStudent = isMaster || permissions.includes("add_student");
 
+  // Determine which branch ID to use for fetching dropdowns
   const effectiveBranchId = useMemo(() => {
-    if (isSuperadmin) {
-      return filters.branch === "all" ? null : filters.branch; 
-    }
+    if (isMaster) return filters.branch === "all" ? null : filters.branch; 
     return branchId;
-  }, [isSuperadmin, filters.branch, branchId]);
+  }, [isMaster, filters.branch, branchId]);
 
   const { data: batchesRes } = useBatches(effectiveBranchId ? { branch: effectiveBranchId } : {});
-  const { data: coursesRes } = useActiveCourses(effectiveBranchId ? { branch: effectiveBranchId } : {});
-  const { data: branchesRes } = useBranches(); 
+  const { data: coursesRes } = useActiveCourses();
+  const { data: branchesRes } = useBranches({}, { enabled: isMaster }); 
   
   useEffect(() => {
     const handler = setTimeout(() => setDebouncedSearch(searchTerm), 500);
@@ -79,7 +70,9 @@ const AllStudents = () => {
 
   const queryFilters = useMemo(() => {
     const activeFilters = { ...filters };
-    if (!isSuperadmin) {
+    
+    // 🚀 PBAC GATE: Branch Isolation
+    if (!isMaster) {
       activeFilters.branch = branchId; 
     } else if (activeFilters.branch === "all") {
       delete activeFilters.branch;
@@ -88,56 +81,55 @@ const AllStudents = () => {
     if (debouncedSearch) activeFilters.search = debouncedSearch;
     
     Object.keys(activeFilters).forEach(key => {
-      if (activeFilters[key] === "all") delete activeFilters[key];
+      if (activeFilters[key] === "all" || activeFilters[key] === "") delete activeFilters[key];
     });
     
     return activeFilters;
-  }, [filters, debouncedSearch, branchId, isSuperadmin]);
+  }, [filters, debouncedSearch, branchId, isMaster]);
 
-  const { data, isLoading, error, refetch, isRefetching } = useStudents(page, limit, queryFilters, {
-    enabled: isSuperadmin ? true : !!branchId 
-  });
+  // 🚀 FETCH STUDENTS (Only if branch is ready for non-admins)
+  const { data, isLoading, error, refetch, isRefetching } = useStudents(
+    page, 
+    limit, 
+    queryFilters,
+    { enabled: isMaster ? true : !!branchId } // Prevent premature fetching
+  );
 
-  const combinedFilterOptions = useMemo(() => {
-    return {
-      batches: batchesRes?.data || [],
-      courses: coursesRes?.data || [],
-      branches: isSuperadmin ? (branchesRes?.data || []) : []
-    };
-  }, [batchesRes, coursesRes, branchesRes, isSuperadmin]);
+  const combinedFilterOptions = useMemo(() => ({
+    batches: batchesRes?.data || [],
+    courses: coursesRes?.data || [],
+    branches: isMaster ? branchesRes?.data || [] : []
+  }), [batchesRes, coursesRes, branchesRes, isMaster]);
 
   const deleteStudentMutation = useDeleteStudent();
   const toggleStatusMutation = useToggleStudentStatus();
 
-  const handleDelete = (id, studentName) => {
-    showConfirmToast({
-      type: "delete", title: "Delete Student",
-      message: `Are you sure you want to permanently delete`,
-      itemName: studentName, confirmText: "Delete", confirmColor: "red",
-      onConfirm: async () => await deleteStudentMutation.mutateAsync(id),
-    });
-  };
+  // Reset page to 1 when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [queryFilters]);
 
-  if (!isSuperadmin && !branchId) return <div className="p-6"><TableSkeleton rows={8} /></div>;
   if (error) return <DataErrorState error={error} onRetry={refetch} isRetrying={isRefetching} />;
+
+  // Prevent UI rendering crash before branch logic resolves
+  if (!isMaster && !branchId) return <div className="p-6"><TableSkeleton rows={8} /></div>;
 
   return (
     <div className="p-6 max-w-[1600px] mx-auto min-h-screen">
       <PageHeader 
         title="Student Directory" 
-        subtitle="Manage academic and financial records." 
-        // RBAC applied to the Add button logic
+        subtitle={`Viewing ${isMaster ? 'All Campuses' : 'Your Campus'} Records`} 
         onAdd={canAddStudent ? () => navigate("/admin/add-student") : undefined} 
         addText={canAddStudent ? "Add Student" : undefined} 
       />
-      
+
       <div className="mb-6">
         <StudentFilters 
           onFilterChange={setFilters} 
           searchTerm={searchTerm} 
           onSearchChange={setSearchTerm}
           filterOptions={combinedFilterOptions} 
-          initialFilters={filters} 
+          initialFilters={INITIAL_FILTERS} 
           isLoading={isLoading} 
         />
       </div>
@@ -148,43 +140,29 @@ const AllStudents = () => {
             students={data?.data || []} 
             currentUser={authUser} 
             pagination={data?.pagination}
-            onDelete={handleDelete} 
+            onDelete={(id, name) => showConfirmToast({
+              type: "delete", title: "Delete", message: `Delete ${name}?`,
+              onConfirm: () => deleteStudentMutation.mutate(id)
+            })} 
             onToggleStatus={(id) => toggleStatusMutation.mutate(id)}
             onGenerateQR={setSelectedStudentForQr} 
             onAddComment={setSelectedStudentForComment}
-            onPay={(student) => setPaymentData({
-              studentId: student._id,
-              studentName: student.student_name
-            })}
+            onPay={(student) => setPaymentData({ studentId: student._id, studentName: student.student_name })}
             onEdit={(id) => navigate(`/admin/update-student/${id}`)}
             page={page} 
             onPageChange={setPage} 
             searchTerm={debouncedSearch}
+            isLoading={isLoading || isRefetching}
+            deleteLoading={deleteStudentMutation.isPending}
+            toggleLoading={toggleStatusMutation.isPending}
           />
         )}
       </Suspense>
 
-      {selectedStudentForQr && (
-        <QRCodeModal 
-          student={selectedStudentForQr} 
-          onClose={() => setSelectedStudentForQr(null)} 
-        />
-      )}
-      
-      {selectedStudentForComment && (
-        <CommentModal 
-          student={selectedStudentForComment} 
-          onClose={() => setSelectedStudentForComment(null)} 
-        />
-      )}
-
+      {selectedStudentForQr && <QRCodeModal student={selectedStudentForQr} onClose={() => setSelectedStudentForQr(null)} />}
+      {selectedStudentForComment && <CommentModal student={selectedStudentForComment} onClose={() => setSelectedStudentForComment(null)} />}
       {paymentData && (
-        <CollectPaymentModal
-          isOpen={!!paymentData}
-          onClose={() => setPaymentData(null)}
-          studentId={paymentData.studentId}
-          studentName={paymentData.studentName}
-        />
+        <CollectPaymentModal isOpen={!!paymentData} onClose={() => setPaymentData(null)} studentId={paymentData.studentId} studentName={paymentData.studentName} />
       )}
     </div>
   );

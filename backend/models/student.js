@@ -61,7 +61,11 @@ const studentSchema = new mongoose.Schema(
       index: true, // Crucial for performance as DB grows
     },
   },
-  { timestamps: true },
+  {
+    timestamps: true,
+    toJSON: { virtuals: true }, // 🚀 এই দুইটা লাইন মাস্ট অ্যাড করবি
+    toObject: { virtuals: true },
+  },
 );
 
 // Performance Indexes

@@ -5,6 +5,7 @@ import EntityForm from "../../components/common/EntityForm";
 import Loader from "../../components/Loader";
 import { Check, ChevronDown, Plus } from "lucide-react";
 import toast from "react-hot-toast";
+import useAuth from "../../store/useAuth"; // 🚀 Added for any future role-based form constraints
 
 const additionalInfoOptions = [
   { value: "haccp&hygiene", label: "HACCP & Hygiene" },
@@ -15,6 +16,7 @@ const additionalInfoOptions = [
 const AddCourse = ({ mode = "add" }) => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { authUser } = useAuth(); // 🚀 Extract auth user
   
   const createCourse = useCreateCourse();
   const updateCourse = useUpdateCourse();

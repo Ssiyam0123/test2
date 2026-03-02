@@ -1,6 +1,12 @@
 import User from "../models/user.js";
+import Role from "../models/role.js"; // 🚀 Added Role Model for dynamic checks
 import { deleteLocalFile } from "../middlewares/multer.js";
 import { generateEmployeeId } from "../lib/utils.js";
+
+// Helper to check if the current admin has Master Key access
+const checkIsMaster = (user) => {
+  return user.role?.permissions?.includes("all_access") || user.role?.name === "superadmin";
+};
 
 // ==========================================
 // READ: MULTI-TENANT FETCH
@@ -13,28 +19,16 @@ export const getAllUsers = async (req, res) => {
       status, 
       role, 
       department,
-      branch, 
       date_from, 
       date_to, 
       search 
     } = req.query;
 
-    let query = {};
-
-    // 1. THE SECURITY GATE: Branch Isolation
-    if (req.user.role === "superadmin") {
-      // Superadmins can see all, OR filter by the branch passed in the query
-      if (branch && branch !== "all") {
-        query.branch = branch;
-      }
-    } else {
-      // Branch Admins are locked to their own branch permanently
-      query.branch = req.user.branch;
-    }
+    let query = { ...req.branchFilter };
 
     // 2. Standard Filters
     if (status && status !== "all") query.status = status;
-    if (role && role !== "all") query.role = role;
+    if (role && role !== "all") query.role = role; 
     if (department && department !== "all") query.department = department;
 
     // 3. Date Range
@@ -56,9 +50,9 @@ export const getAllUsers = async (req, res) => {
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    // 5. Execute with Pagination
     const users = await User.find(query)
       .populate("branch", "branch_name branch_code")
+      .populate("role", "name is_system_role permissions") 
       .skip(skip)
       .limit(parseInt(limit))
       .sort({ createdAt: -1 });
@@ -85,6 +79,23 @@ export const getAllUsers = async (req, res) => {
 export const addUser = async (req, res) => {
   try {
     const userData = { ...req.body };
+    const isMaster = checkIsMaster(req.user);
+
+    // Fetch the requested role to prevent privilege escalation
+    const requestedRole = await Role.findById(userData.role);
+    if (!requestedRole) {
+      return res.status(400).json({ success: false, message: "Invalid role selected." });
+    }
+
+    // SECURITY OVERRIDE: Branch Isolation & Escalation
+    if (!isMaster) {
+      userData.branch = req.user.branch;
+      
+      // Prevent Branch Admins from creating users with "all_access" (Superadmins)
+      if (requestedRole.permissions.includes("all_access") || requestedRole.name === "superadmin") {
+        return res.status(403).json({ success: false, message: "Action blocked: You cannot create a Master level account." });
+      }
+    }
 
     // File Upload Handling
     if (req.file) {
@@ -92,7 +103,7 @@ export const addUser = async (req, res) => {
     }
 
     // Generate ID
-    const baseId = await generateEmployeeId(userData.role);
+    const baseId = await generateEmployeeId(requestedRole.name);
     userData.employee_id = baseId;
 
     // SOCIAL LINKS NESTING FIX
@@ -103,16 +114,6 @@ export const addUser = async (req, res) => {
       instagram: req.body.instagram || "",
       custom: req.body.others || "",
     };
-
-    // SECURITY OVERRIDE: Branch Isolation
-    if (req.user.role !== "superadmin") {
-      userData.branch = req.user.branch;
-      
-      // Prevent Branch Admins from creating Superadmins
-      if (userData.role === "superadmin") {
-        return res.status(403).json({ success: false, message: "Cannot create a superadmin account." });
-      }
-    }
 
     const newUser = new User(userData);
     await newUser.save();
@@ -127,29 +128,41 @@ export const addUser = async (req, res) => {
 // ==========================================
 // WRITE: MULTI-TENANT UPDATE
 // ==========================================
+// ==========================================
+// WRITE: MULTI-TENANT UPDATE
+// ==========================================
 export const updateUser = async (req, res) => {
   try {
     const { id } = req.params;
     const updateData = { ...req.body };
+    const isMaster = checkIsMaster(req.user);
 
     // 1. Fetch target user to ensure they exist and check permissions
     const targetUser = await User.findById(id);
     if (!targetUser) return res.status(404).json({ success: false, message: "User not found" });
 
     // 2. SECURITY GATE: Can this admin edit this user?
-    if (req.user.role !== "superadmin") {
+    if (!isMaster) {
       // A branch admin cannot edit a user from another branch
       if (targetUser.branch.toString() !== req.user.branch.toString()) {
-        return res.status(403).json({ success: false, message: "Access denied to this branch's data." });
+        return res.status(403).json({ success: false, message: "Access denied to this campus's data." });
       }
       
-      // A branch admin cannot elevate someone to superadmin
-      if (updateData.role === "superadmin") {
-        return res.status(403).json({ success: false, message: "Cannot elevate role to superadmin." });
+      // If changing roles, a branch admin cannot elevate someone to superadmin
+      if (updateData.role && updateData.role.toString() !== targetUser.role.toString()) {
+        const requestedRole = await Role.findById(updateData.role);
+        if (requestedRole && (requestedRole.permissions.includes("all_access") || requestedRole.name === "superadmin")) {
+          return res.status(403).json({ success: false, message: "Action blocked: Cannot elevate role to Master level." });
+        }
       }
 
-      // Force the branch ID to remain the admin's branch (prevents transferring users)
+      // Force the branch ID to remain the admin's branch (prevents unauthorized transfers)
       updateData.branch = req.user.branch;
+    }
+
+    // 🚀 FIX 1: Prevent overwriting password with a blank string
+    if (!updateData.password || updateData.password.trim() === "") {
+      delete updateData.password;
     }
 
     // 3. Social Links & Photos
@@ -165,11 +178,15 @@ export const updateUser = async (req, res) => {
       custom: req.body.others || targetUser.social_links?.custom || "",
     };
 
-    // 4. Update
-    const updatedUser = await User.findByIdAndUpdate(id, updateData, { new: true })
-      .populate("branch", "branch_name branch_code");
+    // 🚀 FIX 2: Use Object.assign and .save() to trigger the password hashing hook
+    Object.assign(targetUser, updateData);
+    await targetUser.save(); // This is the magic line that hashes the password
 
-    res.status(200).json({ success: true, data: updatedUser });
+    // Populate data before returning
+    await targetUser.populate("branch", "branch_name branch_code");
+    await targetUser.populate("role", "name is_system_role permissions");
+
+    res.status(200).json({ success: true, data: targetUser });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -181,12 +198,13 @@ export const updateUser = async (req, res) => {
 export const deleteUser = async (req, res) => {
   try {
     const { id } = req.params;
+    const isMaster = checkIsMaster(req.user);
     
     const targetUser = await User.findById(id);
     if (!targetUser) return res.status(404).json({ success: false, message: "User not found" });
 
     // SECURITY GATE
-    if (req.user.role !== "superadmin" && targetUser.branch.toString() !== req.user.branch.toString()) {
+    if (!isMaster && targetUser.branch.toString() !== req.user.branch.toString()) {
       return res.status(403).json({ success: false, message: "Access denied." });
     }
 
@@ -197,25 +215,45 @@ export const deleteUser = async (req, res) => {
   }
 };
 
-// ... keep your getUserById, updateUserStatus, updateUserRole, and removeUserImage functions, 
-// but make sure to add the `if (req.user.role !== "superadmin" && targetUser.branch.toString() !== req.user.branch.toString())` check to them as well!
-
+// ==========================================
+// GET USER BY ID
+// ==========================================
 export const getUserById = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id).select("-password");
+    const user = await User.findById(req.params.id)
+      .select("-password")
+      .populate("branch", "branch_name branch_code")
+      .populate("role", "name is_system_role permissions"); // 🚀 PBAC Populate
+
     if (!user) return res.status(404).json({ message: "User not found" });
+
+    // Security Gate: Standard admins can't peek into other branches
+    const isMaster = checkIsMaster(req.user);
+    if (!isMaster && user.branch._id.toString() !== req.user.branch.toString()) {
+      return res.status(403).json({ success: false, message: "Access denied." });
+    }
+
     res.status(200).json(user);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
+// ==========================================
+// UPDATE STATUS
+// ==========================================
 export const updateUserStatus = async (req, res) => {
   try {
     const { status } = req.body;
     const user = await User.findById(req.params.id).select("-password");
 
     if (!user) return res.status(404).json({ message: "User not found" });
+
+    // Security Gate
+    const isMaster = checkIsMaster(req.user);
+    if (!isMaster && user.branch.toString() !== req.user.branch.toString()) {
+      return res.status(403).json({ success: false, message: "Access denied." });
+    }
 
     const validStatuses = ['Active', 'On Leave', 'Resigned'];
     if (!validStatuses.includes(status)) return res.status(400).json({ message: "Invalid status provided" });
@@ -229,10 +267,19 @@ export const updateUserStatus = async (req, res) => {
   }
 };
 
+// ==========================================
+// REMOVE IMAGE
+// ==========================================
 export const removeUserImage = async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select("-password");
     if (!user) return res.status(404).json({ message: "User not found" });
+
+    // Security Gate
+    const isMaster = checkIsMaster(req.user);
+    if (!isMaster && user.branch.toString() !== req.user.branch.toString()) {
+      return res.status(403).json({ success: false, message: "Access denied." });
+    }
 
     if (user.photo_url) deleteLocalFile(user.photo_url);
 
@@ -245,19 +292,30 @@ export const removeUserImage = async (req, res) => {
   }
 };
 
+// ==========================================
+// SEARCH USER
+// ==========================================
 export const searchUser = async (req, res) => {
   try {
     const { query } = req.query;
     if (!query || query.trim() === "") return res.status(400).json({ message: "Search query is required" });
 
-    const users = await User.find({
+    const searchCriteria = {
+      ...req.branchFilter, // 🚀 Uses middleware branch isolation
       $or: [
         { employee_id: { $regex: query.trim(), $options: "i" } },
         { full_name: { $regex: query.trim(), $options: "i" } },
         { email: { $regex: query.trim(), $options: "i" } },
         { username: { $regex: query.trim(), $options: "i" } },
       ],
-    }).select("-password").sort({ createdAt: -1 }).limit(20);
+    };
+
+    const users = await User.find(searchCriteria)
+      .select("-password")
+      .populate("branch", "branch_name branch_code")
+      .populate("role", "name")
+      .sort({ createdAt: -1 })
+      .limit(20);
 
     res.status(200).json({ message: "Search completed", data: users, count: users.length });
   } catch (error) {
@@ -265,18 +323,39 @@ export const searchUser = async (req, res) => {
   }
 };
 
+// ==========================================
+// QUICK ROLE UPDATE
+// ==========================================
 export const updateUserRole = async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ message: "User not found" });
 
+    const isMaster = checkIsMaster(req.user);
+
+    // Security Gate
+    if (!isMaster && user.branch.toString() !== req.user.branch.toString()) {
+      return res.status(403).json({ success: false, message: "Access denied." });
+    }
+
+    // Verify role isn't elevated to Master
+    const requestedRole = await Role.findById(req.body.role);
+    if (!requestedRole) return res.status(400).json({ message: "Invalid role selected." });
+
+    if (!isMaster && (requestedRole.permissions.includes("all_access") || requestedRole.name === "superadmin")) {
+      return res.status(403).json({ success: false, message: "Action blocked: Cannot elevate role to Master level." });
+    }
+
     user.role = req.body.role;
     await user.save();
+
+    // Populate before returning
+    await user.populate("role", "name permissions");
 
     const userResponse = user.toObject();
     delete userResponse.password;
 
-    res.json({ message: `Role successfully updated to ${req.body.role.toUpperCase()}`, user: userResponse });
+    res.json({ message: `Role successfully updated to ${requestedRole.name.toUpperCase()}`, user: userResponse });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

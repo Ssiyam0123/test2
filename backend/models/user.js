@@ -43,9 +43,7 @@ const userSchema = new mongoose.Schema(
     branch: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Branch",
-      required: function () {
-        return this.role !== "superadmin";
-      },
+      required: true, 
       index: true,
     },
     social_links: {

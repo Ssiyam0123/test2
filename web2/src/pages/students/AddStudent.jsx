@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom"; 
 import { useAddStudent, useUpdateStudent } from "../../hooks/useStudents.js";
 import { useActiveCourses } from "../../hooks/useCourses.js";
@@ -7,11 +7,6 @@ import { useBranches } from "../../hooks/useBranches.js";
 import useAuth from "../../store/useAuth"; 
 import Loader from "../../components/Loader.jsx";
 import EntityForm from "../../components/common/EntityForm.jsx";
-
-// ==========================================
-// ROLE-BASED ACCESS ARRAYS
-// ==========================================
-const CAN_CHANGE_CAMPUS = ["superadmin"];
 
 // Utility to extract course details for payload
 const buildStudentPayload = (baseFormData, jsonPayload, coursesData) => {
@@ -40,16 +35,31 @@ const AddStudentForm = ({ mode = "add", data = null }) => {
   const context = useOutletContext() || {};
   const { branchId } = context;
 
-  // Fetch contextual data based on active branch
-  const { data: coursesData, isLoading: coursesLoading, error: coursesError } = useActiveCourses({ branch: branchId });
-  const { data: batchesData, isLoading: batchesLoading, error: batchesError } = useBatches({ branch: branchId });
+  // PBAC MASTER CHECK
+  const roleName = typeof authUser?.role === 'string' ? authUser.role : authUser?.role?.name;
+  const isMaster = roleName === "superadmin" || authUser?.permissions?.includes("all_access");
+
+  // 🚀 1. Local State: ফর্মে কোন ব্রাঞ্চ সিলেক্ট করা আছে সেটা ট্র্যাক করা
+  const [selectedBranch, setSelectedBranch] = useState(
+    data?.branch?._id || data?.branch || branchId
+  );
+
+  // 🚀 2. Sync State: যদি টপ-ন্যাভবার থেকে ব্রাঞ্চ চেঞ্জ করা হয় (শুধু অ্যাড মোডে)
+  useEffect(() => {
+    if (mode === "add" && branchId) {
+      setSelectedBranch(branchId);
+    }
+  }, [branchId, mode]);
+
+  // 🚀 3. Dynamic Fetching: ফর্মে সিলেক্ট করা ব্রাঞ্চের উপর ভিত্তি করে API কল হবে
+  const queryFilter = selectedBranch ? { branch: selectedBranch } : {};
+  
+  const { data: coursesData, isLoading: coursesLoading, error: coursesError } = useActiveCourses(queryFilter);
+  const { data: batchesData, isLoading: batchesLoading, error: batchesError } = useBatches(queryFilter);
   const { data: branchesResponse } = useBranches(); 
   
   const addStudentMutation = useAddStudent();
   const editStudentMutation = useUpdateStudent();
-
-  // Security Boolean
-  const canChangeCampus = CAN_CHANGE_CAMPUS.includes(authUser?.role);
 
   // ==========================================
   // OPTIONS BUILDERS
@@ -57,9 +67,8 @@ const AddStudentForm = ({ mode = "add", data = null }) => {
   const branchOptions = useMemo(() => {
     if (!branchesResponse?.data) return [];
     
-    // If Admin/Registrar, ONLY show their specific branch in the dropdown visually
     let availableBranches = branchesResponse.data;
-    if (!canChangeCampus && branchId) {
+    if (!isMaster && branchId) {
       availableBranches = availableBranches.filter(b => b._id === branchId);
     }
 
@@ -67,7 +76,7 @@ const AddStudentForm = ({ mode = "add", data = null }) => {
       value: b._id, 
       label: `${b.branch_name} (${b.branch_code})` 
     }));
-  }, [branchesResponse, canChangeCampus, branchId]);
+  }, [branchesResponse, isMaster, branchId]);
 
   const courseOptions = useMemo(() => {
     const activeCourses = coursesData?.data || [];
@@ -83,7 +92,7 @@ const AddStudentForm = ({ mode = "add", data = null }) => {
   }, [batchesData]);
 
   // ==========================================
-  // INITIAL DATA (WITH TODAY'S DATE DEFAULT)
+  // INITIAL DATA
   // ==========================================
   const today = new Date().toISOString().split("T")[0];
 
@@ -97,10 +106,10 @@ const AddStudentForm = ({ mode = "add", data = null }) => {
   } : {
     student_name: "", fathers_name: "", student_id: "", registration_number: "",
     gender: "male", course: "", competency: "not_assessed", batch: "", status: "active",
-    issue_date: today, // 🚀 Defaulted to Today's Date
+    issue_date: today, 
     completion_date: "", contact_number: "", email: "", address: "",
     is_active: true, is_verified: false,
-    branch: branchId // Pre-fills with the active Gatekeeper branch
+    branch: selectedBranch // 🚀 Default fallback to selected state
   };
 
   // ==========================================
@@ -118,11 +127,16 @@ const AddStudentForm = ({ mode = "add", data = null }) => {
     // 🚀 DYNAMIC CAMPUS FIELD
     { 
       name: "branch", 
-      label: canChangeCampus ? "Assigned Campus" : "Assigned Campus (Locked)", 
+      label: isMaster ? "Assigned Campus" : "Assigned Campus (Locked)", 
       type: "select", 
       options: branchOptions, 
       required: true,
-      disabled: !canChangeCampus // Disables interaction for non-superadmins
+      disabled: !isMaster,
+      onChange: (e) => {
+        // ফর্মে ব্রাঞ্চ চেঞ্জ করলেই স্টেট আপডেট হয়ে নতুন ব্যাচ/কোর্স লোড হবে
+        const val = e?.target ? e.target.value : e;
+        setSelectedBranch(val);
+      }
     },
 
     { name: "student_id", label: "Student ID", required: true },
@@ -155,12 +169,11 @@ const AddStudentForm = ({ mode = "add", data = null }) => {
   const handleSubmit = (formData, jsonPayload) => {
     const finalPayload = buildStudentPayload(formData, jsonPayload, coursesData);
     
-    // 🚀 THE SECURITY LOCK
-    // Double-check: If they somehow bypassed the disabled HTML attribute, force it back.
-    if (!canChangeCampus && branchId) {
+    // SECURITY LOCK
+    if (!isMaster && branchId) {
       finalPayload.set("branch", branchId);
-    } else if (!finalPayload.get("branch") && branchId) {
-      finalPayload.set("branch", branchId); // Fallback mapping
+    } else if (!finalPayload.get("branch") && selectedBranch) {
+      finalPayload.set("branch", selectedBranch);
     }
 
     const mutationConfig = { onSuccess: () => navigate("/admin/all-students") };

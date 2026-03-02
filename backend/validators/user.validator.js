@@ -15,8 +15,9 @@ export const userCreateSchema = Joi.object({
   phone: Joi.string().required(),
   designation: Joi.string().allow(""),
   department: Joi.string().allow(""),
+  
   branch: objectId.required(),
-  role: Joi.string().valid("admin", "instructor", "register", "staff", "user").default("user"),
+  role: objectId.required(),
   
   // Flat social links from the frontend
   facebook: Joi.string().allow("").optional(),
@@ -30,7 +31,7 @@ export const userCreateSchema = Joi.object({
 }).unknown(true); // Allows div-basic, div-job, etc. to pass without crashing
 
 
-export const userUpdateSchema = Joi.object({
+export const updateUserSchema = Joi.object({
   full_name: Joi.string().pattern(nameRegex).messages({
     "string.pattern.base": "Invalid name format. Only letters, spaces, hyphens, and dots allowed."
   }),
@@ -40,8 +41,12 @@ export const userUpdateSchema = Joi.object({
   designation: Joi.string().allow(""),
   department: Joi.string().allow(""),
   status: Joi.string().valid("Active", "On Leave", "Resigned"),
-  role: Joi.string().valid("superadmin","admin", "instructor", "register", "staff", "user"),
+  
   branch: objectId,
+  
+  // 🚀 PBAC FIX: Allow ObjectId updates for roles
+  role: objectId,
+  
   employee_id: Joi.string().allow("").optional(),
   joining_date: Joi.date().allow("").optional(),
   
@@ -58,10 +63,13 @@ export const userUpdateSchema = Joi.object({
 
 
 export const roleUpdateSchema = Joi.object({
-  role: Joi.string().valid("admin", "instructor", "register", "staff", "user").required()
+  // 🚀 PBAC FIX: Role updates via UI dropdown must send a valid MongoDB ObjectId
+  role: objectId.required()
 });
 
 export const loginSchema = Joi.object({
-  email: Joi.string().email().required(),
+  // Allow the frontend to send either email or username
+  email: Joi.string().email().optional(),
+  username: Joi.string().optional(),
   password: Joi.string().required()
-});
+}).or('email', 'username'); // Joi rule: At least one of these two MUST be provided

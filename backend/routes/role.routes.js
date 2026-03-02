@@ -2,17 +2,17 @@ import express from "express";
 import { createRole, getRoles, getRoleById, updateRole, deleteRole } from "../controllers/role.controller.js";
 import { createRoleSchema, updateRoleSchema } from "../validators/role.validator.js";
 import { validate } from "../middlewares/validate.js";
-import { verifyToken, requirePermission } from "../middlewares/auth.js"; // You'll create requirePermission next!
+import { verifyToken, requirePermission } from "../middlewares/auth.js";
 
 const router = express.Router();
 
-// Only Superadmins (or people with manage_roles permission) can hit these routes
 router.use(verifyToken);
 
-router.post("/", validate(createRoleSchema), createRole);
-router.get("/", getRoles);
-router.get("/:id", getRoleById);
-router.put("/:id", validate(updateRoleSchema), updateRole);
-router.delete("/:id", deleteRole);
+// All role management requires the "manage_roles" permission
+router.post("/", requirePermission("manage_roles"), validate(createRoleSchema), createRole);
+router.get("/", requirePermission("manage_roles"), getRoles);
+router.get("/:id", requirePermission("manage_roles"), getRoleById);
+router.put("/:id", requirePermission("manage_roles"), validate(updateRoleSchema), updateRole);
+router.delete("/:id", requirePermission("manage_roles"), deleteRole);
 
 export default router;

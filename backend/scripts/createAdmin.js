@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 import User from "../models/user.js";
+import Role from "../models/role.js"; // 🚀 1. IMPORT ROLE MODEL
 
 dotenv.config();
 
@@ -13,7 +14,14 @@ const createAdmin = async () => {
     const adminEmail = "admin@gmail.com";
     const adminUsername = "superadmin";
 
-    // 2. Check for existing account
+    // 🚀 2. FETCH THE SUPERADMIN ROLE FROM THE DATABASE
+    const superAdminRole = await Role.findOne({ name: "superadmin" });
+    if (!superAdminRole) {
+      console.error("❌ Superadmin role not found! Please run 'node scripts/migrateRoles.js' first.");
+      process.exit(1);
+    }
+
+    // 3. Check for existing account
     const existingAdmin = await User.findOne({ 
       $or: [{ email: adminEmail }, { username: adminUsername }] 
     });
@@ -23,21 +31,23 @@ const createAdmin = async () => {
       process.exit();
     }
 
-    // 3. Create the Admin Object with all required User fields
+    // 4. Create the Admin Object
     const admin = new User({
       // Authentication Fields
       username: adminUsername,
       email: adminEmail,
       full_name : "siyam",
       password: "123456", 
-      role: "admin",
-      User_id: "ADM-001",
+      
+      role: superAdminRole._id, // 🚀 3. ASSIGN THE MONGODB OBJECT ID
+      
+      employee_id: "ADM-001",   // Fixed typo: changed from User_id to employee_id to match your schema
       phone: "01700000000",
       designation: "Super Admin",
       department: "Management",
       status: "Active",
       joining_date: new Date(),
-        social_links: {
+      social_links: {
         facebook: "",
         linkedin: "",
         twitter: "",
@@ -45,7 +55,7 @@ const createAdmin = async () => {
       }
     });
 
-    // 4. Save to Database
+    // 5. Save to Database
     await admin.save();
 
     console.log("✅ Admin created successfully!");

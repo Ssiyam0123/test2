@@ -4,13 +4,13 @@ import DataFilters from '../common/DataFilters';
 const EmployeeFilters = ({ 
   searchTerm, 
   onSearchChange, 
-  filterOptions, // NEW PROP
+  filterOptions, // Includes branches and roles now
   onFilterChange, 
   initialFilters = {}, 
   isLoading = false 
 }) => {
   const [filters, setFilters] = useState({
-    branch: "all", // NEW
+    branch: "all", 
     status: "all", 
     department: "all", 
     role: "all", 
@@ -31,7 +31,7 @@ const EmployeeFilters = ({
 
   const clearFilters = () => {
     const cleared = { 
-      branch: "all", // NEW
+      branch: "all", 
       status: "all", 
       department: "all", 
       role: "all", 
@@ -46,7 +46,7 @@ const EmployeeFilters = ({
   const searchConfig = {
     value: searchTerm,
     onChange: onSearchChange,
-    placeholder: "Search by name, username, ID, or email...",
+    placeholder: "Search by name, ID, or email...",
     showButton: false 
   };
 
@@ -80,15 +80,19 @@ const EmployeeFilters = ({
         { value: "Support Staff", label: "Support Staff" }
       ] 
     },
-    { 
-      key: "role", label: "System Role", type: "select", color: "purple",
-      options: [
-        { value: "staff", label: "General Staff" },
-        { value: "instructor", label: "Instructor" },
-        { value: "registrar", label: "Registrar" },
-        { value: "admin", label: "Administrator" }
-      ] 
-    },
+    // 🚀 DYNAMIC ROLE FILTER 
+    ...(filterOptions?.roles?.length > 0 ? [{
+      key: "role", 
+      label: "System Role", 
+      type: "select", 
+      color: "purple",
+      options: filterOptions.roles.map((r) => ({
+        // Search filters need the ObjectId to query the database!
+        value: r._id,
+        label: r.name.charAt(0).toUpperCase() + r.name.slice(1)
+      }))
+    }] : []),
+    
     { key: "date_from", label: "Joining Date From", type: "date", color: "red" },
     { key: "date_to", label: "Joining Date To", type: "date", color: "red" }
   ];

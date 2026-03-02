@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCourses, useDeleteCourse, useToggleCourseStatus } from "../../hooks/useCourses";
+import useAuth from "../../store/useAuth"; // 🚀 Import useAuth for PBAC
+import { PERMISSIONS } from "../../utils/permissions"; // 🚀 Import Permissions Dictionary
 
 // Components
 import CourseFilters from "../../components/Search_filter/CourseFilters";
@@ -14,7 +16,12 @@ import { Edit, Trash2, BookOpen, Hash, Clock, Power, PowerOff } from "lucide-rea
 
 const AllCourses = () => {
   const navigate = useNavigate();
+  const { authUser } = useAuth(); // 🚀 Extract auth user
   
+  // 🚀 PBAC DYNAMIC SECURITY CHECKS
+  const isMaster = authUser?.permissions?.includes("all_access") || authUser?.role === "superadmin" || authUser?.role?.name === "superadmin";
+  const canManageCourses = isMaster || authUser?.permissions?.includes(PERMISSIONS.MANAGE_COURSES);
+
   const [page, setPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -45,12 +52,13 @@ const AllCourses = () => {
 
   if (error) return <DataErrorState error={error} onRetry={refetch} isRetrying={isRefetching} />;
 
+  // 🚀 Dynamically hide the "Actions" column header if the user doesn't have permission
   const columns = [
     { label: "Course Details" },
     { label: "Code" },
     { label: "Duration" },
     { label: "Status" },
-    { label: "Actions", align: "right" }
+    ...(canManageCourses ? [{ label: "Actions", align: "right" }] : []) 
   ];
 
   const renderCourseRow = (course) => (
@@ -90,30 +98,33 @@ const AllCourses = () => {
         </span>
       </td>
 
-      <td className="px-5 py-4 text-right">
-        <div className="flex items-center justify-end space-x-1.5">
-          <ActionIconButton 
-            icon={course.is_active ? Power : PowerOff} 
-            variant={course.is_active ? "activeToggle" : "inactiveToggle"} 
-            onClick={() => handleStatusToggle(course._id)} 
-            disabled={toggleStatusMutation.isPending} 
-            title={course.is_active ? "Deactivate Course" : "Activate Course"} 
-          />
-          <ActionIconButton 
-            icon={Edit} 
-            variant="primary" 
-            onClick={() => navigate(`/admin/update-course/${course._id}`)} 
-            title="Edit" 
-          />
-          <ActionIconButton 
-            icon={Trash2} 
-            variant="danger" 
-            disabled={deleteCourseMutation.isPending} 
-            onClick={() => handleDelete(course._id)} 
-            title="Delete" 
-          />
-        </div>
-      </td>
+      {/* 🚀 Protect the action buttons rendering */}
+      {canManageCourses && (
+        <td className="px-5 py-4 text-right">
+          <div className="flex items-center justify-end space-x-1.5">
+            <ActionIconButton 
+              icon={course.is_active ? Power : PowerOff} 
+              variant={course.is_active ? "activeToggle" : "inactiveToggle"} 
+              onClick={() => handleStatusToggle(course._id)} 
+              disabled={toggleStatusMutation.isPending} 
+              title={course.is_active ? "Deactivate Course" : "Activate Course"} 
+            />
+            <ActionIconButton 
+              icon={Edit} 
+              variant="primary" 
+              onClick={() => navigate(`/admin/update-course/${course._id}`)} 
+              title="Edit" 
+            />
+            <ActionIconButton 
+              icon={Trash2} 
+              variant="danger" 
+              disabled={deleteCourseMutation.isPending} 
+              onClick={() => handleDelete(course._id)} 
+              title="Delete" 
+            />
+          </div>
+        </td>
+      )}
     </tr>
   );
 
@@ -122,7 +133,8 @@ const AllCourses = () => {
       <PageHeader 
         title="Course Management"
         subtitle={`Total active courses: ${pagination?.total || 0}`}
-        onAdd={() => navigate("/admin/add-course")}
+        // 🚀 Remove the Add Course button if they lack permissions
+        onAdd={canManageCourses ? () => navigate("/admin/add-course") : null}
         addText="Add Course"
       />
 
@@ -137,7 +149,6 @@ const AllCourses = () => {
         />
       </div>
 
-      {/* Powered by the new Reusable DataTable */}
       <DataTable
         columns={columns}
         data={courses}

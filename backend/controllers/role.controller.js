@@ -1,4 +1,4 @@
-import Role from "../models/Role.js";
+import Role from "../models/role.js";
 import User from "../models/user.js";
 
 // ==========================================
@@ -8,7 +8,6 @@ export const createRole = async (req, res) => {
   try {
     const { name, description, permissions } = req.body;
 
-    // Check if role name already exists (case-insensitive)
     const existingRole = await Role.findOne({ name: { $regex: new RegExp(`^${name}$`, "i") } });
     if (existingRole) {
       return res.status(400).json({ success: false, message: `The role '${name}' already exists.` });
@@ -18,7 +17,7 @@ export const createRole = async (req, res) => {
       name,
       description,
       permissions: permissions || [],
-      is_system_role: false // Custom roles created via UI are never system roles
+      is_system_role: false 
     });
 
     res.status(201).json({ success: true, message: "Role created successfully.", data: role });
@@ -33,7 +32,6 @@ export const createRole = async (req, res) => {
 // ==========================================
 export const getRoles = async (req, res) => {
   try {
-    // Sort by system roles first, then alphabetically by name
     const roles = await Role.find().sort({ is_system_role: -1, name: 1 });
     res.status(200).json({ success: true, data: roles });
   } catch (error) {
@@ -71,7 +69,6 @@ export const updateRole = async (req, res) => {
       return res.status(404).json({ success: false, message: "Role not found." });
     }
 
-    // SECURITY: Prevent renaming core system roles (like "superadmin")
     if (role.is_system_role && name && name !== role.name) {
       return res.status(400).json({ 
         success: false, 
@@ -113,7 +110,6 @@ export const deleteRole = async (req, res) => {
       });
     }
 
-    // SECURITY 2: Never delete a role if an employee is currently using it
     const usersWithRole = await User.countDocuments({ role: id });
     if (usersWithRole > 0) {
       return res.status(400).json({ 
