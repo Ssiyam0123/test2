@@ -2,41 +2,40 @@ import Fee from "../models/fee.js";
 import Payment from "../models/payment.js";
 import Student from "../models/student.js";
 import mongoose from "mongoose";
+import catchAsync from "../utils/catchAsync.js";
+import AppError from "../utils/AppError.js";
+import ApiResponse from "../utils/ApiResponse.js";
 
-const getSessionInfo = async () => {
+// ==========================================
+// 🐳 [Controller: collectPayment]
+// ==========================================
+export const collectPayment = catchAsync(async (req, res, next) => {
   const session = await mongoose.startSession();
   const isReplicaSet = mongoose.connection.getClient().topology.description.type.includes("ReplicaSet");
-  return { session, isReplicaSet };
-};
 
-// 🚀 Helper to easily check administrative override
-const isGlobalAdmin = (user) => {
-  return user.role?.name === "superadmin" || user.role?.name === "admin" || user.role?.permissions?.includes("all_access");
-};
-
-export const collectPayment = async (req, res) => {
-  const { session, isReplicaSet } = await getSessionInfo();
   try {
     if (isReplicaSet) session.startTransaction();
 
     const { fee_record, amount, payment_type, payment_method, transaction_id, remarks } = req.body;
     const payAmt = Number(amount);
 
-    const fee = await Fee.findById(fee_record).session(session);
-    if (!fee) throw new Error("Ledger not found.");
-
-    // 🚀 PBAC Security Gate
-    if (!isGlobalAdmin(req.user) && req.user.branch.toString() !== fee.branch.toString()) {
-      throw new Error("Unauthorized branch access.");
-    }
+    // 🚀 Security: Ensure user can only collect payment for their own branch
+    const fee = await Fee.findOne({ _id: fee_record, ...req.branchFilter }).session(session);
+    if (!fee) throw new AppError("Fee record not found or access denied.", 404);
 
     const remaining = fee.net_payable - fee.paid_amount;
-    if (payAmt > remaining) throw new Error(`Overpayment error. Max due: ${remaining}`);
+    if (payAmt > remaining) throw new AppError(`Overpayment error. Max due: ${remaining}`, 400);
 
     const [payment] = await Payment.create([{
-      fee_record, student: fee.student, branch: fee.branch,
-      amount: payAmt, payment_type, payment_method, transaction_id,
-      collected_by: req.user._id, remarks
+      fee_record, 
+      student: fee.student, 
+      branch: fee.branch,
+      amount: payAmt, 
+      payment_type, 
+      payment_method, 
+      transaction_id,
+      collected_by: req.user._id, 
+      remarks
     }], { session });
 
     fee.paid_amount += payAmt;
@@ -44,130 +43,108 @@ export const collectPayment = async (req, res) => {
     await fee.save({ session });
 
     if (isReplicaSet) await session.commitTransaction();
-    res.status(201).json({ success: true, data: { payment, fee_summary: fee } });
+
+    res.status(201).json(new ApiResponse(201, { payment, fee_summary: fee }, "Payment collected successfully"));
   } catch (error) {
     if (isReplicaSet && session.inTransaction()) await session.abortTransaction();
-    res.status(400).json({ success: false, message: error.message });
+    return next(error);
   } finally {
     session.endSession();
   }
-};
+});
 
-export const getStudentFinance = async (req, res) => {
-  try {
-    const { studentId } = req.params;
+// ==========================================
+// 🐳 [Controller: getStudentFinance]
+// ==========================================
+export const getStudentFinance = catchAsync(async (req, res, next) => {
+  const { studentId } = req.params;
 
-    const fee_summary = await Fee.findOne({ student: studentId })
-      .populate("course", "course_name base_fee")
-      .populate("discount_history.updated_by", "full_name")
-      .lean();
+  // 🚀 Magic: Using branchFilter to restrict access automatically
+  const fee_summary = await Fee.findOne({ student: studentId, ...req.branchFilter })
+    .populate("course", "course_name base_fee")
+    .populate("discount_history.updated_by", "full_name")
+    .lean();
 
-    if (!fee_summary) {
-      return res.status(404).json({ success: false, message: "Financial record not found for this student." });
-    }
-
-    // 🚀 PBAC Security Gate
-    if (!isGlobalAdmin(req.user) && req.user.branch?.toString() !== fee_summary.branch.toString()) {
-      return res.status(403).json({ success: false, message: "Unauthorized campus access." });
-    }
-
-    const transactions = await Payment.find({ student: studentId })
-      .populate("collected_by", "full_name")
-      .sort({ createdAt: -1 })
-      .lean();
-
-    res.status(200).json({ success: true, data: { fee_summary, transactions } });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+  if (!fee_summary) {
+    return next(new AppError("Financial record not found or access denied.", 404));
   }
-};
 
-export const getCampusFees = async (req, res) => {
-  try {
-    const { branch, status, search } = req.query;
-    const filter = {};
-    
-    // 🚀 PBAC Security Gate
-    if (!isGlobalAdmin(req.user)) {
-      filter.branch = req.user.branch; 
-    } else if (branch && branch !== "all") {
-      filter.branch = branch; 
-    }
+  const transactions = await Payment.find({ student: studentId, ...req.branchFilter })
+    .populate("collected_by", "full_name")
+    .sort({ createdAt: -1 })
+    .lean();
 
-    if (status && status !== "all") filter.status = status;
+  res.status(200).json(new ApiResponse(200, { fee_summary, transactions }, "Student finance data fetched"));
+});
 
-    if (search) {
-      const students = await Student.find({
-        $or: [
-          { student_name: { $regex: search, $options: "i" } },
-          { student_id: { $regex: search, $options: "i" } }
-        ]
-      }).select("_id");
-      filter.student = { $in: students.map(s => s._id) };
-    }
+// ==========================================
+// 🐳 [Controller: getCampusFees]
+// ==========================================
+export const getCampusFees = catchAsync(async (req, res, next) => {
+  const { status, search } = req.query;
+  
+  // 🚀 Start with branch filter from middleware
+  let filter = { ...req.branchFilter };
 
-    const fees = await Fee.find(filter)
-      .populate("student", "student_name student_id photo_url")
-      .populate("course", "course_name")
-      .sort({ createdAt: -1 });
+  if (status && status !== "all") filter.status = status;
 
-    res.status(200).json({ success: true, data: fees });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+  if (search) {
+    const students = await Student.find({
+      ...req.branchFilter, // Search only within the allowed branch
+      $or: [
+        { student_name: { $regex: search, $options: "i" } },
+        { student_id: { $regex: search, $options: "i" } }
+      ]
+    }).select("_id");
+    filter.student = { $in: students.map(s => s._id) };
   }
-};
 
-export const updateFeeDiscount = async (req, res) => {
-  try {
-    const { feeId } = req.params;
-    const newDiscount = Number(req.body.discount);
+  const fees = await Fee.find(filter)
+    .populate("student", "student_name student_id photo_url")
+    .populate("course", "course_name")
+    .sort({ createdAt: -1 });
 
-    const fee = await Fee.findById(feeId);
-    if (!fee) return res.status(404).json({ success: false, message: "Fee record not found." });
+  res.status(200).json(new ApiResponse(200, fees, "Campus fees fetched successfully"));
+});
 
-    // 🚀 PBAC Security Gate
-    if (!isGlobalAdmin(req.user) && req.user.branch.toString() !== fee.branch.toString()) {
-      return res.status(403).json({ success: false, message: "Unauthorized campus access." });
-    }
+// ==========================================
+// 🐳 [Controller: updateFeeDiscount]
+// ==========================================
+export const updateFeeDiscount = catchAsync(async (req, res, next) => {
+  const { feeId } = req.params;
+  const newDiscount = Number(req.body.discount);
 
-    if (fee.discount === newDiscount) {
-      return res.status(200).json({ 
-        success: true, 
-        message: "Discount is already set to this amount. No changes made." 
-      });
-    }
+  const fee = await Fee.findOne({ _id: feeId, ...req.branchFilter });
+  if (!fee) return next(new AppError("Fee record not found or access denied.", 404));
 
-    const newNetPayable = fee.total_amount - newDiscount;
-    if (newNetPayable < fee.paid_amount) {
-      return res.status(400).json({ 
-        success: false, 
-        message: `Cannot apply discount. Student has already paid ৳${fee.paid_amount}.` 
-      });
-    }
+  if (fee.discount === newDiscount) {
+    return res.status(200).json(new ApiResponse(200, null, "Discount is already set to this amount."));
+  }
 
-    let newStatus = "Unpaid";
-    if (fee.paid_amount >= newNetPayable) newStatus = "Paid";
-    else if (fee.paid_amount > 0) newStatus = "Partial";
+  const newNetPayable = fee.total_amount - newDiscount;
+  if (newNetPayable < fee.paid_amount) {
+    return next(new AppError(`Cannot apply discount. Already paid ৳${fee.paid_amount}.`, 400));
+  }
 
-    const updatedFee = await Fee.findByIdAndUpdate(
-      feeId,
-      {
-        $set: { discount: newDiscount, net_payable: newNetPayable, status: newStatus },
-        $push: {
-          discount_history: {
-            previous_discount: fee.discount || 0,
-            new_discount: newDiscount,
-            updated_by: req.user._id,
-            updated_at: new Date()
-          }
+  let newStatus = "Unpaid";
+  if (fee.paid_amount >= newNetPayable) newStatus = "Paid";
+  else if (fee.paid_amount > 0) newStatus = "Partial";
+
+  const updatedFee = await Fee.findByIdAndUpdate(
+    feeId,
+    {
+      $set: { discount: newDiscount, net_payable: newNetPayable, status: newStatus },
+      $push: {
+        discount_history: {
+          previous_discount: fee.discount || 0,
+          new_discount: newDiscount,
+          updated_by: req.user._id,
+          updated_at: new Date()
         }
-      },
-      { new: true } 
-    );
+      }
+    },
+    { new: true } 
+  );
 
-    res.status(200).json({ success: true, message: "Discount applied and audit log updated.", data: updatedFee });
-  } catch (error) {
-    console.error("Discount DB Write Error:", error);
-    res.status(500).json({ success: false, message: "Server error applying discount." });
-  }
-};
+  res.status(200).json(new ApiResponse(200, updatedFee, "Discount updated successfully."));
+});

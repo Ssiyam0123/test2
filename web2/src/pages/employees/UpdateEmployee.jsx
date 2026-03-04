@@ -36,7 +36,7 @@ const UpdateEmployee = () => {
   }
 
   // Pass the fetched data into your form!
-  return <AddEmployeeForm mode="edit" data={employee} />;
+  return <AddEmployeeForm mode="edit" data={employee} isLoading={isLoading}/>;
 };
 
 export default UpdateEmployee;

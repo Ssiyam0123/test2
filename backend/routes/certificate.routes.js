@@ -1,11 +1,11 @@
 import express from "express";
-import { verifyToken, requirePermission } from "../middlewares/auth.js";
+import { verifyToken } from "../middlewares/auth.js";
 import { downloadCertificatePDF } from "../controllers/certificate.controller.js";
 import { downloadEmployeeID } from "../controllers/employeeid.controller.js";
 
 const router = express.Router();
 
-// Basic token validation. Can add requirePermission("view_students") if needed.
+// 🚀 Document Downloads (Only requires Login)
 router.get("/download/:id", verifyToken, downloadCertificatePDF);
 router.get("/employeeid/download/:id", verifyToken, downloadEmployeeID);
 

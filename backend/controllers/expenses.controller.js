@@ -1,22 +1,24 @@
 import Expense from "../models/expense.js";
+import catchAsync from "../utils/catchAsync.js";
+import AppError from "../utils/AppError.js";
+import ApiResponse from "../utils/ApiResponse.js";
 
+// ==========================================
+// 🐳 [Controller: getExpenses]
+// ==========================================
+export const getExpenses = catchAsync(async (req, res, next) => {
+  const { batchId, classId } = req.query;
+  
+  // 🚀 Automatically handles isMaster vs Branch Admin via req.branchFilter
+  let filter = { ...req.branchFilter };
 
-export const getExpenses = async (req, res) => {
-  try {
-    const { branchId, batchId, classId } = req.query;
-    
-    let filter = {};
-    if (classId) filter.class_content = classId;
-    else if (batchId) filter.batch = batchId;
-    else if (branchId) filter.branch = branchId;
+  if (classId) filter.class_content = classId;
+  if (batchId) filter.batch = batchId;
 
-    const expenses = await Expense.find(filter)
-      .sort({ date_incurred: -1 }) // Newest first
-      .populate("class_content", "class_number topic")
-      .populate("recorded_by", "full_name");
+  const expenses = await Expense.find(filter)
+    .sort({ createdAt: -1 })
+    .populate("class_content", "class_number topic")
+    .populate("recorded_by", "full_name");
 
-    res.status(200).json({ success: true, data: expenses });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
+  res.status(200).json(new ApiResponse(200, expenses, "Expenses fetched successfully"));
+});

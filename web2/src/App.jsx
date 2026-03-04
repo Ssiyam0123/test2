@@ -40,6 +40,9 @@ import ManageBranchForm from "./pages/branches/ManageBranchForm.jsx";
 import ManageInventory from "./pages/inventory/ManageInventory.jsx";
 import AddInventory from "./pages/inventory/AddInventory.jsx";
 
+// SYLLABUS DOMAIN
+import ManageMasterSyllabus from "./pages/master-syllabus/ManageMasterSyllabus.jsx";
+import AddMasterSyllabus from "./pages/master-syllabus/AddMasterSyllabus.jsx";
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: { staleTime: 5 * 60 * 1000, cacheTime: 10 * 60 * 1000, retry: 1, refetchOnWindowFocus: false },
@@ -161,6 +164,11 @@ function App() {
             <Route element={<RoleGuard requiredPermission="manage_courses" />}>
               <Route path="add-course" element={<AddCourse />} />
               <Route path="update-course/:id" element={<AddCourse mode="edit" />} />
+              
+              {/* 🚀 NEW SYLLABUS ROUTES */}
+              <Route path="manage-syllabus" element={<ManageMasterSyllabus />} />
+              <Route path="add-syllabus" element={<AddMasterSyllabus mode="add" />} />
+              <Route path="update-syllabus/:id" element={<AddMasterSyllabus mode="edit" />} />
             </Route>
 
             <Route element={<RoleGuard requiredPermission="view_classes" />}>

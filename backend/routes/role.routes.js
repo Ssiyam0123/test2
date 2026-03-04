@@ -2,7 +2,7 @@ import express from "express";
 import { createRole, getRoles, getRoleById, updateRole, deleteRole } from "../controllers/role.controller.js";
 import { createRoleSchema, updateRoleSchema } from "../validators/role.validator.js";
 import { validate } from "../middlewares/validate.js";
-import { verifyToken, requirePermission } from "../middlewares/auth.js";
+import { verifyToken, requirePermission } from "../middlewares/auth.js"; // 🚀 No branch filter needed for global roles
 
 const router = express.Router();
 

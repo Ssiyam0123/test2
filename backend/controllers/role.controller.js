@@ -1,127 +1,104 @@
 import Role from "../models/role.js";
 import User from "../models/user.js";
+import catchAsync from "../utils/catchAsync.js";
+import AppError from "../utils/AppError.js";
+import ApiResponse from "../utils/ApiResponse.js"; // 🚀 Added Global Response Handler
 
 // ==========================================
-// 1. CREATE A NEW CUSTOM ROLE
+// 🐳 [Controller: createRole]
 // ==========================================
-export const createRole = async (req, res) => {
-  try {
-    const { name, description, permissions } = req.body;
+export const createRole = catchAsync(async (req, res, next) => {
+  const { name, description, permissions } = req.body;
 
-    const existingRole = await Role.findOne({ name: { $regex: new RegExp(`^${name}$`, "i") } });
-    if (existingRole) {
-      return res.status(400).json({ success: false, message: `The role '${name}' already exists.` });
-    }
-
-    const role = await Role.create({
-      name,
-      description,
-      permissions: permissions || [],
-      is_system_role: false 
-    });
-
-    res.status(201).json({ success: true, message: "Role created successfully.", data: role });
-  } catch (error) {
-    console.error("Create Role Error:", error);
-    res.status(500).json({ success: false, message: "Failed to create role." });
+  const existingRole = await Role.findOne({ name: { $regex: new RegExp(`^${name}$`, "i") } });
+  if (existingRole) {
+    return next(new AppError(`The role '${name}' already exists.`, 400));
   }
-};
+
+  const role = await Role.create({
+    name,
+    description,
+    permissions: permissions || [],
+    is_system_role: false 
+  });
+
+  // 🚀 Using Global Response Handler
+  res.status(201).json(new ApiResponse(201, role, "Role created successfully."));
+});
 
 // ==========================================
-// 2. GET ALL ROLES (For the UI Dropdowns & Manager)
+// 🐳 [Controller: getRoles]
 // ==========================================
-export const getRoles = async (req, res) => {
-  try {
-    const roles = await Role.find().sort({ is_system_role: -1, name: 1 });
-    res.status(200).json({ success: true, data: roles });
-  } catch (error) {
-    console.error("Fetch Roles Error:", error);
-    res.status(500).json({ success: false, message: "Failed to fetch roles." });
+export const getRoles = catchAsync(async (req, res, next) => {
+  const roles = await Role.find().sort({ is_system_role: -1, name: 1 });
+  
+  // 🚀 Using Global Response Handler
+  res.status(200).json(new ApiResponse(200, roles, "Roles fetched successfully"));
+});
+
+// ==========================================
+// 🐳 [Controller: getRoleById]
+// ==========================================
+export const getRoleById = catchAsync(async (req, res, next) => {
+  const role = await Role.findById(req.params.id);
+  if (!role) {
+    return next(new AppError("Role not found.", 404));
   }
-};
+  
+  // 🚀 Using Global Response Handler
+  res.status(200).json(new ApiResponse(200, role, "Role details fetched"));
+});
 
 // ==========================================
-// 3. GET SINGLE ROLE
+// 🐳 [Controller: updateRole]
 // ==========================================
-export const getRoleById = async (req, res) => {
-  try {
-    const role = await Role.findById(req.params.id);
-    if (!role) {
-      return res.status(404).json({ success: false, message: "Role not found." });
-    }
-    res.status(200).json({ success: true, data: role });
-  } catch (error) {
-    console.error("Fetch Role Error:", error);
-    res.status(500).json({ success: false, message: "Failed to fetch role." });
+export const updateRole = catchAsync(async (req, res, next) => {
+  const { id } = req.params;
+  const { name, description, permissions } = req.body;
+
+  const role = await Role.findById(id);
+  if (!role) {
+    return next(new AppError("Role not found.", 404));
   }
-};
 
-// ==========================================
-// 4. UPDATE A ROLE (Add/Remove Permissions)
-// ==========================================
-export const updateRole = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { name, description, permissions } = req.body;
-
-    const role = await Role.findById(id);
-    if (!role) {
-      return res.status(404).json({ success: false, message: "Role not found." });
-    }
-
-    if (role.is_system_role && name && name !== role.name) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "You cannot change the name of a core system role." 
-      });
-    }
-
-    // Apply updates
-    if (name) role.name = name;
-    if (description !== undefined) role.description = description;
-    if (permissions) role.permissions = permissions;
-
-    await role.save();
-
-    res.status(200).json({ success: true, message: "Role updated successfully.", data: role });
-  } catch (error) {
-    console.error("Update Role Error:", error);
-    res.status(500).json({ success: false, message: "Failed to update role." });
+  if (role.is_system_role && name && name !== role.name) {
+    return next(new AppError("You cannot change the name of a core system role.", 400));
   }
-};
+
+  // Apply updates
+  if (name) role.name = name;
+  if (description !== undefined) role.description = description;
+  if (permissions) role.permissions = permissions;
+
+  await role.save();
+
+  // 🚀 Using Global Response Handler
+  res.status(200).json(new ApiResponse(200, role, "Role updated successfully."));
+});
 
 // ==========================================
-// 5. DELETE A ROLE (With Safety Checks)
+// 🐳 [Controller: deleteRole]
 // ==========================================
-export const deleteRole = async (req, res) => {
-  try {
-    const { id } = req.params;
+export const deleteRole = catchAsync(async (req, res, next) => {
+  const { id } = req.params;
 
-    const role = await Role.findById(id);
-    if (!role) {
-      return res.status(404).json({ success: false, message: "Role not found." });
-    }
-
-    // SECURITY 1: Never delete a system role
-    if (role.is_system_role) {
-      return res.status(403).json({ 
-        success: false, 
-        message: `Cannot delete '${role.name}' because it is a protected system role.` 
-      });
-    }
-
-    const usersWithRole = await User.countDocuments({ role: id });
-    if (usersWithRole > 0) {
-      return res.status(400).json({ 
-        success: false, 
-        message: `Cannot delete this role. There are ${usersWithRole} user(s) currently assigned to it.` 
-      });
-    }
-
-    await Role.findByIdAndDelete(id);
-    res.status(200).json({ success: true, message: "Role deleted successfully." });
-  } catch (error) {
-    console.error("Delete Role Error:", error);
-    res.status(500).json({ success: false, message: "Failed to delete role." });
+  const role = await Role.findById(id);
+  if (!role) {
+    return next(new AppError("Role not found.", 404));
   }
-};
+
+  // SECURITY 1: Never delete a system role
+  if (role.is_system_role) {
+    return next(new AppError(`Cannot delete '${role.name}' because it is a protected system role.`, 403));
+  }
+
+  const usersWithRole = await User.countDocuments({ role: id });
+  if (usersWithRole > 0) {
+    return next(new AppError(`Cannot delete this role. There are ${usersWithRole} user(s) currently assigned to it.`, 400));
+  }
+
+  await Role.findByIdAndDelete(id);
+  
+  // 🚀 Using Global Response Handler
+  res.status(200).json(new ApiResponse(200, null, "Role deleted successfully."));
+});

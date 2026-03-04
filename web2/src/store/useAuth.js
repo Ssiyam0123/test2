@@ -12,7 +12,7 @@ const useAuth = create((set) => ({
   checkAuth: async () => {
     try {
       const res = await API.get("/auth/check");
-      set({ authUser: res.data });
+      set({ authUser: res.data.data });
     } catch (error) {
       set({ authUser: null }); 
     } finally {

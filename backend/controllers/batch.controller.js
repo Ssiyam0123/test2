@@ -1,105 +1,92 @@
 import Batch from "../models/batch.js";
 import ClassContent from "../models/classContent.js";
 import mongoose from "mongoose";
+import catchAsync from "../utils/catchAsync.js";
+import AppError from "../utils/AppError.js";
+import ApiResponse from "../utils/ApiResponse.js";
 
 // ==========================================
-// CORE BATCH OPERATIONS (CRUD)
+// 🐳 [Controller: createBatch]
 // ==========================================
-
-export const createBatch = async (req, res) => {
-  try {
-    console.log("📦 Incoming Batch Payload:", req.body);
-    const newBatch = await Batch.create(req.body);
-    res.status(201).json({ success: true, data: newBatch });
-  } catch (error) {
-    console.error("❌ BATCH CREATE ERROR:", error);
-    if (error.name === "ValidationError" || error.name === "CastError") {
-      return res.status(400).json({ success: false, message: error.message });
-    }
-    res.status(500).json({ success: false, message: error.message });
+export const createBatch = catchAsync(async (req, res, next) => {
+  const batchData = { ...req.body };
+  
+  // 🚀 Security: Ensure Branch Admins can only create batches for their branch
+  if (!req.isMaster) {
+    batchData.branch = req.user.branch;
   }
-};
 
-export const getAllBatches = async (req, res) => {
-  try {
-    const { status, branch } = req.query;
-    let query = {};
+  const newBatch = await Batch.create(batchData);
+  res.status(201).json(new ApiResponse(201, newBatch, "Batch created successfully"));
+});
 
-    // 🚀 PBAC SECURITY GATE
-    const isMaster = req.user.role?.name === "superadmin" || req.user.role?.permissions?.includes("all_access");
+// ==========================================
+// 🐳 [Controller: getAllBatches]
+// ==========================================
+export const getAllBatches = catchAsync(async (req, res, next) => {
+  const { status, branch } = req.query;
+  
+  // 🚀 Magic: Automatic branch filter
+  let query = { ...req.branchFilter };
 
-    if (isMaster) {
-      if (branch && branch !== "all" && mongoose.Types.ObjectId.isValid(branch)) {
-        query.branch = branch;
-      }
-    } else {
-      query.branch = req.user.branch;
-    }
-
-    if (status && status !== "all") {
-      query.status = status;
-    }
-
-    const batches = await Batch.find(query)
-      .populate("course", "course_name")
-      .populate("branch", "branch_name branch_code")
-      .populate("students", "student_name student_id photo_url")
-      .sort({ createdAt: -1 })
-      .lean();
-
-    res.status(200).json({ success: true, data: batches });
-  } catch (error) {
-    console.error("GET_ALL_BATCHES ERROR:", error);
-    res.status(500).json({ success: false, message: error.message });
+  if (req.isMaster && branch && branch !== "all") {
+    query.branch = branch;
   }
-};
 
-export const getBatchById = async (req, res) => {
-  try {
-    const batch = await Batch.findById(req.params.id)
-      .populate("course")
-      .populate("instructors", "full_name email photo_url")
-      .populate("branch", "branch_name branch_code")
-      .populate("students", "student_name student_id photo_url");
+  if (status && status !== "all") query.status = status;
 
-    if (!batch) {
-      return res.status(404).json({ success: false, message: "Batch not found" });
-    }
+  const batches = await Batch.find(query)
+    .populate("course", "course_name")
+    .populate("branch", "branch_name branch_code")
+    .populate("students", "student_name student_id photo_url")
+    .sort({ createdAt: -1 })
+    .lean();
 
-    res.status(200).json({ success: true, data: batch });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
+  res.status(200).json(new ApiResponse(200, batches, "Batches fetched"));
+});
 
-export const updateBatch = async (req, res) => {
-  try {
-    const updatedBatch = await Batch.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true, runValidators: true },
-    ).populate("course", "course_name");
+// ==========================================
+// 🐳 [Controller: getBatchById]
+// ==========================================
+export const getBatchById = catchAsync(async (req, res, next) => {
+  const batch = await Batch.findOne({ _id: req.params.id, ...req.branchFilter })
+    .populate("course")
+    .populate("instructors", "full_name email photo_url")
+    .populate("branch", "branch_name branch_code")
+    .populate("students", "student_name student_id photo_url");
 
-    if (!updatedBatch) {
-      return res.status(404).json({ success: false, message: "Batch not found" });
-    }
+  if (!batch) return next(new AppError("Batch not found or unauthorized.", 404));
 
-    res.status(200).json({ success: true, data: updatedBatch });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
+  res.status(200).json(new ApiResponse(200, batch, "Batch details fetched"));
+});
 
-export const deleteBatch = async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    // Cascade delete: Remove all classes when batch is deleted
-    await ClassContent.deleteMany({ batch: id });
-    await Batch.findByIdAndDelete(id);
+// ==========================================
+// 🐳 [Controller: updateBatch]
+// ==========================================
+export const updateBatch = catchAsync(async (req, res, next) => {
+  const updatedBatch = await Batch.findOneAndUpdate(
+    { _id: req.params.id, ...req.branchFilter },
+    req.body,
+    { new: true, runValidators: true }
+  ).populate("course", "course_name");
 
-    res.status(200).json({ success: true, message: "Batch and curriculum deleted." });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
+  if (!updatedBatch) return next(new AppError("Batch not found or unauthorized.", 404));
+
+  res.status(200).json(new ApiResponse(200, updatedBatch, "Batch updated"));
+});
+
+// ==========================================
+// 🐳 [Controller: deleteBatch]
+// ==========================================
+export const deleteBatch = catchAsync(async (req, res, next) => {
+  const { id } = req.params;
+  
+  const batch = await Batch.findOne({ _id: id, ...req.branchFilter });
+  if (!batch) return next(new AppError("Batch not found or unauthorized.", 404));
+
+  // Cascade delete syllabus
+  await ClassContent.deleteMany({ batch: id });
+  await Batch.findByIdAndDelete(id);
+
+  res.status(200).json(new ApiResponse(200, null, "Batch and syllabus deleted"));
+});

@@ -7,14 +7,19 @@ import { branchCreateSchema, branchUpdateSchema } from "../validators/branch.val
 
 const router = express.Router();
 
+// 🚀 Authentication applies to all routes below
 router.use(verifyToken);
 
-// Read
+// ==========================================
+// READ ROUTES (Global)
+// ==========================================
 router.get("/all", requirePermission("view_branches"), ctrl.getAllBranches);
 router.get("/:id", requirePermission("view_branches"), ctrl.getBranchById);
 router.get("/stats/:branchId", requirePermission("view_branches"), getBranchStats);
 
-// Write (Typically only Superadmin has 'manage_branches' in their role)
+// ==========================================
+// WRITE ROUTES (Superadmin Only)
+// ==========================================
 router.post("/create", requirePermission("manage_branches"), validate(branchCreateSchema), ctrl.createBranch);
 router.put("/:id", requirePermission("manage_branches"), validate(branchUpdateSchema), ctrl.updateBranch);
 router.patch("/:id/toggle", requirePermission("manage_branches"), ctrl.toggleBranchStatus);

@@ -10,12 +10,16 @@ const router = express.Router();
 
 router.use(verifyToken);
 
-// Read
+// ==========================================
+// READ ROUTES (Global)
+// ==========================================
 router.get("/all", requirePermission("view_courses"), getAllCourses);
 router.get("/active", requirePermission("view_courses"), getActiveCourses);
 router.get("/:id", requirePermission("view_courses"), getCourseById);
 
-// Write (Courses are usually global, managed by those with "manage_courses")
+// ==========================================
+// WRITE ROUTES (Global Admins)
+// ==========================================
 router.post("/create", requirePermission("manage_courses"), validateCourseFields, checkCourseDuplicates, processCoursePayload, createCourse);
 router.put("/update/:id", requirePermission("manage_courses"), validateCourseFields, checkCourseDuplicates, processCoursePayload, updateCourse);
 router.patch("/toggle-status/:id", requirePermission("manage_courses"), toggleCourseStatus);

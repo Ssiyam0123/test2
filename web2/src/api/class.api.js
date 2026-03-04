@@ -1,7 +1,7 @@
 import { API } from "./axios";
 
 // ==========================================
-// CLASS & SYLLABUS ENDPOINTS (/api/classes)
+// CLASS & SYLLABUS ENDPOINTS
 // ==========================================
 
 export const fetchBatchClasses = async (batchId) => {
@@ -30,7 +30,6 @@ export const deleteClassContent = async (classId) => {
 };
 
 export const scheduleClass = async (classId, date_scheduled) => {
-  // Pass the date payload matching the backend Joi schema
   const { data } = await API.put(`/classes/${classId}/schedule`, { date_scheduled });
   return data;
 };

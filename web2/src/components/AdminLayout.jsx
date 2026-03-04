@@ -1,13 +1,12 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Link, Outlet, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, Users, UserPlus, Briefcase, GraduationCap,
   BookPlus, CalendarDays, PlusCircle, Layers, ShieldCheck,
   LogOut, Menu, X, UserCircle, Building2, MapPin,
-  PackageSearch, ChevronDown,
+  PackageSearch, ChevronDown, BookOpen
 } from "lucide-react";
 import useAuth from "../store/useAuth";
-import { apiURL } from "../../Constant.js";
 import { useBranches } from "../hooks/useBranches";
 
 const AdminLayout = () => {
@@ -16,12 +15,13 @@ const AdminLayout = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const { logout, authUser } = useAuth();
 
-  console.log(authUser);
-
+  // --- 🚀 SECURITY LOGIC ---
   const userPermissions = authUser?.role?.permissions || authUser?.permissions || [];
-  const roleName = typeof authUser?.role === "string" ? authUser.role : authUser?.role?.name;
-  const safeRoleName = roleName?.toLowerCase().replace(/\s/g, "");
-  const isSuperAdmin = userPermissions.includes("all_access") || safeRoleName === "superadmin";
+  const rawRole = typeof authUser?.role === "string" ? authUser.role : authUser?.role?.name || "";
+  const safeRoleName = rawRole.toLowerCase().replace(/\s/g, "");
+
+  // ১. সুপারঅ্যাডমিন চেক (একদম কড়া চেক)
+  const isSuperAdmin = safeRoleName === "superadmin" || userPermissions.includes("all_access");
 
   const [activeBranch, setActiveBranch] = useState(null);
 
@@ -36,14 +36,9 @@ const AdminLayout = () => {
       if (isSuperAdmin && branches.length > 0) {
         setActiveBranch(branches[0]);
       } else if (!isSuperAdmin) {
-        // 🚀 FIXED: Robust branch info extraction
-        // Checking multiple possible keys (branch_name, name) from the populated object
         const bId = authUser?.branch?._id || (typeof authUser?.branch === "string" ? authUser.branch : null);
         const bName = authUser?.branch?.branch_name || authUser?.branch?.name || "My Campus";
-        
-        if (bId) {
-          setActiveBranch({ _id: bId, branch_name: bName });
-        }
+        if (bId) setActiveBranch({ _id: bId, branch_name: bName });
       }
     }
   }, [authUser, isSuperAdmin, branches, activeBranch]);
@@ -59,6 +54,7 @@ const AdminLayout = () => {
     return userPermissions.includes(requiredPermission);
   };
 
+  // --- 🚀 NAVIGATION CONFIGURATION ---
   const navigationGroups = useMemo(() => [
     {
       label: null,
@@ -81,7 +77,10 @@ const AdminLayout = () => {
       label: "Staff & Faculty",
       items: [
         { name: "All Employees", href: "/admin/all-employees", icon: Briefcase, permission: "view_employees" },
-        { name: "Add Employee", href: "/admin/add-employee", icon: UserPlus, permission: "add_employee" },
+        // 🚀 STRICT BLOCK: ব্রাঞ্চ অ্যাডমিন (admin) হলে এই অপশনটি অ্যারেতে ঢুকবেই না
+        ...(safeRoleName === "superadmin" ? [
+          { name: "Add Employee", href: "/admin/add-employee", icon: UserPlus, permission: "add_employee" }
+        ] : []),
       ],
     },
     {
@@ -89,6 +88,7 @@ const AdminLayout = () => {
       items: [
         { name: "All Courses", href: "/admin/all-courses", icon: GraduationCap, permission: "view_courses" },
         { name: "Add Course", href: "/admin/add-course", icon: BookPlus, permission: "manage_courses" },
+        { name: "Master Syllabus", href: "/admin/manage-syllabus", icon: BookOpen, permission: "manage_courses" },
       ],
     },
     {
@@ -119,7 +119,7 @@ const AdminLayout = () => {
         { name: "Manage Admins", href: "/admin/manage-admins", icon: ShieldCheck, permission: "manage_roles" },
       ],
     },
-  ], [isSuperAdmin]);
+  ], [isSuperAdmin, safeRoleName]); // 🚀 Added safeRoleName to dependencies
 
   const filteredNavigation = useMemo(() => {
     return navigationGroups
@@ -130,9 +130,10 @@ const AdminLayout = () => {
       .filter((group) => group.items.length > 0);
   }, [navigationGroups, userPermissions, isSuperAdmin]);
 
+  // --- 🚀 UI RENDER ---
   return (
     <div className="min-h-screen bg-[#e8f0f2] relative flex overflow-x-hidden">
-      {/* Mobile Header */}
+      {/* Mobile Header (unchanged) */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-[#1e293b] shadow-md">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-3">

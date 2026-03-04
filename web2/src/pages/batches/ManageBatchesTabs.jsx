@@ -1,24 +1,53 @@
-// src/pages/batches/ManageBatchesTabs.jsx
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { useBatches, useDeleteBatch } from "../../hooks/useBatches"; // IMPORT DELETION HOOK
+import React, { useState, useMemo, useEffect } from "react";
+import { useNavigate, useOutletContext } from "react-router-dom";
+import { useBatches, useDeleteBatch } from "../../hooks/useBatches"; 
+import { useBranches } from "../../hooks/useBranches"; 
 import useAuth from "../../store/useAuth";
-import { useConfirmToast } from "../../components/ConfirmToast.jsx"; // IMPORT CONFIRM TOAST
+import { useConfirmToast } from "../../components/ConfirmToast.jsx"; 
 
 import BatchHeader from "../../components/batches/BatchHeader";
 import BatchList from "../../components/batches/BatchList";
 import Loader from "../../components/Loader";
+
+// 🚀 ১. নতুন কম্পোনেন্ট ইমপোর্ট কর
+import BranchDropdown from "../../components/common/BranchDropdown"; 
 
 export default function ManageBatchesTabs() {
   const navigate = useNavigate();
   const { authUser } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   
-  // Initialize Toast and Mutation
+  const context = useOutletContext() || {};
+  const { branchId: contextBranchId } = context;
+
+  const permissions = authUser?.role?.permissions || authUser?.permissions || [];
+  const roleName = (typeof authUser?.role === 'string' ? authUser.role : authUser?.role?.name || "").toLowerCase();
+  const isMaster = roleName === "superadmin" || permissions.includes("all_access");
+
+  const [localBranchId, setLocalBranchId] = useState(isMaster ? "all" : contextBranchId);
+
+  useEffect(() => {
+    if (!isMaster && contextBranchId) {
+      setLocalBranchId(contextBranchId);
+    }
+  }, [contextBranchId, isMaster]);
+
+  const { data: branchesRes } = useBranches({}, { enabled: isMaster });
+  const branches = branchesRes?.data || [];
+
+  const queryFilter = useMemo(() => {
+    if (!isMaster) return { branch: contextBranchId };
+    return localBranchId !== "all" ? { branch: localBranchId } : {};
+  }, [localBranchId, isMaster, contextBranchId]);
+
   const { showConfirmToast } = useConfirmToast();
   const deleteBatchMutation = useDeleteBatch();
 
-  const { data: batchesResponse, isLoading: batchesLoading } = useBatches();
+  const { data: batchesResponse, isLoading: batchesLoading } = useBatches(
+    queryFilter,
+    { enabled: isMaster ? true : !!contextBranchId } 
+  );
+  
   const batches = batchesResponse?.data || [];
 
   const filteredBatches = batches.filter(b => 
@@ -26,12 +55,8 @@ export default function ManageBatchesTabs() {
     (b.course?.course_name && b.course.course_name.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  // ==========================================
-  // DELETE HANDLER LOGIC
-  // ==========================================
   const handleDeleteBatch = (e, id, batchName) => {
-    e.stopPropagation(); // Prevents the card click from navigating to the details page
-
+    e.stopPropagation(); 
     showConfirmToast({
       type: "delete",
       title: "Delete Batch",
@@ -40,7 +65,7 @@ export default function ManageBatchesTabs() {
       confirmText: "Delete",
       confirmColor: "red",
       onConfirm: async () => await deleteBatchMutation.mutateAsync(id),
-    })
+    });
   };
 
   if (batchesLoading) return <Loader />;
@@ -51,6 +76,13 @@ export default function ManageBatchesTabs() {
         <div className="flex-1 flex flex-col bg-white/40 backdrop-blur-xl rounded-[1.25rem] md:rounded-[2.5rem] p-3 md:p-6 shadow-sm border border-white/60 overflow-hidden">
           
           <BatchHeader searchTerm={searchTerm} setSearchTerm={setSearchTerm} authUser={authUser} />
+
+          <BranchDropdown 
+            isMaster={isMaster} 
+            branches={branches} 
+            value={localBranchId} 
+            onChange={setLocalBranchId} 
+          />
 
           <BatchList 
             batches={filteredBatches} 

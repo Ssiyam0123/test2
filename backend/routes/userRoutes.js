@@ -5,12 +5,8 @@ import {
 } from "../controllers/user.controller.js";
 import { upload } from "../middlewares/multer.js";
 import { validate } from "../middlewares/validate.js";
-
-// 🚀 FIXED: The imports now perfectly match your validator file!
 import { userCreateSchema, updateUserSchema, roleUpdateSchema } from "../validators/user.validator.js";
-
-// PBAC Auth Middlewares
-import { verifyToken, requirePermission, branchGuard } from "../middlewares/auth.js";
+import { verifyToken, requirePermission, injectBranchFilter } from "../middlewares/auth.js"; // 🚀 Updated Middleware
 
 const router = express.Router();
 
@@ -19,8 +15,9 @@ router.use(verifyToken);
 // ==========================================
 // READ OPERATIONS
 // ==========================================
-router.get("/search", requirePermission("view_employees"), branchGuard, searchUser);
-router.get("/all", requirePermission("view_employees"), branchGuard, getAllUsers);
+// 🚀 injectBranchFilter applied for data isolation
+router.get("/search", requirePermission("view_employees"), injectBranchFilter, searchUser);
+router.get("/all", requirePermission("view_employees"), injectBranchFilter, getAllUsers);
 router.get("/:id", requirePermission("view_employees"), getUserById);
 
 // ==========================================
@@ -38,7 +35,7 @@ router.put(
   "/:id", 
   requirePermission("edit_employee"), 
   upload.single("photo"), 
-  validate(updateUserSchema), // 🚀 FIXED: Uses the exact name from your validator
+  validate(updateUserSchema), 
   updateUser
 );
 

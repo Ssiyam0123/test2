@@ -1,10 +1,13 @@
 import express from "express";
 import { getExpenses } from "../controllers/expenses.controller.js";
-import { verifyToken, requirePermission, branchGuard } from "../middlewares/auth.js";
+import { verifyToken, requirePermission, injectBranchFilter } from "../middlewares/auth.js"; // 🚀 Updated Middleware
 
 const router = express.Router();
 
-// SECURED: Tied to view_finance, and strictly locked to user's branch
-router.get("/", verifyToken, requirePermission("view_finance"), branchGuard, getExpenses);
+// ==========================================
+// READ ROUTES
+// ==========================================
+// 🚀 SECURED: Tied to view_finance, and strictly locked to user's branch via injectBranchFilter
+router.get("/", verifyToken, requirePermission("view_finance"), injectBranchFilter, getExpenses);
 
 export default router;

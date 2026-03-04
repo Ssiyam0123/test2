@@ -2,12 +2,12 @@ import React, { useMemo } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { useAddUser, useUpdateUser } from "../../hooks/useUser.js";
 import { useBranches } from "../../hooks/useBranches.js"; 
-import { useRoles } from "../../hooks/useRoles.js"; // 🚀 1. IMPORT ROLE HOOK
+import { useRoles } from "../../hooks/useRoles.js"; 
 import EntityForm from "../../components/common/EntityForm.jsx";
 import useAuth from "../../store/useAuth"; 
 import Loader from "../../components/Loader.jsx";
 
-const AddEmployeeForm = ({ mode = "add", data = null }) => {
+const AddEmployeeForm = ({ mode = "add", data = null, isLoading }) => {
   const navigate = useNavigate();
   const { authUser } = useAuth(); 
   
@@ -17,10 +17,11 @@ const AddEmployeeForm = ({ mode = "add", data = null }) => {
   const addUserMutation = useAddUser();
   const updateUserMutation = useUpdateUser();
   
-  // 🚀 2. FETCH DATA
+  // Data Fetching
   const { data: branchesResponse } = useBranches(); 
   const { data: rolesResponse } = useRoles(); 
 
+  // --- 1. Branch Options Logic ---
   const branchOptions = useMemo(() => {
     if (!branchesResponse?.data) return [];
     return branchesResponse.data.map(b => ({ 
@@ -29,22 +30,33 @@ const AddEmployeeForm = ({ mode = "add", data = null }) => {
     }));
   }, [branchesResponse]);
 
-  // 🚀 3. GENERATE DYNAMIC ROLE OPTIONS
+  // --- 2. Dynamic Role Options Logic (Security Filter) ---
   const roleOptions = useMemo(() => {
     if (!rolesResponse?.data) return [];
     
-    // Check if current user is a master admin
-    const isMaster = authUser?.permissions?.includes("all_access") || authUser?.role === "superadmin" || authUser?.role?.name === "superadmin";
+    const userRole = (typeof authUser?.role === 'string' ? authUser.role : authUser?.role?.name || "").toLowerCase();
+    const isMaster = authUser?.permissions?.includes("all_access") || userRole === "superadmin";
 
     return rolesResponse.data
-      // Security Check: Hide Master/Superadmin roles from standard Branch Admins in the dropdown
-      .filter(role => isMaster ? true : (!role.permissions.includes("all_access") && role.name !== "superadmin"))
+      .filter(role => {
+        // যদি Superadmin হয়, সব রোল দেখবে
+        if (isMaster) return true;
+
+        // Branch Admin হলে শুধু সাধারণ স্টাফ বা এমপ্লয়ি রোল দেখবে
+        const targetRoleName = role.name.toLowerCase();
+        
+        // অ্যাডমিন বা অল অ্যাকসেস পারমিশন আছে এমন কোনো রোল ফিল্টার করে বাদ দেওয়া হচ্ছে
+        const isAdminRole = targetRoleName.includes("admin") || role.permissions.includes("all_access");
+        
+        return !isAdminRole; 
+      })
       .map(role => ({
-        value: role._id, // We must send the ObjectId to the backend!
-        label: role.name.charAt(0).toUpperCase() + role.name.slice(1) // Capitalizes the name nicely
+        value: role._id, 
+        label: role.name.charAt(0).toUpperCase() + role.name.slice(1) 
       }));
   }, [rolesResponse, authUser]);
 
+  // --- 3. Initial Data Setup ---
   const initialData = mode === "edit" && data ? {
     employee_id: data.employee_id || "",
     full_name: data.full_name || "",
@@ -56,7 +68,6 @@ const AddEmployeeForm = ({ mode = "add", data = null }) => {
     status: data.status || "Active",
     username: data.username || "",
     password: "", 
-    // 🚀 4. EXTRACT OBJECT ID SAFELY
     role: data.role?._id || data.role || "", 
     facebook: data.social_links?.facebook || "",
     linkedin: data.social_links?.linkedin || "",
@@ -69,11 +80,12 @@ const AddEmployeeForm = ({ mode = "add", data = null }) => {
     employee_id: "", full_name: "", email: "", phone: "", designation: "", department: "",
     joining_date: "", status: "Active", username: "", 
     password: mode === "add" ? "123456" : "", 
-    role: "", // Blank default forces them to select from the dropdown
+    role: "", 
     facebook: "", linkedin: "", twitter: "", instagram: "", others: "",
     branch: branchId 
   };
 
+  // --- 4. EntityForm Configuration ---
   const employeeConfig = [
     { divider: true, name: "div-basic", title: "Basic Information" },
     { name: "full_name", label: "Full Name", required: true },
@@ -85,7 +97,7 @@ const AddEmployeeForm = ({ mode = "add", data = null }) => {
     
     { 
       name: "branch", 
-      label: authUser?.role === "superadmin" || authUser?.role?.name === "superadmin" ? "Assigned Campus" : "Assigned Campus (Locked)", 
+      label: (authUser?.role === "superadmin" || authUser?.role?.name === "superadmin") ? "Assigned Campus" : "Assigned Campus (Locked)", 
       type: "select", 
       options: branchOptions, 
       required: true,
@@ -93,7 +105,10 @@ const AddEmployeeForm = ({ mode = "add", data = null }) => {
     },
 
     { name: "department", label: "Department", type: "select", defaultOption: "Select Department...", required: true, options: [
-      { value: "Faculty", label: "Faculty / Instructor" }, { value: "Administration", label: "Administration" }, { value: "Management", label: "Management" }, { value: "Support Staff", label: "Support Staff" }
+      { value: "Faculty", label: "Faculty / Instructor" }, 
+      { value: "Administration", label: "Administration" }, 
+      { value: "Management", label: "Management" }, 
+      { value: "Support Staff", label: "Support Staff" }
     ]},
     { name: "designation", label: "Designation / Job Title", placeholder: "e.g. Senior Culinary Instructor", required: true },
     { name: "joining_date", label: "Joining Date", type: "date" },
@@ -111,14 +126,13 @@ const AddEmployeeForm = ({ mode = "add", data = null }) => {
       required: mode === "add" 
     },
     
-    // 🚀 5. USE THE DYNAMIC OPTIONS IN THE FORM
     { 
       name: "role", 
       label: "System Access Role", 
       type: "select", 
       required: true, 
       defaultOption: "Select Access Level...",
-      options: roleOptions 
+      options: roleOptions // 🚀 Dynamic filtered roles
     },
 
     { divider: true, name: "div-social", title: "Social Links (Optional)" },
@@ -132,10 +146,12 @@ const AddEmployeeForm = ({ mode = "add", data = null }) => {
   ];
 
   const handleSubmit = (formData) => {
+    // পাসওয়ার্ড খালি থাকলে সেটা ডিলিট করে দিচ্ছি (Edit মোডে)
     if (mode === "edit" && !formData.get("password")) {
       formData.delete("password");
     }
     
+    // ব্রাঞ্চ আইডি অটোমেটিক সেট করা (সুপারঅ্যাডমিন না হলে)
     const isMaster = authUser?.permissions?.includes("all_access") || authUser?.role === "superadmin" || authUser?.role?.name === "superadmin";
 
     if (!isMaster && branchId) {
@@ -155,10 +171,10 @@ const AddEmployeeForm = ({ mode = "add", data = null }) => {
 
   const isMutating = addUserMutation.isPending || updateUserMutation.isPending;
 
-  if (!branchId) return <Loader />;
+  if (!branchId || isLoading) return <Loader />;
 
   return (
-    <div className="min-h-screen py-8 px-4">
+    <div className="min-h-screen py-8 px-4 animate-in fade-in duration-300">
       <EntityForm
         title={mode === "edit" ? "Edit Employee Profile" : "Register New Employee"}
         subtitle={`Fill out the information below to ${mode === "edit" ? "update" : "create"} an employee record.`}
@@ -169,7 +185,7 @@ const AddEmployeeForm = ({ mode = "add", data = null }) => {
         buttonText={mode === "edit" ? "Save Changes" : "Register Employee"}
         mode={mode}
         onCancel={() => navigate("/admin/all-employees")}
-        buttonColor="bg-[#000c1d] hover:bg-slate-800 focus:ring-slate-200"
+        buttonColor="bg-[#1e293b] hover:bg-slate-800"
       />
     </div>
   );
