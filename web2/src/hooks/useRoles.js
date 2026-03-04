@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import * as RoleAPI from "../api/role.api";
+import { API } from "../api/axios";
 
 // ==============================
 // FETCH QUERIES (GET)
@@ -79,5 +80,19 @@ export const useDeleteRole = () => {
       toast.error(error?.response?.data?.message || "Failed to delete role.");
       console.error("Delete Role Error:", error);
     },
+  });
+};
+
+
+export const useUpdateRolePermissions = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, permissions }) => {
+      const { data } = await API.put(`/roles/${id}/permissions`, { permissions });
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["roles"] }); // Table refresh korar jonno
+    }
   });
 };

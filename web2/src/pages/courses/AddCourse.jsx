@@ -16,7 +16,7 @@ const additionalInfoOptions = [
 const AddCourse = ({ mode = "add" }) => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { authUser } = useAuth(); // 🚀 Extract auth user
+  const { authUser } = useAuth(); 
   
   const createCourse = useCreateCourse();
   const updateCourse = useUpdateCourse();
@@ -169,7 +169,8 @@ const AddCourse = ({ mode = "add" }) => {
   if (isLoading && mode === "edit" && !courseData) return <Loader />;
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
+    // 🚀 Ekhane bg-[#e8f0f2] deya hoyeche onnano page er shathe match korar jonno
+    <div className="min-h-screen bg-[#e8f0f2] py-8 px-4 font-sans text-slate-800">
       <EntityForm
         title={mode === "edit" ? "Edit Course Details" : "Create New Course"}
         subtitle={mode === "edit" ? "Update existing course curriculum information" : "Define a new training program"}

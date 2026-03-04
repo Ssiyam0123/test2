@@ -8,6 +8,7 @@ import {
 import { useConfirmToast } from "../../components/ConfirmToast";
 import DataTable from "../../components/common/DataTable";
 import PageHeader from "../../components/common/PageHeader";
+import useAuth from "../../store/useAuth"; // 🚀 Zustand Store Import
 
 const CATEGORIES = [
   "Foundations",
@@ -23,6 +24,10 @@ const CATEGORIES = [
 export default function ManageMasterSyllabus() {
   const navigate = useNavigate();
   const { showConfirmToast } = useConfirmToast();
+  
+  // 🚀 PBAC Dynamic Permission Check
+  const { hasPermission } = useAuth();
+  const canManageSyllabus = hasPermission("manage_master_syllabus") || hasPermission("manage_syllabus");
 
   const [category, setCategory] = useState("");
   const [search, setSearch] = useState("");
@@ -31,7 +36,6 @@ export default function ManageMasterSyllabus() {
   const { data: res, isLoading } = useMasterTopics({ category, search });
   const deleteMutation = useDeleteMasterSyllabus();
 
-  // 🚀 ডাটাকে order_index অনুযায়ী সর্ট করে নিচ্ছি যাতে সিরিয়াল ঠিক থাকে
   const syllabusData = res?.data
     ? [...res.data].sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
     : [];
@@ -46,7 +50,7 @@ export default function ManageMasterSyllabus() {
   };
 
   const columns = [
-    { label: "#", align: "center", className: "w-16" }, // 🚀 নাম্বার কলাম
+    { label: "#", align: "center", className: "w-16" }, 
     { label: "Syllabus Topic & Recipes", align: "left" },
     { label: "Category", align: "left" },
     { label: "Type", align: "left" },
@@ -55,7 +59,7 @@ export default function ManageMasterSyllabus() {
 
   const renderRow = (item) => (
     <tr key={item._id} className="hover:bg-slate-50/80 transition-colors group">
-      {/* 🚀 সিরিয়াল নাম্বার (Class-01 স্টাইল) */}
+      
       <td className="px-6 py-5 text-center">
         <span className="font-mono font-black text-teal-600 bg-teal-50 px-2.5 py-1 rounded-lg text-[11px] border border-teal-100">
           {String(item.order_index || 0).padStart(2, "0")}
@@ -95,18 +99,29 @@ export default function ManageMasterSyllabus() {
 
       <td className="px-6 py-5 text-right">
         <div className="flex justify-end gap-2">
-          <button
-            onClick={() => navigate(`/admin/update-syllabus/${item._id}`)}
-            className="p-2 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-xl border border-transparent hover:border-teal-100 transition-all"
-          >
-            <Edit3 size={16} />
-          </button>
-          <button
-            onClick={() => handleDelete(item._id, item.topic)}
-            className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl border border-transparent hover:border-rose-100 transition-all"
-          >
-            <Trash2 size={16} />
-          </button>
+          {/* 🚀 Role Protected Actions */}
+          {canManageSyllabus ? (
+            <>
+              <button
+                onClick={() => navigate(`/admin/update-syllabus/${item._id}`)}
+                className="p-2 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-xl border border-transparent hover:border-teal-100 transition-all"
+                title="Edit Topic"
+              >
+                <Edit3 size={16} />
+              </button>
+              <button
+                onClick={() => handleDelete(item._id, item.topic)}
+                className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl border border-transparent hover:border-rose-100 transition-all"
+                title="Delete Topic"
+              >
+                <Trash2 size={16} />
+              </button>
+            </>
+          ) : (
+            <span className="text-[10px] text-slate-300 font-bold uppercase tracking-widest">
+              View Only
+            </span>
+          )}
         </div>
       </td>
     </tr>
@@ -117,8 +132,9 @@ export default function ManageMasterSyllabus() {
       <PageHeader
         title="Master Syllabus Library"
         subtitle="Global blueprint for all batch curricula."
-        onAdd={() => navigate("/admin/add-syllabus")}
-        addText="Add Topics"
+        // 🚀 Role Protected Add Button
+        onAdd={canManageSyllabus ? () => navigate("/admin/add-syllabus") : undefined}
+        addText={canManageSyllabus ? "Add Topics" : undefined}
       />
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mb-8">
         <div className="md:col-span-8 relative group">

@@ -5,6 +5,7 @@ import { useBatches, useDeleteBatch } from "../../hooks/useBatches";
 import Loader from "../../components/Loader";
 import Swal from "sweetalert2";
 import DataTable from "../../components/common/DataTable.jsx";
+import useAuth from "../../store/useAuth"; // 🚀 Imported Zustand Store
 
 export default function BatchListPage() {
   const navigate = useNavigate();
@@ -12,6 +13,10 @@ export default function BatchListPage() {
   const { mutate: deleteBatch } = useDeleteBatch();
   const [searchTerm, setSearchTerm] = useState("");
   
+  // 🚀 Dynamic Permission Checks
+  const { hasPermission } = useAuth();
+  const canManageBatches = hasPermission("manage_batches");
+
   const batches = batchesResponse?.data || [];
 
   const handleDelete = (id) => {
@@ -96,27 +101,36 @@ export default function BatchListPage() {
       {/* 4. Actions */}
       <td className="px-6 py-4 text-right align-middle">
         <div className="flex items-center justify-end gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
+          
           <button 
-            onClick={() => navigate(`/admin/manage-batches?id=${batch._id}`)}
+            onClick={() => navigate(`/admin/batches/${batch._id}`)}
             className="p-2 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-xl transition-all"
             title="Manage Workspace"
           >
             <BookOpen size={16} />
           </button>
-          <button 
-            onClick={() => navigate(`/admin/edit-batch/${batch._id}`)}
-            className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
-            title="Edit Settings"
-          >
-            <Edit3 size={16} />
-          </button>
-          <button 
-            onClick={() => handleDelete(batch._id)}
-            className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
-            title="Delete Batch"
-          >
-            <Trash2 size={16} />
-          </button>
+
+          {/* 🚀 Conditional Edit/Delete Actions */}
+          {canManageBatches && (
+            <>
+              <button 
+                onClick={() => navigate(`/admin/edit-batch/${batch._id}`)}
+                className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+                title="Edit Settings"
+              >
+                <Edit3 size={16} />
+              </button>
+              
+              <button 
+                onClick={() => handleDelete(batch._id)}
+                className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                title="Delete Batch"
+              >
+                <Trash2 size={16} />
+              </button>
+            </>
+          )}
+
         </div>
       </td>
     </tr>
@@ -146,12 +160,16 @@ export default function BatchListPage() {
                 className="w-full pl-10 pr-4 py-2.5 bg-white border border-transparent focus:border-teal-500 rounded-2xl outline-none shadow-sm transition-all text-sm font-medium"
               />
             </div>
-            <button 
-              onClick={() => navigate("/admin/add-batch")} 
-              className="bg-[#1e293b] hover:bg-slate-800 text-white px-5 py-2.5 rounded-2xl font-bold flex items-center gap-2 shadow-lg transition-all active:scale-95 shrink-0"
-            >
-              <Plus size={20} /> <span className="hidden sm:inline">New Batch</span>
-            </button>
+            
+            {/* 🚀 Role Guard on Create Button */}
+            {canManageBatches && (
+              <button 
+                onClick={() => navigate("/admin/add-batch")} 
+                className="bg-[#1e293b] hover:bg-slate-800 text-white px-5 py-2.5 rounded-2xl font-bold flex items-center gap-2 shadow-lg transition-all active:scale-95 shrink-0"
+              >
+                <Plus size={20} /> <span className="hidden sm:inline">New Batch</span>
+              </button>
+            )}
           </div>
         </div>
 

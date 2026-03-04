@@ -12,9 +12,8 @@ const roleSchema = new mongoose.Schema(
       type: String 
     },
     permissions: [
-      { type: String } // e.g., ["add_student", "view_finance", "edit_inventory"]
+      { type: String } 
     ],
-    // System roles (like Superadmin) cannot be deleted from the UI later
     is_system_role: { 
       type: Boolean, 
       default: false 

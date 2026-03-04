@@ -12,7 +12,7 @@ import PublicLayout from "./components/PublicLayout";
 // PUBLIC & AUTH PAGES
 import LoginPage from "./pages/LoginPage";
 import Dashboard from "./pages/Dashboard";
-import BranchDashboard from "./pages/BranchDashboard"; // 🚀 MUST IMPORT THIS
+import BranchDashboard from "./pages/BranchDashboard"; 
 import SearchStudent from "./pages/student-public/SearchStudent.jsx";
 import StudentDetails from "./pages/student-public/StudentDetails.jsx";
 import EmployeeDetails from "./pages/employee-public/EmployeeDetails.jsx";
@@ -43,6 +43,7 @@ import AddInventory from "./pages/inventory/AddInventory.jsx";
 // SYLLABUS DOMAIN
 import ManageMasterSyllabus from "./pages/master-syllabus/ManageMasterSyllabus.jsx";
 import AddMasterSyllabus from "./pages/master-syllabus/AddMasterSyllabus.jsx";
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: { staleTime: 5 * 60 * 1000, cacheTime: 10 * 60 * 1000, retry: 1, refetchOnWindowFocus: false },
@@ -57,23 +58,12 @@ const ProtectedRoute = ({ children }) => {
   return authUser ? children : <Navigate to="/login" replace />;
 };
 
+// RoleGuard ekhon shudhu hasPermission use korbe
 const RoleGuard = ({ requiredPermission }) => {
-  const { authUser } = useAuth(); 
+  const { hasPermission } = useAuth(); 
   const context = useOutletContext(); 
 
-  const hasPerm = () => {
-    if (!authUser) return false;
-    
-    const roleName = typeof authUser.role === 'string' ? authUser.role : authUser.role?.name;
-    if (roleName?.toLowerCase().replace(/\s/g, '') === "superadmin") return true;
-
-    const userPermissions = authUser.role?.permissions || authUser.permissions || [];
-    if (userPermissions.includes("all_access")) return true;
-    
-    return userPermissions.includes(requiredPermission);
-  };
-
-  if (!hasPerm()) {
+  if (!hasPermission(requiredPermission)) {
     toast.error("You do not have permission to view this page.");
     return <Navigate to="/admin" replace />;
   }
@@ -83,31 +73,29 @@ const RoleGuard = ({ requiredPermission }) => {
 
 // 🚀 TRAFFIC CONTROLLER FOR THE DASHBOARD
 const AdminIndex = () => {
-  const { authUser } = useAuth();
+  const { hasPermission, isMaster } = useAuth(); 
   
-  const roleName = typeof authUser?.role === 'string' ? authUser.role : authUser?.role?.name;
-  const userPermissions = authUser?.role?.permissions || authUser?.permissions || [];
-  const safeRoleName = roleName?.toLowerCase().replace(/\s/g, '');
-  
-  const isSuperAdmin = userPermissions.includes("all_access") || safeRoleName === "superadmin";
-  const isBranchAdmin = safeRoleName === "branchadmin" || safeRoleName === "admin";
-
-  // 1. Superadmins get global
-  if (isSuperAdmin) {
+  // 1. Superadmins get global dashboard
+  if (isMaster()) {
     return <Dashboard />;
   } 
   
-  // 2. Branch Admins (or anyone with the specific permission) get branch dashboard
-  if (isBranchAdmin || userPermissions.includes("view_dashboard")) {
+  // 2. Branch Admins / Staff with dashboard access get branch dashboard
+  if (hasPermission("view_dashboard")) {
     return <BranchDashboard />;
   }
 
-  // 3. Fallback for staff/instructors
-  if (userPermissions.includes("view_students")) {
+  // 3. Fallback for instructors/staff who don't have dashboard access
+  if (hasPermission("view_students")) {
     return <Navigate to="/admin/all-students" replace />;
   }
   
-  return <div className="p-8 text-center font-bold text-slate-500 mt-20">Access Denied: Please contact System Administrator.</div>;
+  // 4. Ultimate Fallback (Kono access nai)
+  return (
+    <div className="p-8 text-center font-bold text-slate-500 mt-20">
+      Access Denied: Please contact System Administrator.
+    </div>
+  );
 };
 
 // ==========================================
@@ -165,7 +153,7 @@ function App() {
               <Route path="add-course" element={<AddCourse />} />
               <Route path="update-course/:id" element={<AddCourse mode="edit" />} />
               
-              {/* 🚀 NEW SYLLABUS ROUTES */}
+              {/* SYLLABUS ROUTES */}
               <Route path="manage-syllabus" element={<ManageMasterSyllabus />} />
               <Route path="add-syllabus" element={<AddMasterSyllabus mode="add" />} />
               <Route path="update-syllabus/:id" element={<AddMasterSyllabus mode="edit" />} />

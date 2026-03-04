@@ -1,16 +1,17 @@
 import Joi from "joi";
 
+// Create Role Schema
 export const createRoleSchema = Joi.object({
-  name: Joi.string().min(2).max(50).required().messages({
-    "string.empty": "Role name is required.",
-    "string.min": "Role name must be at least 2 characters long."
+  name: Joi.string().required().trim().messages({
+    "string.empty": "Role name is required"
   }),
-  description: Joi.string().max(255).allow("").optional(),
-  permissions: Joi.array().items(Joi.string()).optional()
+  description: Joi.string().allow("").optional(),
+  permissions: Joi.array().items(Joi.string()).optional() // 🚀 Array of strings support
 });
 
+// Update Role Schema
 export const updateRoleSchema = Joi.object({
-  name: Joi.string().min(2).max(50).optional(),
-  description: Joi.string().max(255).allow("").optional(),
-  permissions: Joi.array().items(Joi.string()).optional()
-});
+  name: Joi.string().trim().optional(),
+  description: Joi.string().allow("").optional(),
+  permissions: Joi.array().items(Joi.string()).optional() // 🚀 Array of strings support
+}).min(1);

@@ -6,18 +6,18 @@ import { useActiveCourses } from "../../hooks/useCourses.js";
 import { useBranches } from "../../hooks/useBranches.js"; 
 import { useConfirmToast } from "../../components/ConfirmToast.jsx";
 import StudentFilters from "../../components/Search_filter/StudentFilters.jsx";
+import BranchDropdown from "../../components/common/BranchDropdown.jsx";
 import QRCodeModal from "../../components/modal/QRCodeModal.jsx";
 import CollectPaymentModal from "../../components/modal/CollectPaymentModal.jsx";
-import useAuth from "../../store/useAuth.js";
+import CommentModal from "../../components/modal/CommentModal.jsx";
 import PageHeader from "../../components/common/PageHeader.jsx";
 import TableSkeleton from "../../components/common/TableSkeleton.jsx";
 import DataErrorState from "../../components/common/DataErrorState.jsx";
-import CommentModal from "../../components/modal/CommentModal.jsx";
+import useAuth from "../../store/useAuth.js";
 
 const StudentsTable = React.lazy(() => import("../../components/table/StudentsTable.jsx"));
 
 const INITIAL_FILTERS = {
-  branch: "all",
   status: "all", 
   batch: "all", 
   course: "all", 
@@ -30,38 +30,35 @@ const INITIAL_FILTERS = {
 const AllStudents = () => {
   const navigate = useNavigate();
   const { showConfirmToast } = useConfirmToast();
-  const { authUser } = useAuth();
+  const { authUser, hasPermission, isMaster } = useAuth();
   
-  // 🚀 GATEKEEPER CONTEXT (From AdminLayout)
   const context = useOutletContext() || {}; 
   const branchId = context.branchId || authUser?.branch?._id || authUser?.branch; 
 
   const [filters, setFilters] = useState(INITIAL_FILTERS);
+  const [superAdminBranchFilter, setSuperAdminBranchFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(1);
+  
   const [selectedStudentForQr, setSelectedStudentForQr] = useState(null);
   const [selectedStudentForComment, setSelectedStudentForComment] = useState(null);
   const [paymentData, setPaymentData] = useState(null); 
   
   const limit = 20;
 
-  // 🚀 PBAC DYNAMIC SECURITY CHECKS
-  const permissions = authUser?.role?.permissions || authUser?.permissions || [];
-  const roleName = (typeof authUser?.role === 'string' ? authUser.role : authUser?.role?.name || "").toLowerCase();
-  
-  const isMaster = roleName === "superadmin" || permissions.includes("all_access");
-  const canAddStudent = isMaster || permissions.includes("add_student");
+  const isSuper = isMaster();
+  const canAddStudent = hasPermission("add_student");
 
-  // Determine which branch ID to use for fetching dropdowns
+  // Determine branch ID for API calls
   const effectiveBranchId = useMemo(() => {
-    if (isMaster) return filters.branch === "all" ? null : filters.branch; 
+    if (isSuper) return superAdminBranchFilter === "all" ? null : superAdminBranchFilter; 
     return branchId;
-  }, [isMaster, filters.branch, branchId]);
+  }, [isSuper, superAdminBranchFilter, branchId]);
 
   const { data: batchesRes } = useBatches(effectiveBranchId ? { branch: effectiveBranchId } : {});
   const { data: coursesRes } = useActiveCourses();
-  const { data: branchesRes } = useBranches({}, { enabled: isMaster }); 
+  const { data: branchesRes } = useBranches({}, { enabled: isSuper }); 
   
   useEffect(() => {
     const handler = setTimeout(() => setDebouncedSearch(searchTerm), 500);
@@ -71,11 +68,11 @@ const AllStudents = () => {
   const queryFilters = useMemo(() => {
     const activeFilters = { ...filters };
     
-    // 🚀 PBAC GATE: Branch Isolation
-    if (!isMaster) {
+    // Injecting branch logic cleanly
+    if (!isSuper) {
       activeFilters.branch = branchId; 
-    } else if (activeFilters.branch === "all") {
-      delete activeFilters.branch;
+    } else if (superAdminBranchFilter !== "all") {
+      activeFilters.branch = superAdminBranchFilter;
     }
 
     if (debouncedSearch) activeFilters.search = debouncedSearch;
@@ -85,46 +82,58 @@ const AllStudents = () => {
     });
     
     return activeFilters;
-  }, [filters, debouncedSearch, branchId, isMaster]);
+  }, [filters, debouncedSearch, branchId, isSuper, superAdminBranchFilter]);
 
-  // 🚀 FETCH STUDENTS (Only if branch is ready for non-admins)
   const { data, isLoading, error, refetch, isRefetching } = useStudents(
-    page, 
-    limit, 
-    queryFilters,
-    { enabled: isMaster ? true : !!branchId } // Prevent premature fetching
+    page, limit, queryFilters, { enabled: isSuper ? true : !!branchId } 
   );
 
   const combinedFilterOptions = useMemo(() => ({
     batches: batchesRes?.data || [],
     courses: coursesRes?.data || [],
-    branches: isMaster ? branchesRes?.data || [] : []
-  }), [batchesRes, coursesRes, branchesRes, isMaster]);
+  }), [batchesRes, coursesRes]);
 
   const deleteStudentMutation = useDeleteStudent();
   const toggleStatusMutation = useToggleStudentStatus();
 
-  // Reset page to 1 when filters change
-  useEffect(() => {
-    setPage(1);
-  }, [queryFilters]);
+  useEffect(() => { setPage(1); }, [queryFilters]);
+
+  // 🚀 Branch change korle auto batch/course reset hobe (Ekhon eta perfect kaj korbe!)
+  const handleBranchChange = (newBranch) => {
+    setSuperAdminBranchFilter(newBranch);
+    setFilters(prev => ({ ...prev, batch: "all", course: "all" }));
+  };
 
   if (error) return <DataErrorState error={error} onRetry={refetch} isRetrying={isRefetching} />;
-
-  // Prevent UI rendering crash before branch logic resolves
-  if (!isMaster && !branchId) return <div className="p-6"><TableSkeleton rows={8} /></div>;
+  if (!isSuper && !branchId) return <div className="p-6"><TableSkeleton rows={8} /></div>;
 
   return (
     <div className="p-6 max-w-[1600px] mx-auto min-h-screen">
       <PageHeader 
         title="Student Directory" 
-        subtitle={`Viewing ${isMaster ? 'All Campuses' : 'Your Campus'} Records`} 
+        subtitle={`Viewing ${isSuper ? 'All Campuses' : 'Your Campus'} Records`} 
         onAdd={canAddStudent ? () => navigate("/admin/add-student") : undefined} 
         addText={canAddStudent ? "Add Student" : undefined} 
       />
 
-      <div className="mb-6">
+      <div className="mb-6 space-y-4">
+        {isSuper && (
+          <div className="flex justify-end">
+            <div className="w-full md:w-64 bg-white rounded-xl shadow-sm border border-slate-200">
+              <BranchDropdown 
+                isMaster={isSuper} 
+                branches={branchesRes?.data} 
+                value={superAdminBranchFilter} 
+                onChange={handleBranchChange} 
+                wrapperClassName="w-full"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* 🚀 EKHANE filters={filters} PASS KORA HOYECHE */}
         <StudentFilters 
+          filters={filters} 
           onFilterChange={setFilters} 
           searchTerm={searchTerm} 
           onSearchChange={setSearchTerm}
@@ -138,10 +147,9 @@ const AllStudents = () => {
         {isLoading ? <TableSkeleton rows={8} /> : (
           <StudentsTable
             students={data?.data || []} 
-            currentUser={authUser} 
             pagination={data?.pagination}
             onDelete={(id, name) => showConfirmToast({
-              type: "delete", title: "Delete", message: `Delete ${name}?`,
+              type: "delete", title: "Delete Student", message: `Are you sure you want to delete ${name}?`,
               onConfirm: () => deleteStudentMutation.mutate(id)
             })} 
             onToggleStatus={(id) => toggleStatusMutation.mutate(id)}

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { Package, Plus, Trash2, Calculator, ArrowLeft } from "lucide-react";
+import React, { useState, useMemo } from "react";
+import { Package, Plus, Trash2, Calculator, ArrowLeft, Store, FileText } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import EntityForm from "../../components/common/EntityForm"; 
 import { useAddStockPurchase } from "../../hooks/useInventory";
@@ -10,7 +10,7 @@ const CATEGORIES = ["Meat", "Dairy", "Produce", "Dry Goods", "Equipment", "Packa
 const UNITS = ["kg", "g", "L", "ml", "pcs", "pkt", "box", "dozen"];
 
 // ==========================================
-// 1. DYNAMIC STOCK ITEMS COMPONENT
+// 1. DYNAMIC STOCK ITEMS COMPONENT (Line Items)
 // ==========================================
 const DynamicStockField = ({ value = [], onChange }) => {
   const handleAddItem = () => {
@@ -30,86 +30,97 @@ const DynamicStockField = ({ value = [], onChange }) => {
   const grandTotal = value.reduce((sum, item) => sum + (Number(item.rowTotal) || 0), 0);
 
   return (
-    <div className="bg-slate-50 border border-slate-200 rounded-[1.5rem] p-5 lg:p-8 w-full">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-        <div className="flex items-center gap-2 text-slate-700">
-          <Package size={20} className="text-teal-600" />
-          <h3 className="text-base font-black uppercase tracking-widest">Bazar List Details</h3>
+    <div className="w-full bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden mb-6">
+      <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-2.5">
+          <div className="p-2 bg-teal-100 rounded-xl text-teal-600">
+            <Package size={20} />
+          </div>
+          <h3 className="text-sm font-black uppercase tracking-widest text-slate-700">Purchase Line Items</h3>
         </div>
-        <div className="flex items-center gap-2 bg-teal-50 px-4 py-2 rounded-full border border-teal-100">
-          <Calculator size={16} className="text-teal-600" />
-          <span className="text-sm font-black text-teal-700">Bill Total: ৳{grandTotal.toLocaleString()}</span>
+        <div className="flex items-center gap-3 bg-white px-4 py-2 rounded-2xl border border-slate-200 shadow-sm">
+          <Calculator size={16} className="text-teal-500" />
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-tighter">Running Total:</span>
+          <span className="text-base font-black text-teal-600">৳{grandTotal.toLocaleString()}</span>
         </div>
       </div>
       
-      <div className="space-y-3 overflow-x-auto custom-scrollbar pb-4">
-        <div className="flex gap-2 min-w-[700px] px-1">
-          <label className="flex-1 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Item Name</label>
-          <label className="w-32 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Category*</label>
-          <label className="w-20 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Qty</label>
-          <label className="w-20 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Unit</label>
-          <label className="w-32 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">Price (৳)</label>
-          <div className="w-10"></div>
-        </div>
-
-        {value.map((item, index) => (
-          <div key={index} className="flex items-center gap-2 min-w-[700px] animate-in slide-in-from-top-1 duration-200">
-            <input 
-              type="text" required
-              value={item.name}
-              onChange={(e) => handleItemChange(index, "name", e.target.value)}
-              placeholder="e.g. Broiler Chicken"
-              className="flex-1 px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none transition-all"
-            />
-            <select
-              required
-              value={item.category}
-              onChange={(e) => handleItemChange(index, "category", e.target.value)}
-              className="w-32 px-2 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none transition-all cursor-pointer"
-            >
-              <option value="" disabled>Select...</option>
-              {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-            <input 
-              type="number" required min="0.01" step="any"
-              value={item.qty}
-              onChange={(e) => handleItemChange(index, "qty", e.target.value)}
-              placeholder="0"
-              className="w-20 px-2 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none transition-all text-center"
-            />
-            <select
-              required value={item.unit}
-              onChange={(e) => handleItemChange(index, "unit", e.target.value)}
-              className="w-20 px-2 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none transition-all cursor-pointer"
-            >
-              {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
-            </select>
-            <input 
-              type="number" required min="0" step="any"
-              value={item.rowTotal}
-              onChange={(e) => handleItemChange(index, "rowTotal", e.target.value)}
-              placeholder="৳180"
-              className="w-32 px-3 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none transition-all text-right"
-            />
-            <button 
-              type="button" onClick={() => handleRemoveItem(index)} disabled={value.length === 1}
-              className="w-10 h-10 flex items-center justify-center text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all disabled:opacity-30 disabled:hover:bg-transparent"
-            >
-              <Trash2 size={16} />
-            </button>
+      <div className="p-4 lg:p-6 overflow-x-auto custom-scrollbar">
+        <div className="space-y-3 min-w-[800px]">
+          {/* Header Labels */}
+          <div className="flex gap-3 px-2 mb-1">
+            <label className="flex-[2] text-[10px] font-black text-slate-400 uppercase tracking-widest">Product Description</label>
+            <label className="flex-1 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Category</label>
+            <label className="w-24 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Quantity</label>
+            <label className="w-24 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Unit</label>
+            <label className="w-32 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Price (৳)</label>
+            <div className="w-10"></div>
           </div>
-        ))}
 
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between pt-6 border-t border-slate-200/60 mt-4 gap-4">
-          <button 
-            type="button" onClick={handleAddItem}
-            className="flex items-center justify-center gap-1.5 text-sm font-black text-teal-600 hover:text-teal-700 bg-teal-50 hover:bg-teal-100 px-4 py-2.5 rounded-xl transition-colors w-full sm:w-auto"
-          >
-            <Plus size={16} /> Add Another Row
-          </button>
-          <div className="text-right pr-12 w-full sm:w-auto">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Subtotal</span>
-            <span className="text-2xl font-black text-slate-700">৳{grandTotal.toLocaleString()}</span>
+          {value.map((item, index) => (
+            <div key={index} className="flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
+              <input 
+                type="text" required
+                value={item.name}
+                onChange={(e) => handleItemChange(index, "name", e.target.value)}
+                placeholder="e.g. Fresh Chicken Breast"
+                className="flex-[2] px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:bg-white focus:ring-4 focus:ring-teal-500/5 focus:border-teal-500 outline-none transition-all"
+              />
+              
+              <select
+                required
+                value={item.category}
+                onChange={(e) => handleItemChange(index, "category", e.target.value)}
+                className="flex-1 px-2 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:bg-white outline-none cursor-pointer transition-all"
+              >
+                <option value="" disabled>Select...</option>
+                {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+
+              <input 
+                type="number" required min="0.01" step="any"
+                value={item.qty}
+                onChange={(e) => handleItemChange(index, "qty", e.target.value)}
+                placeholder="0.00"
+                className="w-24 px-2 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:bg-white outline-none text-center transition-all"
+              />
+
+              <select
+                required value={item.unit}
+                onChange={(e) => handleItemChange(index, "unit", e.target.value)}
+                className="w-24 px-2 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:bg-white outline-none cursor-pointer transition-all"
+              >
+                {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+              </select>
+
+              <input 
+                type="number" required min="0" step="any"
+                value={item.rowTotal}
+                onChange={(e) => handleItemChange(index, "rowTotal", e.target.value)}
+                placeholder="0.00"
+                className="w-32 px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-black text-slate-800 focus:bg-white outline-none text-right transition-all"
+              />
+
+              <button 
+                type="button" onClick={() => handleRemoveItem(index)} disabled={value.length === 1}
+                className="w-10 h-10 flex items-center justify-center text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all disabled:opacity-0"
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
+          ))}
+
+          <div className="flex items-center justify-between pt-6 mt-4">
+            <button 
+              type="button" onClick={handleAddItem}
+              className="flex items-center justify-center gap-2 text-xs font-black text-teal-600 bg-teal-50 hover:bg-teal-100 px-5 py-3 rounded-xl transition-all active:scale-95 uppercase tracking-widest"
+            >
+              <Plus size={16} strokeWidth={3} /> Add New Row
+            </button>
+            <div className="text-right pr-12">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Grand Total Amount</span>
+              <span className="text-3xl font-black text-slate-800 tracking-tighter">৳{grandTotal.toLocaleString()}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -124,20 +135,14 @@ export default function AddInventory() {
   const navigate = useNavigate();
   const { authUser } = useAuth();
   
-  // Safely extract the branch ID
   const activeBranchId = typeof authUser?.branch === 'object' 
     ? authUser?.branch?._id 
     : authUser?.branch;
 
   const addStockMutation = useAddStockPurchase(activeBranchId);
 
-  // If no branch is found (e.g., admin hasn't selected one or auth is loading), show a loader or error
   if (!activeBranchId) {
-    return (
-      <div className="h-full flex items-center justify-center min-h-[400px]">
-        <Loader />
-      </div>
-    );
+    return <div className="h-screen bg-[#e8f0f2] flex items-center justify-center"><Loader /></div>;
   }
 
   const formConfig = [
@@ -147,26 +152,30 @@ export default function AddInventory() {
       fullWidth: true,
       render: ({ value, onChange }) => <DynamicStockField value={value || []} onChange={onChange} />
     },
-    { divider: true, title: "Invoice Details" },
+    { 
+      divider: true, 
+      title: "Invoice & Logistics", 
+      icon: FileText 
+    },
     {
       name: "supplier",
-      label: "Shop / Vendor Name (Optional)", 
+      label: "Shop / Vendor Name", 
       type: "text",
-      placeholder: "e.g. Karwan Bazar, Meena Bazar",
-      required: false
+      placeholder: "e.g. Karwan Bazar Wholesale",
+      required: false,
+      icon: Store
     },
     {
       name: "notes",
-      label: "Reference Notes",
+      label: "Reference / Internal Notes",
       type: "text",
-      placeholder: "e.g. Bought for tomorrow's baking class",
+      placeholder: "Describe what this bazar is for...",
+      fullWidth: true
     }
   ];
 
   const handleSubmit = async (formDataObj, rawFormData) => {
     const { items, supplier, notes } = rawFormData;
-    
-    // Summing up the grand total
     const total_cost = items.reduce((acc, curr) => acc + (Number(curr.rowTotal) || 0), 0);
 
     const payload = {
@@ -185,44 +194,46 @@ export default function AddInventory() {
 
     try {
       await addStockMutation.mutateAsync(payload);
-      // On success, redirect back to the manage inventory page
-      navigate("/admin/manage-inventory");
+      navigate("/admin/inventory");
     } catch (error) {
       console.error("Stock addition failed", error);
     }
   };
 
   return (
-    <div className="p-4 md:p-8 max-w-5xl mx-auto animate-in fade-in duration-300">
-      
-      {/* HEADER SECTION */}
-      <div className="mb-8">
-        <button 
-          onClick={() => navigate(-1)} // Goes back to the previous page
-          className="flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-teal-600 uppercase tracking-widest mb-4 transition-colors w-fit"
-        >
-          <ArrowLeft size={14} /> Back
-        </button>
-        <h1 className="text-3xl font-black text-slate-800 tracking-tight">Log Stock Purchase</h1>
-        <p className="text-sm font-bold text-slate-400 mt-1 uppercase tracking-widest">
-          Record physical goods and update financial ledger
-        </p>
-      </div>
+    <div className="min-h-screen p-4 md:p-8 lg:p-10 font-sans">
+      <div className="max-w-6xl mx-auto">
+        
+        {/* HEADER SECTION */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10 animate-in fade-in slide-in-from-left-4 duration-500">
+          <div>
+            <button 
+              onClick={() => navigate(-1)}
+              className="flex items-center gap-1.5 text-[10px] font-black text-slate-400 hover:text-teal-600 uppercase tracking-[0.2em] mb-4 transition-all w-fit group"
+            >
+              <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform" /> Back to Pantry
+            </button>
+            <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">Log Stock Purchase</h1>
+            <p className="text-slate-500 text-sm font-medium mt-1">Record new inventory arrival and update financial ledger records.</p>
+          </div>
+        </div>
 
-      {/* FORM SECTION */}
-      <div className="bg-white rounded-[2rem] border border-slate-100 shadow-xl overflow-hidden p-6 md:p-8">
-        <EntityForm
-          // We don't need the title/subtitle here since we built our own header above
-          config={formConfig}
-          initialData={{ items: [{ name: "", category: "", qty: "", unit: "kg", rowTotal: "" }] }}
-          onSubmit={handleSubmit}
-          onCancel={() => navigate("/admin/manage-inventory")}
-          isLoading={addStockMutation.isPending}
-          buttonText="Confirm & Post to Ledger"
-          buttonColor="bg-teal-600 hover:bg-teal-700 shadow-teal-500/20"
-        />
-      </div>
+        {/* FORM CONTAINER */}
+        <div className="p-4 md:p-8">
+          <EntityForm
+            config={formConfig}
+            initialData={{ items: [{ name: "", category: "", qty: "", unit: "kg", rowTotal: "" }] }}
+            onSubmit={handleSubmit}
+            onCancel={() => navigate("/admin/inventory")}
+            isLoading={addStockMutation.isPending}
+            buttonText="Post to Inventory & Ledger"
+            buttonColor="bg-slate-900 hover:bg-teal-600 shadow-xl shadow-slate-900/10"
+            // Customizing the form appearance
+            gridCols="grid-cols-1 md:grid-cols-2"
+          />
+        </div>
 
+      </div>
     </div>
   );
 }

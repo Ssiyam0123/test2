@@ -131,17 +131,42 @@ export const updateStudent = catchAsync(async (req, res, next) => {
 export const getAllStudents = catchAsync(async (req, res, next) => {
   const page = Math.max(1, parseInt(req.query.page) || 1);
   const limit = Math.min(100, parseInt(req.query.limit) || 30);
-  const { search, status } = req.query;
+  
+  // 🚀 ফ্রন্টএন্ড থেকে আসা সব ফিল্টার রিসিভ করছি
+  const { 
+    search, status, branch, batch, course, 
+    is_active, is_verified, date_from, date_to 
+  } = req.query;
 
   let match = {};
 
-  // 🚀 Safely cast branch to ObjectId for aggregation pipeline
-  if (req.branchFilter?.branch) {
-    match.branch = new mongoose.Types.ObjectId(req.branchFilter.branch);
+  // 🚀 1. Branch Logic: Middleware এর ফিল্টার অথবা ফ্রন্টএন্ডের পাঠানো ফিল্টার
+  const effectiveBranch = req.branchFilter?.branch || branch;
+  if (effectiveBranch && effectiveBranch !== "all") {
+    match.branch = new mongoose.Types.ObjectId(effectiveBranch);
   }
 
-  if (status && status !== "all") match.status = status;
+  // 🚀 2. Batch & Course Filters (Must be cast to ObjectId for aggregation)
+  if (batch && batch !== "all") {
+    match.batch = new mongoose.Types.ObjectId(batch);
+  }
+  if (course && course !== "all") {
+    match.course = new mongoose.Types.ObjectId(course);
+  }
 
+  // 🚀 3. Boolean & String Filters
+  if (status && status !== "all") match.status = status;
+  if (is_active && is_active !== "all") match.is_active = is_active === "true";
+  if (is_verified && is_verified !== "all") match.is_verified = is_verified === "true";
+
+  // 🚀 4. Date Range Filter
+  if (date_from || date_to) {
+    match.createdAt = {}; 
+    if (date_from) match.createdAt.$gte = new Date(date_from);
+    if (date_to) match.createdAt.$lte = new Date(date_to);
+  }
+
+  // 🚀 5. Search Filter
   if (search) {
     match.$or = [
       { student_name: { $regex: search, $options: "i" } },
@@ -163,7 +188,8 @@ export const getAllStudents = catchAsync(async (req, res, next) => {
           let: { studentId: "$_id" },
           pipeline: [
             { $match: { $expr: { $eq: ["$student", "$$studentId"] } } },
-            { $project: { total_amount: 1, paid_amount: 1, status: 1 } }
+            // 🚀 net_payable অ্যাড করেছি কারণ ফ্রন্টএন্ডে এটা ইউজ করছিস
+            { $project: { total_amount: 1, paid_amount: 1, status: 1, net_payable: 1 } }
           ],
           as: "fee_summary"
         }
@@ -203,10 +229,16 @@ export const getAllStudents = catchAsync(async (req, res, next) => {
       },
       { $unwind: { path: "$branch", preserveNullAndEmptyArrays: true } }
     ]),
-    Student.countDocuments(match)
+    
+    // Total count for pagination
+    Student.aggregate([
+      { $match: match },
+      { $count: "total" }
+    ])
   ]);
 
-  const pagination = { total, page, limit, totalPages: Math.ceil(total / limit) };
+  const totalCount = total.length > 0 ? total[0].total : 0;
+  const pagination = { total: totalCount, page, limit, totalPages: Math.ceil(totalCount / limit) };
 
   res.status(200).json(new ApiResponse(200, students, "Students fetched successfully", pagination));
 });

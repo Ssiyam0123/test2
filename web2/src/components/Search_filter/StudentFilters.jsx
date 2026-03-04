@@ -1,82 +1,34 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import DataFilters from "../common/DataFilters.jsx";
 
 const StudentFilters = ({
   searchTerm,
   onSearchChange,
   filterOptions,
+  filters, // 🚀 প্যারেন্ট থেকে সরাসরি স্টেট রিসিভ করবে
   initialFilters = {},
   onFilterChange,
   isLoading = false,
 }) => {
-  const [filters, setFilters] = useState({
-    branch: "all",
-    status: "all",
-    batch: "all",
-    course: "all",
-    competency: "all",
-    is_active: "all",
-    is_verified: "all",
-    date_from: "",
-    date_to: "",
-    ...initialFilters,
-  });
-
-  useEffect(() => {
-    setFilters((prev) => ({ ...prev, ...initialFilters }));
-  }, [initialFilters]);
-
+  
+  // 🚀 নিজস্ব স্টেট রিমুভ করা হয়েছে। এখন সে সরাসরি প্যারেন্টকে আপডেট জানাবে।
   const handleFilterChange = (key, value) => {
-    const newFilters = { ...filters, [key]: value };
-    
-    // IMPORTANT: If superadmin changes the branch, reset the batch and course filters!
-    // Otherwise, it might try to search for a Dhaka batch inside Cumilla.
-    if (key === "branch") {
-      newFilters.batch = "all";
-      newFilters.course = "all";
-    }
-    
-    setFilters(newFilters);
-    onFilterChange(newFilters);
+    onFilterChange({ ...filters, [key]: value });
   };
 
   const clearFilters = () => {
-    const cleared = {
-      branch: "all",
-      status: "all",
-      batch: "all",
-      course: "all",
-      competency: "all",
-      is_active: "all",
-      is_verified: "all",
-      date_from: "",
-      date_to: "",
-    };
-    setFilters(cleared);
     onSearchChange("");
-    onFilterChange(cleared);
+    onFilterChange(initialFilters); // 🚀 প্যারেন্টকে রিসেট করতে বলবে
   };
 
   const searchConfig = {
     value: searchTerm || "",
     onChange: onSearchChange,
-    placeholder: "Search students...",
+    placeholder: "Search students by name, ID, or phone...",
     showButton: false,
   };
 
   const filterConfig = [
-    // 🚀 DYNAMIC BRANCH FILTER (Only renders if array has items)
-    ...(filterOptions?.branches?.length > 0 ? [{
-      key: "branch",
-      label: "Campus / Branch",
-      type: "select",
-      color: "indigo",
-      options: filterOptions.branches.map((b) => ({
-        value: b._id ? String(b._id) : String(b),
-        label: b.branch_name ? String(b.branch_name) : String(b),
-      })),
-    }] : []),
-
     {
       key: "status",
       label: "Status",
@@ -93,8 +45,7 @@ const StudentFilters = ({
       label: "Batch",
       type: "select",
       color: "green",
-      options:
-        filterOptions?.batches?.map((b) => ({
+      options: filterOptions?.batches?.map((b) => ({
           value: b._id ? String(b._id) : String(b), 
           label: b.batch_name ? String(b.batch_name) : String(b),
         })) || [],
@@ -104,8 +55,7 @@ const StudentFilters = ({
       label: "Course",
       type: "select",
       color: "purple",
-      options:
-        filterOptions?.courses?.map((c) => ({
+      options: filterOptions?.courses?.map((c) => ({
           value: c._id ? String(c._id) : String(c),
           label: c.course_name ? String(c.course_name) : String(c),
         })) || [],
@@ -149,7 +99,7 @@ const StudentFilters = ({
     <DataFilters
       searchConfig={searchConfig}
       filterConfig={filterConfig}
-      filters={filters}
+      filters={filters} // 🚀 প্যারেন্টের পাঠানো filters
       onFilterChange={handleFilterChange}
       onClearFilters={clearFilters}
       isLoading={isLoading}

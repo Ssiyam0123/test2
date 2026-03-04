@@ -2,27 +2,24 @@ import React, { useState, useMemo, useEffect } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { useBatches, useDeleteBatch } from "../../hooks/useBatches"; 
 import { useBranches } from "../../hooks/useBranches"; 
-import useAuth from "../../store/useAuth";
+import useAuth from "../../store/useAuth"; // 🚀 Zustand Store
 import { useConfirmToast } from "../../components/ConfirmToast.jsx"; 
 
 import BatchHeader from "../../components/batches/BatchHeader";
 import BatchList from "../../components/batches/BatchList";
 import Loader from "../../components/Loader";
-
-// 🚀 ১. নতুন কম্পোনেন্ট ইমপোর্ট কর
 import BranchDropdown from "../../components/common/BranchDropdown"; 
 
 export default function ManageBatchesTabs() {
   const navigate = useNavigate();
-  const { authUser } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
+  
+  // 🚀 Zustand Helper Call
+  const { isMaster: checkIsMaster } = useAuth();
+  const isMaster = checkIsMaster(); 
   
   const context = useOutletContext() || {};
   const { branchId: contextBranchId } = context;
-
-  const permissions = authUser?.role?.permissions || authUser?.permissions || [];
-  const roleName = (typeof authUser?.role === 'string' ? authUser.role : authUser?.role?.name || "").toLowerCase();
-  const isMaster = roleName === "superadmin" || permissions.includes("all_access");
 
   const [localBranchId, setLocalBranchId] = useState(isMaster ? "all" : contextBranchId);
 
@@ -75,18 +72,18 @@ export default function ManageBatchesTabs() {
       <div className="w-full max-w-[1400px] flex gap-4 lg:gap-6 ">
         <div className="flex-1 flex flex-col bg-white/40 backdrop-blur-xl rounded-[1.25rem] md:rounded-[2.5rem] p-3 md:p-6 shadow-sm border border-white/60 overflow-hidden">
           
-          <BatchHeader searchTerm={searchTerm} setSearchTerm={setSearchTerm} authUser={authUser} />
+          <BatchHeader searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
 
           <BranchDropdown 
             isMaster={isMaster} 
             branches={branches} 
             value={localBranchId} 
             onChange={setLocalBranchId} 
+            wrapperClassName="flex justify-end mb-4"
           />
 
           <BatchList 
             batches={filteredBatches} 
-            authUser={authUser} 
             onSelectBatch={(batch) => navigate(`/admin/batches/${batch._id}`)} 
             onDeleteBatch={handleDeleteBatch}
             isDeleting={deleteBatchMutation.isPending}

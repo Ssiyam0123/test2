@@ -2,13 +2,39 @@ import { create } from "zustand";
 import { API } from "../api/axios";
 import toast from "react-hot-toast";
 
-const useAuth = create((set) => ({
+const useAuth = create((set, get) => ({ 
   authUser: null,
   isCheckingAuth: true,
   isSigningUp: false,
   isLoggingIn: false,
   onlineUsers: [],
 
+  // ==========================================
+  // 🛡️ ROLE & PERMISSION HELPERS
+  // ==========================================
+  hasPermission: (permission) => {
+    const { authUser } = get(); 
+    
+    if (!authUser || !authUser.role) return false;
+
+    const roleName = authUser.role.name;
+    const permissions = authUser.role.permissions || [];
+
+    if (roleName === "superadmin" || permissions.includes("all_access")) {
+      return true;
+    }
+
+    return permissions.includes(permission);
+  },
+
+  isMaster: () => {
+    const { authUser } = get();
+    return authUser?.role?.name === "superadmin";
+  },
+
+  // ==========================================
+  // 🔐 AUTH ACTIONS
+  // ==========================================
   checkAuth: async () => {
     try {
       const res = await API.get("/auth/check");

@@ -1,9 +1,14 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus, BookOpen, Clock, Users, ListPlus, Edit2 } from "lucide-react";
+import useAuth from "../../store/useAuth"; // 🚀 Imported Zustand Store
 
-export default function BatchList({ batches, authUser, onSelectBatch }) {
+export default function BatchList({ batches, onSelectBatch }) {
   const navigate = useNavigate();
+  
+  // 🚀 Dynamic Permission Check
+  const { hasPermission } = useAuth();
+  const canManageBatches = hasPermission("manage_batches");
 
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
@@ -13,7 +18,8 @@ export default function BatchList({ batches, authUser, onSelectBatch }) {
           <p className="text-sm text-gray-500 font-medium">Manage and track batch progress.</p>
         </div>
         
-        {['admin', 'registrar'].includes(authUser?.role) && (
+        {/* 🚀 Role Guard Applied */}
+        {canManageBatches && (
           <button 
             onClick={() => navigate('/admin/add-batch')} 
             className="w-full sm:w-auto px-5 py-3 bg-[#1e293b] text-white text-sm font-bold rounded-2xl shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-all"
@@ -31,7 +37,8 @@ export default function BatchList({ batches, authUser, onSelectBatch }) {
               onClick={() => onSelectBatch(batch)}
               className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100 hover:border-teal-200 hover:shadow-xl transition-all cursor-pointer group relative flex flex-col justify-between"
             >
-              {['admin', 'registrar'].includes(authUser?.role) && (
+              {/* 🚀 Role Guard Applied */}
+              {canManageBatches && (
                 <button 
                   onClick={(e) => {
                     e.stopPropagation();

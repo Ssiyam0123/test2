@@ -13,15 +13,10 @@ const AdminLayout = () => {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const { logout, authUser } = useAuth();
-
-  // --- 🚀 SECURITY LOGIC ---
-  const userPermissions = authUser?.role?.permissions || authUser?.permissions || [];
-  const rawRole = typeof authUser?.role === "string" ? authUser.role : authUser?.role?.name || "";
-  const safeRoleName = rawRole.toLowerCase().replace(/\s/g, "");
-
-  // ১. সুপারঅ্যাডমিন চেক (একদম কড়া চেক)
-  const isSuperAdmin = safeRoleName === "superadmin" || userPermissions.includes("all_access");
+  
+  // 🚀 Cleaned up PBAC checks using Zustand
+  const { logout, authUser, hasPermission, isMaster: checkIsMaster } = useAuth();
+  const isSuperAdmin = checkIsMaster(); // Returns true if Superadmin
 
   const [activeBranch, setActiveBranch] = useState(null);
 
@@ -48,12 +43,6 @@ const AdminLayout = () => {
     if (branch) setActiveBranch(branch);
   };
 
-  const hasPermission = (requiredPermission) => {
-    if (isSuperAdmin) return true;
-    if (!requiredPermission) return true;
-    return userPermissions.includes(requiredPermission);
-  };
-
   // --- 🚀 NAVIGATION CONFIGURATION ---
   const navigationGroups = useMemo(() => [
     {
@@ -62,7 +51,8 @@ const AdminLayout = () => {
         { 
           name: isSuperAdmin ? "Global Dashboard" : "Branch Dashboard", 
           href: "/admin", 
-          icon: LayoutDashboard 
+          icon: LayoutDashboard,
+          permission: "view_dashboard" // Added permission check here too
         }
       ],
     },
@@ -77,10 +67,7 @@ const AdminLayout = () => {
       label: "Staff & Faculty",
       items: [
         { name: "All Employees", href: "/admin/all-employees", icon: Briefcase, permission: "view_employees" },
-        // 🚀 STRICT BLOCK: ব্রাঞ্চ অ্যাডমিন (admin) হলে এই অপশনটি অ্যারেতে ঢুকবেই না
-        ...(safeRoleName === "superadmin" ? [
-          { name: "Add Employee", href: "/admin/add-employee", icon: UserPlus, permission: "add_employee" }
-        ] : []),
+        { name: "Add Employee", href: "/admin/add-employee", icon: UserPlus, permission: "add_employee" }
       ],
     },
     {
@@ -88,7 +75,8 @@ const AdminLayout = () => {
       items: [
         { name: "All Courses", href: "/admin/all-courses", icon: GraduationCap, permission: "view_courses" },
         { name: "Add Course", href: "/admin/add-course", icon: BookPlus, permission: "manage_courses" },
-        { name: "Master Syllabus", href: "/admin/manage-syllabus", icon: BookOpen, permission: "manage_courses" },
+        // 🚀 FIXED: Changed permission to view_syllabus
+        { name: "Master Syllabus", href: "/admin/manage-syllabus", icon: BookOpen, permission: "view_syllabus" }, 
       ],
     },
     {
@@ -108,8 +96,8 @@ const AdminLayout = () => {
     {
       label: "Batches",
       items: [
-        { name: "All Batches", href: "/admin/all-batches", icon: Layers, permission: "view_classes" },
-        { name: "Manage Batches", href: "/admin/manage-batches", icon: CalendarDays, permission: "manage_classes" },
+        { name: "All Batches", href: "/admin/all-batches", icon: Layers, permission: "view_batches" },
+        { name: "Manage Batches", href: "/admin/manage-batches", icon: CalendarDays, permission: "manage_batches" },
       ],
     },
     {
@@ -119,7 +107,7 @@ const AdminLayout = () => {
         { name: "Manage Admins", href: "/admin/manage-admins", icon: ShieldCheck, permission: "manage_roles" },
       ],
     },
-  ], [isSuperAdmin, safeRoleName]); // 🚀 Added safeRoleName to dependencies
+  ], [isSuperAdmin]);
 
   const filteredNavigation = useMemo(() => {
     return navigationGroups
@@ -128,12 +116,12 @@ const AdminLayout = () => {
         items: group.items.filter((item) => hasPermission(item.permission)),
       }))
       .filter((group) => group.items.length > 0);
-  }, [navigationGroups, userPermissions, isSuperAdmin]);
+  }, [navigationGroups, hasPermission]);
 
   // --- 🚀 UI RENDER ---
   return (
     <div className="min-h-screen bg-[#e8f0f2] relative flex overflow-x-hidden">
-      {/* Mobile Header (unchanged) */}
+      {/* Mobile Header */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-[#1e293b] shadow-md">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-3">
