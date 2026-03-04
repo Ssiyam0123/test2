@@ -5,7 +5,10 @@ import {
   useMasterTopics,
   useDeleteMasterSyllabus,
 } from "../../hooks/useMasterSyllabus";
-import { useConfirmToast } from "../../components/ConfirmToast";
+
+// 🚀 IMPORT THE REUSABLE SWAL DELETE UTILITY
+import { confirmDelete } from "../../utils/swalUtils"; 
+
 import DataTable from "../../components/common/DataTable";
 import PageHeader from "../../components/common/PageHeader";
 import useAuth from "../../store/useAuth"; // 🚀 Zustand Store Import
@@ -23,7 +26,6 @@ const CATEGORIES = [
 
 export default function ManageMasterSyllabus() {
   const navigate = useNavigate();
-  const { showConfirmToast } = useConfirmToast();
   
   // 🚀 PBAC Dynamic Permission Check
   const { hasPermission } = useAuth();
@@ -40,11 +42,12 @@ export default function ManageMasterSyllabus() {
     ? [...res.data].sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
     : [];
 
+  // 🚀 DYNAMIC DELETE HANDLER WITH SWAL
   const handleDelete = (id, name) => {
-    showConfirmToast({
-      type: "delete",
-      title: "Remove Topic",
-      message: `Delete "${name}"?`,
+    confirmDelete({
+      title: "Remove Topic?",
+      text: `Are you sure you want to permanently delete "${name}"? This action cannot be undone.`,
+      confirmText: "Yes, delete topic",
       onConfirm: () => deleteMutation.mutate(id),
     });
   };
@@ -111,7 +114,8 @@ export default function ManageMasterSyllabus() {
               </button>
               <button
                 onClick={() => handleDelete(item._id, item.topic)}
-                className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl border border-transparent hover:border-rose-100 transition-all"
+                disabled={deleteMutation.isPending}
+                className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl border border-transparent hover:border-rose-100 transition-all disabled:opacity-50"
                 title="Delete Topic"
               >
                 <Trash2 size={16} />

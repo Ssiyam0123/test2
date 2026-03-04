@@ -8,7 +8,10 @@ import DataTable from "../common/DataTable.jsx";
 import ActionIconButton from "../common/ActionIconButton.jsx";
 import Avatar from "../common/Avatar.jsx";
 import { useNavigate } from "react-router-dom";
-import useAuth from "../../store/useAuth.js"; // 🚀 Zustand Store
+import useAuth from "../../store/useAuth.js";
+
+// 🚀 IMPORT THE REUSABLE SWAL DELETE UTILITY
+import { confirmDelete } from "../../utils/swalUtils"; 
 
 const StudentsTable = ({
   students, pagination, onDelete, onToggleStatus, 
@@ -18,11 +21,20 @@ const StudentsTable = ({
   const downloadMutation = useDownloadCertificate();
   const navigate = useNavigate();
   
-  // 🚀 Zustand Helper
   const { hasPermission } = useAuth();
 
   const handleDownloadCertificate = (student) => {
     downloadMutation.mutate(student);
+  };
+
+  // 🚀 DYNAMIC DELETE HANDLER
+  const handleDeleteClick = (studentId, studentName) => {
+    confirmDelete({
+      title: "Delete Student?",
+      text: `Are you sure you want to permanently delete ${studentName}? This action cannot be undone.`,
+      confirmText: "Yes, delete student",
+      onConfirm: () => onDelete(studentId) // তোর প্যারেন্ট থেকে আসা onDelete কল হচ্ছে
+    });
   };
 
   // ==========================================
@@ -43,10 +55,10 @@ const StudentsTable = ({
     { label: "Branch", className: "hidden sm:table-cell w-[12%]" },
     { label: "ID", className: "hidden md:table-cell w-[10%]" },
     { label: "Course", className: "hidden lg:table-cell w-[18%]" },
-    canViewFinance && { label: "Balance", className: "hidden xl:table-cell w-[12%]" }, // 🚀 Conditional Column
+    canViewFinance && { label: "Balance", className: "hidden xl:table-cell w-[12%]" },
     { label: "Status", className: "w-[8%]" },
     { label: "Actions", align: "right", className: "w-[15%]" },
-  ].filter(Boolean); // 🚀 Removes false/null objects perfectly
+  ].filter(Boolean);
 
   const renderStudentRow = (student) => {
     const isInactive = !student.is_active;
@@ -73,7 +85,7 @@ const StudentsTable = ({
                 {student.is_verified && <ShieldCheck size={14} className="text-teal-500" title="Verified" />}
               </div>
               <span className="text-[12px] text-slate-400 font-medium mt-0.5 tracking-wide">
-                Batch: {typeof student.batch === "object" ? student.batch?.batch_name : student.batch || "N/A"}
+                Batch: {student.batch?.batch_name || "N/A"}
               </span>
             </div>
           </div>
@@ -88,9 +100,6 @@ const StudentsTable = ({
                 {student.branch?.branch_name || "N/A"}
               </span>
             </div>
-            <span className="text-[10px] text-slate-400 font-mono mt-0.5 ml-4" title="Branch ID">
-              ID: {student.branch?.branch_code || student.branch?._id?.slice(-6).toUpperCase() || "N/A"}
-            </span>
           </div>
         </td>
 
@@ -106,13 +115,10 @@ const StudentsTable = ({
           <div className="flex flex-col">
             <div className="flex items-center gap-1.5">
               <BookOpen size={12} className="text-purple-400" />
-              <span className="text-[13px] font-medium text-slate-700 line-clamp-1" title={student.course?.course_name}>
-                {student.course?.course_name || "N/A"}
-              </span>
-            </div>
             <span className="text-[10px] text-slate-400 font-mono mt-0.5 ml-4" title="Course ID/Code">
               Code: {student.course?.course_code || student.course?._id?.slice(-6).toUpperCase() || "N/A"}
             </span>
+            </div>
           </div>
         </td>
 
@@ -178,8 +184,15 @@ const StudentsTable = ({
               </>
             )}
 
+            {/* 🚀 UPDATED DELETE BUTTON */}
             {canDelete && (
-              <ActionIconButton icon={Trash2} variant="danger" onClick={() => onDelete(student._id, student.student_name)} disabled={deleteLoading} title="Delete Student" />
+              <ActionIconButton 
+                icon={Trash2} 
+                variant="danger" 
+                onClick={() => handleDeleteClick(student._id, student.student_name)} 
+                disabled={deleteLoading} 
+                title="Delete Student" 
+              />
             )}
           </div>
         </td>

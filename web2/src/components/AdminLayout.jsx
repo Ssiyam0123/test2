@@ -4,9 +4,10 @@ import {
   LayoutDashboard, Users, UserPlus, Briefcase, GraduationCap,
   BookPlus, CalendarDays, PlusCircle, Layers, ShieldCheck,
   LogOut, Menu, X, UserCircle, Building2, MapPin,
-  PackageSearch, ChevronDown, BookOpen
+  PackageSearch, BookOpen
 } from "lucide-react";
 import useAuth from "../store/useAuth";
+
 import { useBranches } from "../hooks/useBranches";
 
 const AdminLayout = () => {
@@ -14,15 +15,14 @@ const AdminLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   
-  // 🚀 Cleaned up PBAC checks using Zustand
   const { logout, authUser, hasPermission, isMaster: checkIsMaster } = useAuth();
-  const isSuperAdmin = checkIsMaster(); // Returns true if Superadmin
+  const isSuperAdmin = checkIsMaster(); 
 
   const [activeBranch, setActiveBranch] = useState(null);
 
-  const { data: branchRes, isLoading: branchesLoading } = useBranches(
+  const { data: branchRes } = useBranches(
     {},
-    { enabled: !!isSuperAdmin }
+    { enabled: !!isSuperAdmin } 
   );
   const branches = branchRes?.data || [];
 
@@ -31,29 +31,23 @@ const AdminLayout = () => {
       if (isSuperAdmin && branches.length > 0) {
         setActiveBranch(branches[0]);
       } else if (!isSuperAdmin) {
-        const bId = authUser?.branch?._id || (typeof authUser?.branch === "string" ? authUser.branch : null);
-        const bName = authUser?.branch?.branch_name || authUser?.branch?.name || "My Campus";
-        if (bId) setActiveBranch({ _id: bId, branch_name: bName });
+        const userBranch = authUser?.branch;
+        
+        if (userBranch && typeof userBranch === 'object') {
+          setActiveBranch({ 
+            _id: userBranch._id, 
+            branch_name: userBranch.branch_name 
+          });
+        }
       }
     }
   }, [authUser, isSuperAdmin, branches, activeBranch]);
 
-  const handleBranchChange = (e) => {
-    const branch = branches.find((b) => b._id === e.target.value);
-    if (branch) setActiveBranch(branch);
-  };
-
-  // --- 🚀 NAVIGATION CONFIGURATION ---
   const navigationGroups = useMemo(() => [
     {
       label: null,
       items: [
-        { 
-          name: isSuperAdmin ? "Global Dashboard" : "Branch Dashboard", 
-          href: "/admin", 
-          icon: LayoutDashboard,
-          permission: "view_dashboard" // Added permission check here too
-        }
+        { name: isSuperAdmin ? "Global Dashboard" : "Branch Dashboard", href: "/admin", icon: LayoutDashboard, permission: "view_dashboard" }
       ],
     },
     {
@@ -75,7 +69,6 @@ const AdminLayout = () => {
       items: [
         { name: "All Courses", href: "/admin/all-courses", icon: GraduationCap, permission: "view_courses" },
         { name: "Add Course", href: "/admin/add-course", icon: BookPlus, permission: "manage_courses" },
-        // 🚀 FIXED: Changed permission to view_syllabus
         { name: "Master Syllabus", href: "/admin/manage-syllabus", icon: BookOpen, permission: "view_syllabus" }, 
       ],
     },
@@ -118,7 +111,6 @@ const AdminLayout = () => {
       .filter((group) => group.items.length > 0);
   }, [navigationGroups, hasPermission]);
 
-  // --- 🚀 UI RENDER ---
   return (
     <div className="min-h-screen bg-[#e8f0f2] relative flex overflow-x-hidden">
       {/* Mobile Header */}
@@ -129,7 +121,7 @@ const AdminLayout = () => {
               <img src="/logo.png" alt="Logo" className="h-8 w-auto" />
             </div>
             <span className="text-white font-semibold text-sm truncate max-w-[150px]">
-              {activeBranch?.branch_name || "Admin"}
+              {activeBranch?.branch_name || "Loading..."}
             </span>
           </div>
           <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2 text-slate-300">
@@ -141,24 +133,36 @@ const AdminLayout = () => {
       {/* Sidebar */}
       <div className={`fixed z-40 bg-[#1e293b] shadow-2xl flex flex-col transition-all duration-300 inset-y-0 left-0 lg:inset-y-4 lg:left-4 lg:rounded-3xl lg:h-[calc(100vh-32px)] ${sidebarOpen ? "translate-x-0 w-64" : "-translate-x-full lg:translate-x-0"} ${isCollapsed ? "lg:w-20" : "lg:w-64"}`}>
         
+        {/* Logo Section */}
         <div onClick={() => setIsCollapsed(!isCollapsed)} className="p-6 border-b border-white/10 shrink-0 flex justify-center items-center mt-2 cursor-pointer">
           <div className={`bg-white rounded-2xl flex justify-center items-center transition-all ${isCollapsed ? "p-1.5" : "px-4 py-2"}`}>
             <img src="/logo.png" alt="Logo" style={{ width: isCollapsed ? "40px" : "90px" }} />
           </div>
         </div>
 
+        {/* 🚀 User Info Section */}
         <div className={`p-4 shrink-0 bg-white/5 mt-4 rounded-2xl mx-4 transition-all ${isCollapsed ? "px-2" : "px-4"}`}>
           <div className="flex items-center space-x-3">
             <div className="h-10 w-10 rounded-xl bg-teal-500/20 flex items-center justify-center border border-teal-500/30 shrink-0">
               <UserCircle size={20} className="text-teal-400" />
             </div>
             {!isCollapsed && (
-              <div className="overflow-hidden">
-                <p className="text-sm font-bold text-white truncate capitalize">{authUser?.full_name || "Admin"}</p>
-                <div className="flex items-center gap-1 mt-0.5">
+              <div className="overflow-hidden flex-1">
+                <p className="text-sm font-bold text-white truncate capitalize">{authUser?.full_name || "User"}</p>
+                
+                {/* Role Info */}
+                <div className="mt-1 flex items-center gap-1.5">
+                   <ShieldCheck size={10} className="text-indigo-400 shrink-0" />
+                   <p className="text-[9px] font-black uppercase text-indigo-300 truncate tracking-widest">
+                     {typeof authUser?.role === 'string' ? authUser.role : authUser?.role?.name || "Role"}
+                   </p>
+                </div>
+
+                {/* Branch Info */}
+                <div className="flex items-center gap-1.5 mt-0.5">
                    <MapPin size={10} className="text-teal-500 shrink-0" />
-                   <p className="text-[10px] font-black uppercase text-teal-400 truncate tracking-tighter">
-                     {activeBranch?.branch_name || "Select Branch"}
+                   <p className="text-[9px] font-black uppercase text-teal-400 truncate tracking-widest">
+                     {isSuperAdmin ? "Global Access" : activeBranch?.branch_name || "Locating..."}
                    </p>
                 </div>
               </div>
@@ -166,23 +170,7 @@ const AdminLayout = () => {
           </div>
         </div>
 
-        {isSuperAdmin && !isCollapsed && (
-          <div className="px-4 mt-4">
-            <div className="relative">
-              <select
-                value={activeBranch?._id || ""}
-                onChange={handleBranchChange}
-                className="w-full appearance-none bg-slate-800 border border-slate-700 text-teal-400 text-xs font-bold py-2.5 pl-3 pr-8 rounded-xl focus:outline-none focus:border-teal-500 cursor-pointer"
-              >
-                {branchesLoading ? <option>Loading...</option> : branches.map((b) => (
-                  <option key={b._id} value={b._id}>{b.branch_name}</option>
-                ))}
-              </select>
-              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-            </div>
-          </div>
-        )}
-
+        {/* Navigation */}
         <nav className={`flex-1 overflow-y-auto mt-4 px-3 space-y-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] ${isCollapsed ? "px-2" : "px-4"}`}>
           {filteredNavigation.map((group, idx) => (
             <div key={idx} className="space-y-1">
@@ -204,6 +192,7 @@ const AdminLayout = () => {
           ))}
         </nav>
 
+        {/* Logout Button */}
         <div className={`shrink-0 mt-auto border-t border-white/5 p-4`}>
           <button onClick={logout} className={`flex items-center justify-center w-full rounded-xl text-slate-400 font-bold hover:bg-red-500/10 hover:text-red-400 transition-all ${isCollapsed ? "py-3" : "space-x-2 py-3"}`}>
             <LogOut size={18} />
@@ -217,6 +206,7 @@ const AdminLayout = () => {
       {/* Main Content Area */}
       <div className={`relative z-0 flex flex-col min-h-screen w-full transition-all duration-300 ${isCollapsed ? "lg:pl-[112px]" : "lg:pl-[288px]"}`}>
         <div className="pt-20 lg:pt-4 px-4 pb-4 lg:pr-6 lg:pb-6 flex-1">
+          {/* Outlet কে activeBranch.id পাস করা হচ্ছে */}
           <Outlet context={{ branchId: activeBranch?._id, branchName: activeBranch?.branch_name }} />
         </div>
       </div>

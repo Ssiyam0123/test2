@@ -7,37 +7,61 @@ import AppError from "../utils/AppError.js";
 import ApiResponse from "../utils/ApiResponse.js";
 
 // ==========================================
+// 🛠️ সাহায্যকারী ফাংশন: ব্রাঞ্চ এক্সেস চেক
+// ==========================================
+const validateBranchAccess = (req, branchId) => {
+  if (req.isMaster) return true;
+  
+  if (req.user.branch && req.user.branch.toString() === branchId) {
+    return true;
+  }
+
+  return false;
+};
+
+// ==========================================
 // 🐳 [Controller: getBranchInventory]
 // ==========================================
 export const getBranchInventory = catchAsync(async (req, res, next) => {
-  // 🚀 Filter by branchId from params but ensure user has access to that branch
   const { branchId } = req.params;
-  
-  if (!req.isMaster && branchId !== req.user.branch.toString()) {
-    return next(new AppError("Access denied to this branch's inventory.", 403));
+
+  if (!validateBranchAccess(req, branchId)) {
+    return next(new AppError("আপনি শুধু আপনার নিজের ব্রাঞ্চের ইনভেন্টরি দেখতে পারবেন।", 403));
   }
 
   const inventory = await Inventory.find({ branch: branchId }).sort({ item_name: 1 });
-  
   res.status(200).json(new ApiResponse(200, inventory, "Inventory fetched successfully"));
 });
 
 // ==========================================
-// 🐳 [Controller: getBranchTransactions]
+// 🐳 [Controller: getBranchTransactions] (FIXED FOR FRONTEND)
 // ==========================================
 export const getBranchTransactions = catchAsync(async (req, res, next) => {
   const { branchId } = req.params;
 
-  if (!req.isMaster && branchId !== req.user.branch.toString()) {
-    return next(new AppError("Access denied to these transactions.", 403));
+  if (!validateBranchAccess(req, branchId)) {
+    return next(new AppError("এই ট্রানজেকশনগুলো দেখার অনুমতি আপনার নেই।", 403));
   }
 
   const transactions = await StockTransaction.find({ branch: branchId })
     .populate("inventory_item", "item_name unit")
-    .populate("performed_by", "full_name")
-    .populate("reference_class", "class_number topic")
+    // ১. Accepted By (Admin/System) এর নাম ও রোল পপুলেট করা হচ্ছে
+    .populate({
+      path: "performed_by",
+      select: "full_name role",
+      populate: { path: "role", select: "name" } 
+    })
+    // ২. 🚀 THE FIX: Class, Batch এবং Instructor এর নাম ডিপ পপুলেট করা হচ্ছে
+    .populate({
+      path: "reference_class",
+      select: "class_number topic batch instructor",
+      populate: [
+        { path: "batch", select: "batch_name" },
+        { path: "instructor", select: "full_name" } // 👈 এখান থেকেই ইন্সট্রাক্টরের নাম ফ্রন্টএন্ডে যাবে
+      ]
+    })
     .sort({ createdAt: -1 });
-    
+
   res.status(200).json(new ApiResponse(200, transactions, "Transactions fetched successfully"));
 });
 
@@ -55,16 +79,15 @@ export const addStockPurchase = catchAsync(async (req, res, next) => {
     const { items, total_cost, supplier, notes } = req.body;
     const userId = req.user._id;
 
-    // 🚀 Security Check
-    if (!req.isMaster && branchId !== req.user.branch.toString()) {
-      throw new AppError("Unauthorized to purchase for this branch.", 403);
+    if (!validateBranchAccess(req, branchId)) {
+      throw new AppError("আপনি অন্য ব্রাঞ্চের হয়ে কেনাকাটা এন্ট্রি করতে পারবেন না।", 403);
     }
 
     const inventoryBulkOps = items.map(item => ({
       updateOne: {
         filter: { branch: branchId, item_name: item.item_name.toLowerCase().trim() },
-        update: { 
-          $inc: { quantity_in_stock: item.quantity }, 
+        update: {
+          $inc: { quantity_in_stock: item.quantity },
           $set: { category: item.category, unit: item.unit }
         },
         upsert: true
@@ -84,28 +107,28 @@ export const addStockPurchase = catchAsync(async (req, res, next) => {
         inventory_item: invItem._id,
         branch: branchId,
         transaction_type: "PURCHASE",
-        quantity: original.quantity, 
+        quantity: original.quantity,
         total_cost: original.total_price || 0,
         supplier,
         notes,
         performed_by: userId
       };
     });
-    
+
     await StockTransaction.insertMany(transactionsToInsert, isReplicaSet ? { session } : {});
 
     if (total_cost > 0) {
       await Expense.create([{
-        title: `Inventory Restock: ${items.length} items`,
+        title: `Stock Entry: ${items.length} items`,
         amount: total_cost,
         branch: branchId,
-        recorded_by: userId
+        recorded_by: userId,
+        category: "Inventory" 
       }], isReplicaSet ? { session } : {});
     }
 
     if (isReplicaSet) await session.commitTransaction();
-
-    res.status(201).json(new ApiResponse(201, null, "Pantry updated successfully"));
+    res.status(201).json(new ApiResponse(201, null, "Stock updated and Ledger recorded successfully"));
 
   } catch (error) {
     if (isReplicaSet && session.inTransaction()) await session.abortTransaction();

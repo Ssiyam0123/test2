@@ -4,7 +4,6 @@ import { useStudents, useDeleteStudent, useToggleStudentStatus } from "../../hoo
 import { useBatches } from "../../hooks/useBatches.js"; 
 import { useActiveCourses } from "../../hooks/useCourses.js";
 import { useBranches } from "../../hooks/useBranches.js"; 
-import { useConfirmToast } from "../../components/ConfirmToast.jsx";
 import StudentFilters from "../../components/Search_filter/StudentFilters.jsx";
 import BranchDropdown from "../../components/common/BranchDropdown.jsx";
 import QRCodeModal from "../../components/modal/QRCodeModal.jsx";
@@ -29,7 +28,6 @@ const INITIAL_FILTERS = {
 
 const AllStudents = () => {
   const navigate = useNavigate();
-  const { showConfirmToast } = useConfirmToast();
   const { authUser, hasPermission, isMaster } = useAuth();
   
   const context = useOutletContext() || {}; 
@@ -98,7 +96,7 @@ const AllStudents = () => {
 
   useEffect(() => { setPage(1); }, [queryFilters]);
 
-  // 🚀 Branch change korle auto batch/course reset hobe (Ekhon eta perfect kaj korbe!)
+  // 🚀 Branch change korle auto batch/course reset hobe
   const handleBranchChange = (newBranch) => {
     setSuperAdminBranchFilter(newBranch);
     setFilters(prev => ({ ...prev, batch: "all", course: "all" }));
@@ -131,7 +129,6 @@ const AllStudents = () => {
           </div>
         )}
 
-        {/* 🚀 EKHANE filters={filters} PASS KORA HOYECHE */}
         <StudentFilters 
           filters={filters} 
           onFilterChange={setFilters} 
@@ -148,10 +145,10 @@ const AllStudents = () => {
           <StudentsTable
             students={data?.data || []} 
             pagination={data?.pagination}
-            onDelete={(id, name) => showConfirmToast({
-              type: "delete", title: "Delete Student", message: `Are you sure you want to delete ${name}?`,
-              onConfirm: () => deleteStudentMutation.mutate(id)
-            })} 
+            
+            // 🚀 FIX: এখানে সরাসরি মিউটেশন ফাংশন কল করা হয়েছে। Swal পপআপ StudentsTable থেকেই হ্যান্ডেল হবে।
+            onDelete={(id) => deleteStudentMutation.mutate(id)} 
+            
             onToggleStatus={(id) => toggleStatusMutation.mutate(id)}
             onGenerateQR={setSelectedStudentForQr} 
             onAddComment={setSelectedStudentForComment}

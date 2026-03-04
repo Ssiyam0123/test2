@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { X, Plus, Trash2, Save, ShoppingCart, Info } from "lucide-react";
-import Loader from "../../components/Loader";
+import { X, Plus, Trash2, Save, ShoppingBag, Info, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
 
-// 🚀 হুক ইমপোর্ট করা হলো স্টোরের আইটেম সাজেশন দেখানোর জন্য
 import { useBranchInventory } from "../../hooks/useInventory";
 
 export default function ClassRequisitionModal({ isOpen, onClose, classData, batchData, onSave }) {
@@ -11,20 +9,22 @@ export default function ClassRequisitionModal({ isOpen, onClose, classData, batc
   const [budget, setBudget] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // 🚀 বর্তমান ব্রাঞ্চের ইনভেন্টরি ফেচ করা হচ্ছে
   const branchId = batchData?.branch?._id || batchData?.branch;
   const { data: invRes } = useBranchInventory(branchId);
   const inventoryItems = invRes?.data || [];
 
-  // মডাল খুললে ডাটা রিসেট হবে
   useEffect(() => {
     if (isOpen) {
-      setItems([{ item_name: "", quantity: "", unit: "kg" }]);
-      setBudget("");
+      const existingItems = classData?.requisitions?.length > 0 
+        ? classData.requisitions 
+        : [{ item_name: "", quantity: "", unit: "kg" }];
+        
+      setItems(existingItems);
+      setBudget(classData?.financials?.budget || "");
     }
-  }, [isOpen]);
+  }, [isOpen, classData]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !classData || !batchData) return null;
 
   const handleAddRow = () => {
     setItems([...items, { item_name: "", quantity: "", unit: "kg" }]);
@@ -40,7 +40,6 @@ export default function ClassRequisitionModal({ isOpen, onClose, classData, batc
     const updated = [...items];
     updated[index][field] = value;
     
-    // 🚀 স্মার্ট লজিক: সাজেশন থেকে সিলেক্ট করলে ইউনিট অটোমেটিক বসে যাবে
     if (field === "item_name") {
       const matchedItem = inventoryItems.find(inv => inv.item_name.toLowerCase() === value.toLowerCase());
       if (matchedItem) {
@@ -54,7 +53,6 @@ export default function ClassRequisitionModal({ isOpen, onClose, classData, batc
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // ফিল্টার করে ফাঁকা রো বাদ দেওয়া
     const validItems = items.filter(item => item.item_name.trim() !== "" && Number(item.quantity) > 0);
     
     if (validItems.length === 0) {
@@ -64,72 +62,81 @@ export default function ClassRequisitionModal({ isOpen, onClose, classData, batc
     setIsSubmitting(true);
     try {
       const payload = {
+        class_content: classData._id,
+        batch: batchData._id,
+        branch: branchId,
         items: validItems.map(item => ({
-          ...item,
+          item_name: item.item_name,
+          unit: item.unit,
           quantity: Number(item.quantity)
         })),
         budget: Number(budget) || 0
       };
 
-      await onSave(classData._id, payload);
-      // মডাল ক্লোজ হবে onSave এর ভেতর থেকেই
+      await onSave(payload);
+      onClose(); 
+      toast.success("Requisition submitted successfully!");
     } catch (error) {
       console.error(error);
+      toast.error("Failed to submit requisition");
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
         
-        {/* Header */}
-        <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+        {/* 🟢 HEADER */}
+        <div className="p-6 md:p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 shrink-0">
           <div>
+            <div className="flex items-center gap-3 mb-1.5">
+               <span className="px-2.5 py-1 bg-teal-50 text-teal-700 text-[9px] font-black uppercase tracking-widest rounded-lg">Class {classData.class_number}</span>
+               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">ID: #{classData._id.slice(-6)}</span>
+            </div>
             <h2 className="text-xl font-black text-slate-800 flex items-center gap-2">
-              <ShoppingCart size={24} className="text-indigo-500" />
-              Request Bazar List
+              <ShoppingBag size={22} className="text-teal-500" />
+              Request Materials & Bazar
             </h2>
-            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mt-1">
-              Class: {classData?.topic} | Batch: {batchData?.batch_name}
-            </p>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-rose-50 hover:text-rose-500 rounded-full transition-colors">
-            <X size={24} />
+          <button onClick={onClose} className="p-2.5 text-slate-400 hover:bg-white hover:shadow-sm rounded-xl transition-all border border-transparent hover:border-slate-200">
+            <X size={20} />
           </button>
         </div>
 
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
-          <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 mb-6 flex gap-3">
-            <Info size={20} className="text-indigo-500 shrink-0" />
-            <p className="text-xs text-indigo-800 font-medium">
-              Start typing an item name to see suggestions from the current inventory. You can also add custom items that are not in the store.
+        {/* 🟢 BODY */}
+        <div className="flex-1 overflow-y-auto p-6 md:p-8 custom-scrollbar">
+          
+          <div className="bg-teal-50 border border-teal-100 rounded-2xl p-4 mb-8 flex gap-3 shadow-inner">
+            <Info size={20} className="text-teal-600 shrink-0" />
+            <p className="text-xs text-teal-800 font-medium leading-relaxed">
+              Start typing an item name to see suggestions from the current pantry stock. You can also add custom items that are not in the store yet.
             </p>
           </div>
 
           <div className="space-y-4">
-            {/* Table Header */}
-            <div className="grid grid-cols-12 gap-3 px-2">
-              <div className="col-span-6 text-[10px] font-black text-slate-400 uppercase">Item Name</div>
-              <div className="col-span-3 text-[10px] font-black text-slate-400 uppercase">Qty</div>
-              <div className="col-span-2 text-[10px] font-black text-slate-400 uppercase">Unit</div>
+            {/* Table Headers */}
+            <div className="grid grid-cols-12 gap-3 px-2 hidden sm:grid">
+              <div className="col-span-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Item Description</div>
+              <div className="col-span-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Quantity</div>
+              <div className="col-span-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">Unit</div>
               <div className="col-span-1"></div>
             </div>
 
-            {/* Dynamic Rows */}
+            {/* Dynamic Input Rows */}
             {items.map((item, index) => (
-              <div key={index} className="grid grid-cols-12 gap-3 items-center p-3 bg-slate-50 border border-slate-100 rounded-2xl group hover:border-indigo-200 transition-all">
-                <div className="col-span-6 relative">
-                  {/* 🚀 Datalist Integration for Suggestions */}
+              <div key={index} className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center p-4 bg-slate-50 border border-slate-100 rounded-[1.5rem] group hover:border-teal-200 transition-all shadow-sm">
+                
+                <div className="sm:col-span-6 relative">
+                  <label className="text-[9px] font-bold text-slate-400 uppercase block mb-1 sm:hidden">Item Name</label>
                   <input 
                     list={`inventory-suggestions-${index}`}
                     type="text" 
-                    placeholder="e.g., Chicken Breast"
+                    placeholder="e.g., Fresh Chicken"
                     value={item.item_name}
                     onChange={(e) => handleItemChange(index, "item_name", e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700 outline-none focus:border-indigo-500 transition-colors"
+                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all"
                   />
                   <datalist id={`inventory-suggestions-${index}`}>
                     {inventoryItems.map(inv => (
@@ -137,34 +144,41 @@ export default function ClassRequisitionModal({ isOpen, onClose, classData, batc
                     ))}
                   </datalist>
                 </div>
-                <div className="col-span-3">
-                  <input 
-                    type="number" 
-                    placeholder="0"
-                    min="0"
-                    step="0.01"
-                    value={item.quantity}
-                    onChange={(e) => handleItemChange(index, "quantity", e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700 outline-none focus:border-indigo-500 transition-colors"
-                  />
+
+                <div className="sm:col-span-3 flex gap-3 sm:block">
+                  <div className="flex-1">
+                    <label className="text-[9px] font-bold text-slate-400 uppercase block mb-1 sm:hidden">Qty</label>
+                    <input 
+                      type="number" 
+                      placeholder="0"
+                      min="0"
+                      step="any"
+                      value={item.quantity}
+                      onChange={(e) => handleItemChange(index, "quantity", e.target.value)}
+                      className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-black text-slate-700 outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all text-center"
+                    />
+                  </div>
                 </div>
-                <div className="col-span-2">
+
+                <div className="sm:col-span-2">
+                  <label className="text-[9px] font-bold text-slate-400 uppercase block mb-1 sm:hidden">Unit</label>
                   <select 
                     value={item.unit}
                     onChange={(e) => handleItemChange(index, "unit", e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-xl px-2 py-2.5 text-xs font-bold text-slate-600 outline-none focus:border-indigo-500 cursor-pointer"
+                    className="w-full bg-white border border-slate-200 rounded-xl px-2 py-3 text-xs font-bold text-slate-600 outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 cursor-pointer transition-all"
                   >
                     {["kg", "g", "L", "ml", "pcs", "pkt", "box", "dozen"].map(u => (
                       <option key={u} value={u}>{u}</option>
                     ))}
                   </select>
                 </div>
-                <div className="col-span-1 flex justify-center">
+
+                <div className="sm:col-span-1 flex justify-end sm:justify-center mt-2 sm:mt-0">
                   <button 
                     type="button"
                     onClick={() => handleRemoveRow(index)}
                     disabled={items.length === 1}
-                    className="p-2 text-slate-300 hover:text-rose-500 disabled:opacity-30 transition-colors"
+                    className="p-2.5 text-slate-300 hover:bg-rose-50 hover:text-rose-500 rounded-xl disabled:opacity-30 transition-colors"
                   >
                     <Trash2 size={18} />
                   </button>
@@ -175,14 +189,15 @@ export default function ClassRequisitionModal({ isOpen, onClose, classData, batc
             <button 
               type="button"
               onClick={handleAddRow}
-              className="w-full py-3 mt-2 border-2 border-dashed border-slate-200 rounded-2xl text-slate-500 text-xs font-bold uppercase tracking-widest hover:border-indigo-300 hover:text-indigo-600 hover:bg-indigo-50/50 transition-all flex items-center justify-center gap-2"
+              className="w-full py-4 mt-2 border-2 border-dashed border-slate-200 rounded-[1.5rem] text-slate-400 text-xs font-black uppercase tracking-widest hover:border-teal-300 hover:text-teal-600 hover:bg-teal-50/50 transition-all flex items-center justify-center gap-2"
             >
-              <Plus size={16} /> Add Another Item
+              <Plus size={16} strokeWidth={3} /> Add Another Item
             </button>
           </div>
 
-          <div className="mt-8 pt-6 border-t border-slate-100">
-            <label className="block text-xs font-black text-slate-700 mb-2">Estimated Budget (Optional)</label>
+          {/* Budget Field */}
+          <div className="mt-10 pt-8 border-t border-slate-100">
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Estimated Budget (Optional)</label>
             <div className="relative max-w-xs">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-black">৳</span>
               <input 
@@ -190,27 +205,28 @@ export default function ClassRequisitionModal({ isOpen, onClose, classData, batc
                 placeholder="0.00"
                 value={budget}
                 onChange={(e) => setBudget(e.target.value)}
-                className="w-full pl-8 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-indigo-500"
+                className="w-full pl-10 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-lg font-black text-slate-800 outline-none focus:border-teal-500 focus:bg-white transition-all shadow-inner"
               />
             </div>
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3 shrink-0">
+        {/* 🟢 FOOTER */}
+        <div className="p-6 md:px-8 md:py-6 bg-white border-t border-slate-100 flex justify-end gap-4 shrink-0">
           <button 
             type="button"
             onClick={onClose} 
-            className="px-6 py-3 text-sm font-bold text-slate-500 hover:text-slate-700 transition-colors"
+            className="px-6 py-3.5 text-sm font-bold text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-xl transition-all"
           >
             Cancel
           </button>
           <button 
             onClick={handleSubmit}
             disabled={isSubmitting}
-            className="px-8 py-3 bg-slate-900 text-white text-sm font-black uppercase tracking-widest rounded-2xl hover:bg-slate-800 shadow-xl shadow-slate-200 disabled:opacity-50 transition-all flex items-center gap-2"
+            className="px-8 py-3.5 bg-slate-900 text-white text-xs font-black uppercase tracking-widest rounded-xl hover:bg-teal-600 shadow-xl shadow-slate-900/10 disabled:opacity-50 transition-all flex items-center gap-2 active:scale-95"
           >
-            {isSubmitting ? <Loader size={18} color="white" /> : <><Save size={18} /> Submit List</>}
+            {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} 
+            {isSubmitting ? "Submitting..." : "Submit Requisition"}
           </button>
         </div>
 

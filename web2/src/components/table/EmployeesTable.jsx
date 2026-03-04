@@ -10,10 +10,11 @@ import ActionIconButton from "../common/ActionIconButton.jsx";
 import Avatar from "../common/Avatar.jsx";
 import CanAccess from "../common/CanAccess.jsx"; 
 import { PERMISSIONS } from "../../utils/permissions.js";
+import { confirmDelete } from "../../utils/swalUtils"; // 🚀 Import Swal Utility
 
 const EmployeesTable = ({
   employees,
-  roles = [], // 🚀 Accepting roles prop for the dropdown
+  roles = [], 
   currentUserId,
   currentUserRole, 
   pagination,
@@ -58,6 +59,16 @@ const EmployeesTable = ({
     }
   };
 
+  // 🚀 DYNAMIC DELETE HANDLER
+  const handleDeleteClick = (employeeId, employeeName) => {
+    confirmDelete({
+      title: "Delete Employee?",
+      text: `Are you sure you want to permanently delete ${employeeName}? This action cannot be undone.`,
+      confirmText: "Yes, delete employee",
+      onConfirm: () => onDelete(employeeId)
+    });
+  };
+
   const columns = [
     { label: "Employee Identity", className: "w-[30%]" },
     { label: "Campus", className: "hidden sm:table-cell w-[15%]" }, 
@@ -71,11 +82,9 @@ const EmployeesTable = ({
     const isInactive = employee.status !== "Active";
     const isSelf = employee._id === currentUserId;
 
-    // PBAC Data Extraction
     const roleName = employee.role?.name || "Unassigned";
     const isSuperAdmin = roleName.toLowerCase() === "superadmin";
 
-    // Static Badge UI for fallbacks or uneditable roles (Self/Superadmin)
     const StaticRoleBadge = () => (
       <div className={`px-2.5 py-1 text-[10px] font-black uppercase tracking-widest rounded-md border flex items-center gap-1.5 ${
         isSuperAdmin 
@@ -186,13 +195,12 @@ const EmployeesTable = ({
         <td className="px-6 py-4 text-right align-middle">
           <div className="flex flex-col items-end gap-2">
             
-            {/* 🚀 ROLE DROPDOWN VIA CanAccess */}
             <div className="flex items-center gap-2">
               {roleLoadingId === employee._id && <Loader2 size={12} className="animate-spin text-indigo-500" />}
               
               <CanAccess permission={PERMISSIONS.EDIT_EMPLOYEE} fallback={<StaticRoleBadge />}>
                 {isSelf || isSuperAdmin ? (
-                  <StaticRoleBadge /> // Cannot edit own role or superadmin's role
+                  <StaticRoleBadge /> 
                 ) : (
                   <select
                     value={employee.role?._id || ""}
@@ -218,7 +226,6 @@ const EmployeesTable = ({
               </CanAccess>
             </div>
 
-            {/* 🚀 DYNAMIC PBAC ACTIONS */}
             <div className="flex items-center justify-end flex-wrap gap-1 opacity-60 group-hover:opacity-100 transition-opacity duration-200">
               <ActionIconButton icon={Eye} onClick={() => onViewProfile(employee)} title="View Profile" variant="neutral" />
               
@@ -244,11 +251,12 @@ const EmployeesTable = ({
               </CanAccess>
 
               <CanAccess permission={PERMISSIONS.DELETE_EMPLOYEE}>
+                {/* 🚀 Use the new handler here */}
                 <ActionIconButton
                   icon={Trash2}
                   variant="danger"
                   disabled={isSelf || isSuperAdmin} 
-                  onClick={() => onDelete(employee._id, employee.full_name)}
+                  onClick={() => handleDeleteClick(employee._id, employee.full_name)}
                   title="Delete"
                 />
               </CanAccess>

@@ -82,46 +82,7 @@ export default function ManageBatches() {
           <BatchHeader searchTerm={searchTerm} setSearchTerm={setSearchTerm} authUser={authUser} />
 
           {/* TOP CONTROLS: Batch Selector & View Toggle */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-            
-            {/* Batch Navigation Pills */}
-            <div className="overflow-x-auto custom-scrollbar flex-1">
-              <div className="flex items-center gap-1.5 bg-slate-100/60 p-1.5 rounded-[1.25rem] w-fit border border-slate-200/60">
-                {batches.map((batch) => {
-                  const isActive = batch._id === batchId;
-                  return (
-                    <button
-                      key={batch._id}
-                      onClick={() => navigate(`/admin/batches/${batch._id}`)}
-                      className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-bold whitespace-nowrap transition-all duration-300
-                        ${isActive ? 'bg-white text-slate-800 shadow-sm border border-slate-200/50' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/50 border border-transparent'}
-                      `}
-                    >
-                      <Layers size={16} className={`${isActive ? 'text-teal-500' : 'text-slate-400 opacity-70'} transition-colors`} />
-                      {batch.batch_name}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* View Mode Toggle (Schedule vs Attendance) */}
-            <div className="flex items-center bg-slate-100/60 p-1.5 rounded-2xl border border-slate-200/60 shrink-0">
-              <button 
-                onClick={() => setActiveView("schedule")}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 ${activeView === 'schedule' ? 'bg-white text-teal-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-              >
-                <CalendarDays size={16} /> Schedule
-              </button>
-              <button 
-                onClick={() => setActiveView("attendance")}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 ${activeView === 'attendance' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-              >
-                <ClipboardCheck size={16} /> Attendance
-              </button>
-            </div>
-
-          </div>
+        
 
           {/* MAIN WORKSPACE AREA */}
           <div className="flex-1 overflow-hidden flex flex-col relative">

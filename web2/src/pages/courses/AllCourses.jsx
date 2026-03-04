@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useCourses, useDeleteCourse, useToggleCourseStatus } from "../../hooks/useCourses";
 import useAuth from "../../store/useAuth"; // 🚀 Import useAuth for PBAC
 import { PERMISSIONS } from "../../utils/permissions"; // 🚀 Import Permissions Dictionary
+import { confirmDelete } from "../../utils/swalUtils"; // 🚀 Import Swal Utility
 
 // Components
 import CourseFilters from "../../components/Search_filter/CourseFilters";
@@ -47,7 +48,16 @@ const AllCourses = () => {
 
   useEffect(() => { setPage(1); }, [filters]);
 
-  const handleDelete = (id) => deleteCourseMutation.mutate(id);
+  // 🚀 DYNAMIC DELETE HANDLER WITH SWAL
+  const handleDeleteClick = (id, courseName) => {
+    confirmDelete({
+      title: "Delete Course?",
+      text: `Are you sure you want to permanently delete "${courseName}"? This cannot be undone.`,
+      confirmText: "Yes, delete course",
+      onConfirm: () => deleteCourseMutation.mutate(id)
+    });
+  };
+
   const handleStatusToggle = (id) => toggleStatusMutation.mutate(id);
 
   if (error) return <DataErrorState error={error} onRetry={refetch} isRetrying={isRefetching} />;
@@ -119,7 +129,7 @@ const AllCourses = () => {
               icon={Trash2} 
               variant="danger" 
               disabled={deleteCourseMutation.isPending} 
-              onClick={() => handleDelete(course._id)} 
+              onClick={() => handleDeleteClick(course._id, course.course_name)} 
               title="Delete" 
             />
           </div>

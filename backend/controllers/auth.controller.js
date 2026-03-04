@@ -48,25 +48,19 @@ export const login = async (req, res) => {
 
 export const checkAuth = async (req, res) => {
   try {
-    // 🚀 এখানেও .populate("branch") দেওয়া আছে
+    // 🚀 এখানে User কে খুঁজে তার role এবং branch পপুলেট করা হচ্ছে
     const user = await User.findById(req.user._id)
       .populate("role")
-      .populate("branch"); 
+      .populate("branch"); // 👈 এই লাইনটাই তোর ব্রাঞ্চের নাম ফ্রন্টএন্ডে পাঠাবে
 
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    res.status(200).json(formatUserResponse(user)); // 🚀 ফ্রন্টএন্ডে অবজেক্ট পাঠাবে
+    // ApiResponse ফরম্যাটে পাঠা, যাতে ফ্রন্টএন্ড বুঝতে পারে
+    res.status(200).json(new ApiResponse(200, formatUserResponse(user), "User authenticated successfully")); 
   } catch (error) {
     res.status(500).json({ message: "Internal server error" });
   }
 };
-
-export const logout = (_, res) => {
-  res.cookie("jwt", "", { maxAge: 0, httpOnly: true, secure: process.env.NODE_ENV !== "development", sameSite: "strict" });
-  res.status(200).json({ message: "Logged out successfully" });
-};
-
-
 
 
 

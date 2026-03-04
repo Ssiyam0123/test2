@@ -31,16 +31,14 @@ const AllEmployees = () => {
   const navigate = useNavigate();
   const { authUser } = useAuth();
   const currentUserId = authUser?.id || authUser?._id;
-  const { data: rolesRes } = useRoles(); // 🚀 Fetching roles
+  const { data: rolesRes } = useRoles(); 
 
-  // PBAC DYNAMIC SECURITY CHECKS
   const isMaster =
     authUser?.permissions?.includes("all_access") ||
     authUser?.role === "superadmin" ||
     authUser?.role?.name === "superadmin";
   const canAddEmployee = isMaster || authUser?.permissions?.includes("add_employee");
 
-  // GATEKEEPER CONTEXT
   const context = useOutletContext() || {};
   const { branchId } = context;
 
@@ -61,7 +59,6 @@ const AllEmployees = () => {
   const queryFilters = useMemo(() => {
     const activeFilters = { ...filters };
 
-    // PBAC GATE: Branch Isolation
     if (!isMaster) {
       activeFilters.branch = branchId;
     } else {
@@ -107,6 +104,7 @@ const AllEmployees = () => {
     setPage(1);
   }, [queryFilters]);
 
+  // 🚀 FIXED: Directly mutate here, Swal is handled in the child
   const handleDelete = (id) => {
     if (id === currentUserId) return toast.error("You cannot delete your own account.");
     deleteUserMutation.mutate(id);
@@ -162,7 +160,7 @@ const AllEmployees = () => {
           ) : (
             <EmployeesTable
               employees={employees}
-              roles={rolesRes?.data || []} // 🚀 Pasing roles array to Table
+              roles={rolesRes?.data || []} 
               currentUserId={currentUserId}
               currentUserRole={
                 typeof authUser?.role === "string"
@@ -170,7 +168,7 @@ const AllEmployees = () => {
                   : authUser?.role?.name
               }
               pagination={pagination}
-              onDelete={handleDelete}
+              onDelete={handleDelete} 
               onToggleStatus={handleToggleStatus}
               onUpdateRole={handleUpdateRole}
               onGenerateQR={setSelectedEmployeeForQr}

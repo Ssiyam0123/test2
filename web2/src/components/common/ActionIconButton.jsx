@@ -10,10 +10,8 @@ const ActionIconButton = ({
   loading = false,
   className = ""
 }) => {
-  // Base classes that apply to every action button
   const baseClasses = "p-2 rounded-md transition disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center";
   
-  // Tailwind color maps for the different button purposes
   const variants = {
     primary: "hover:bg-blue-50 text-blue-600",
     success: "hover:bg-emerald-50 text-emerald-600",
@@ -29,7 +27,7 @@ const ActionIconButton = ({
     <button
       type="button"
       onClick={(e) => {
-        e.stopPropagation(); // Prevents row click events from firing
+        e.stopPropagation(); 
         if (!disabled && !loading && onClick) onClick(e);
       }}
       disabled={disabled || loading}
