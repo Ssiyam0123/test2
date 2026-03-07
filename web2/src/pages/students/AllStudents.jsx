@@ -7,7 +7,6 @@ import { useBranches } from "../../hooks/useBranches.js";
 import StudentFilters from "../../components/Search_filter/StudentFilters.jsx";
 import BranchDropdown from "../../components/common/BranchDropdown.jsx";
 import QRCodeModal from "../../components/modal/QRCodeModal.jsx";
-import CollectPaymentModal from "../../components/modal/CollectPaymentModal.jsx";
 import CommentModal from "../../components/modal/CommentModal.jsx";
 import PageHeader from "../../components/common/PageHeader.jsx";
 import TableSkeleton from "../../components/common/TableSkeleton.jsx";
@@ -41,7 +40,6 @@ const AllStudents = () => {
   
   const [selectedStudentForQr, setSelectedStudentForQr] = useState(null);
   const [selectedStudentForComment, setSelectedStudentForComment] = useState(null);
-  const [paymentData, setPaymentData] = useState(null); 
   
   const limit = 20;
 
@@ -96,7 +94,6 @@ const AllStudents = () => {
 
   useEffect(() => { setPage(1); }, [queryFilters]);
 
-  // 🚀 Branch change korle auto batch/course reset hobe
   const handleBranchChange = (newBranch) => {
     setSuperAdminBranchFilter(newBranch);
     setFilters(prev => ({ ...prev, batch: "all", course: "all" }));
@@ -145,14 +142,14 @@ const AllStudents = () => {
           <StudentsTable
             students={data?.data || []} 
             pagination={data?.pagination}
-            
-            // 🚀 FIX: এখানে সরাসরি মিউটেশন ফাংশন কল করা হয়েছে। Swal পপআপ StudentsTable থেকেই হ্যান্ডেল হবে।
             onDelete={(id) => deleteStudentMutation.mutate(id)} 
-            
             onToggleStatus={(id) => toggleStatusMutation.mutate(id)}
             onGenerateQR={setSelectedStudentForQr} 
             onAddComment={setSelectedStudentForComment}
-            onPay={(student) => setPaymentData({ studentId: student._id, studentName: student.student_name })}
+            
+            // 🚀 FIX: Navigate to the new single finance page
+            onPay={(student) => navigate(`/admin/student-finance/${student._id}`)}
+            
             onEdit={(id) => navigate(`/admin/update-student/${id}`)}
             page={page} 
             onPageChange={setPage} 
@@ -166,9 +163,6 @@ const AllStudents = () => {
 
       {selectedStudentForQr && <QRCodeModal student={selectedStudentForQr} onClose={() => setSelectedStudentForQr(null)} />}
       {selectedStudentForComment && <CommentModal student={selectedStudentForComment} onClose={() => setSelectedStudentForComment(null)} />}
-      {paymentData && (
-        <CollectPaymentModal isOpen={!!paymentData} onClose={() => setPaymentData(null)} studentId={paymentData.studentId} studentName={paymentData.studentName} />
-      )}
     </div>
   );
 };

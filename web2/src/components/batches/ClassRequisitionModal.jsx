@@ -1,235 +1,267 @@
-import React, { useState, useEffect } from "react";
-import { X, Plus, Trash2, Save, ShoppingBag, Info, Loader2 } from "lucide-react";
-import toast from "react-hot-toast";
+import React, { useState, useEffect, useMemo } from "react";
+import {
+  useClassRequisition,
+  useSubmitRequisition,
+  useReviewRequisition,
+} from "../../hooks/useRequisitions";
+import { useInventory } from "../../hooks/useInventory"; 
+import { X, Plus, Trash2, CheckCircle, XCircle } from "lucide-react";
+import useAuth from "../../store/useAuth";
+import Loader from "../Loader";
+import Swal from "sweetalert2";
 
-import { useBranchInventory } from "../../hooks/useInventory";
+export default function ClassRequisitionModal({
+  isOpen,
+  onClose,
+  classData,
+  batchData,
+}) {
+  const { hasPermission } = useAuth();
+  const canApprove = hasPermission("approve_requisitions");
 
-export default function ClassRequisitionModal({ isOpen, onClose, classData, batchData, onSave }) {
-  const [items, setItems] = useState([{ item_name: "", quantity: "", unit: "kg" }]);
-  const [budget, setBudget] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { data: reqRes, isLoading } = useClassRequisition(classData?._id);
+  const existingReq = reqRes?.data;
 
-  const branchId = batchData?.branch?._id || batchData?.branch;
-  const { data: invRes } = useBranchInventory(branchId);
-  const inventoryItems = invRes?.data || [];
+  // Fetch Inventory
+  const { data: invRes } = useInventory(batchData?.branch?._id || batchData?.branch);
+  
+  // 🚀 FIXED: Safely extract inventory items from standard API response
+  const inventoryList = useMemo(() => {
+    if (Array.isArray(invRes?.data)) return invRes.data;
+    if (Array.isArray(invRes?.data?.data)) return invRes.data.data;
+    if (Array.isArray(invRes)) return invRes;
+    return [];
+  }, [invRes]);
+
+  const submitMutation = useSubmitRequisition();
+  const { approve, reject } = useReviewRequisition(existingReq?._id, classData?._id);
+
+  const [items, setItems] = useState([]);
+  const [estimatedCost, setEstimatedCost] = useState(0);
+  const [adminNote, setAdminNote] = useState("");
 
   useEffect(() => {
-    if (isOpen) {
-      const existingItems = classData?.requisitions?.length > 0 
-        ? classData.requisitions 
-        : [{ item_name: "", quantity: "", unit: "kg" }];
-        
-      setItems(existingItems);
-      setBudget(classData?.financials?.budget || "");
+    if (existingReq) {
+      setItems(existingReq.items);
+      setEstimatedCost(existingReq.total_estimated_cost || 0);
+    } else {
+      setItems([{ inventory_item: "", item_name: "", quantity: 1, unit: "pcs", is_custom: false }]);
     }
-  }, [isOpen, classData]);
+  }, [existingReq, isOpen]);
 
-  if (!isOpen || !classData || !batchData) return null;
+  if (!isOpen) return null;
 
-  const handleAddRow = () => {
-    setItems([...items, { item_name: "", quantity: "", unit: "kg" }]);
-  };
-
-  const handleRemoveRow = (index) => {
-    if (items.length > 1) {
-      setItems(items.filter((_, i) => i !== index));
-    }
-  };
-
-  const handleItemChange = (index, field, value) => {
-    const updated = [...items];
-    updated[index][field] = value;
-    
-    if (field === "item_name") {
-      const matchedItem = inventoryItems.find(inv => inv.item_name.toLowerCase() === value.toLowerCase());
-      if (matchedItem) {
-        updated[index].unit = matchedItem.unit;
-      }
-    }
-    
-    setItems(updated);
-  };
-
-  const handleSubmit = async (e) => {
+const handleSubmit = (e) => {
     e.preventDefault();
-    
-    const validItems = items.filter(item => item.item_name.trim() !== "" && Number(item.quantity) > 0);
-    
-    if (validItems.length === 0) {
-      return toast.error("Please add at least one valid item with quantity.");
-    }
+    const validItems = items.filter((i) => i.item_name.trim() !== "" && i.quantity > 0);
+    if (validItems.length === 0) return Swal.fire("Error", "Add at least one valid item", "error");
 
-    setIsSubmitting(true);
-    try {
+    // Strictly map the items
+    const sanitizedItems = validItems.map(item => {
       const payload = {
-        class_content: classData._id,
-        batch: batchData._id,
-        branch: branchId,
-        items: validItems.map(item => ({
-          item_name: item.item_name,
-          unit: item.unit,
-          quantity: Number(item.quantity)
-        })),
-        budget: Number(budget) || 0
+        item_name: item.item_name,
+        quantity: Number(item.quantity),
+        unit: item.unit,
+        is_custom: item.is_custom // Keep this if needed
       };
+      
+      // Only add inventory_item if it exists AND is not custom.
+      if (!item.is_custom && item.inventory_item) {
+        payload.inventory_item = item.inventory_item;
+      }
+      return payload;
+    });
 
-      await onSave(payload);
-      onClose(); 
-      toast.success("Requisition submitted successfully!");
-    } catch (error) {
-      console.error(error);
-      toast.error("Failed to submit requisition");
-    } finally {
-      setIsSubmitting(false);
-    }
+    // 🚀 FIXED: Added the 'branch' field back to satisfy Mongoose requirements
+    submitMutation.mutate({
+      class_content: classData._id, 
+      batch: batchData._id,         
+      branch: batchData?.branch?._id || batchData?.branch, // 👈 এটা এখন মাস্ট পাঠাতে হবে
+      items: sanitizedItems,        
+    });
   };
+
+  const handleApprove = () => {
+    approve.mutate({ items, total_estimated_cost: estimatedCost, admin_note: adminNote });
+  };
+
+  const handleReject = () => reject.mutate(adminNote || "Rejected by admin");
+
+  const isPending = existingReq?.status === "pending";
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+      <div className="bg-white w-full max-w-3xl rounded-[2rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         
-        {/* 🟢 HEADER */}
-        <div className="p-6 md:p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 shrink-0">
+        {/* Header */}
+        <div className="px-6 py-4 bg-gray-50 flex justify-between items-center border-b border-gray-100 shrink-0">
           <div>
-            <div className="flex items-center gap-3 mb-1.5">
-               <span className="px-2.5 py-1 bg-teal-50 text-teal-700 text-[9px] font-black uppercase tracking-widest rounded-lg">Class {classData.class_number}</span>
-               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">ID: #{classData._id.slice(-6)}</span>
-            </div>
-            <h2 className="text-xl font-black text-slate-800 flex items-center gap-2">
-              <ShoppingBag size={22} className="text-teal-500" />
-              Request Materials & Bazar
-            </h2>
+            <h2 className="text-lg font-black text-gray-800 uppercase">Class Requisition</h2>
+            <p className="text-xs text-gray-500 font-bold">{classData?.topic}</p>
           </div>
-          <button onClick={onClose} className="p-2.5 text-slate-400 hover:bg-white hover:shadow-sm rounded-xl transition-all border border-transparent hover:border-slate-200">
+          <button onClick={onClose} className="p-2 bg-gray-200 hover:bg-rose-100 hover:text-rose-600 rounded-full transition-colors">
             <X size={20} />
           </button>
         </div>
 
-        {/* 🟢 BODY */}
-        <div className="flex-1 overflow-y-auto p-6 md:p-8 custom-scrollbar">
-          
-          <div className="bg-teal-50 border border-teal-100 rounded-2xl p-4 mb-8 flex gap-3 shadow-inner">
-            <Info size={20} className="text-teal-600 shrink-0" />
-            <p className="text-xs text-teal-800 font-medium leading-relaxed">
-              Start typing an item name to see suggestions from the current pantry stock. You can also add custom items that are not in the store yet.
-            </p>
-          </div>
-
-          <div className="space-y-4">
-            {/* Table Headers */}
-            <div className="grid grid-cols-12 gap-3 px-2 hidden sm:grid">
-              <div className="col-span-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Item Description</div>
-              <div className="col-span-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Quantity</div>
-              <div className="col-span-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">Unit</div>
-              <div className="col-span-1"></div>
-            </div>
-
-            {/* Dynamic Input Rows */}
-            {items.map((item, index) => (
-              <div key={index} className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center p-4 bg-slate-50 border border-slate-100 rounded-[1.5rem] group hover:border-teal-200 transition-all shadow-sm">
-                
-                <div className="sm:col-span-6 relative">
-                  <label className="text-[9px] font-bold text-slate-400 uppercase block mb-1 sm:hidden">Item Name</label>
-                  <input 
-                    list={`inventory-suggestions-${index}`}
-                    type="text" 
-                    placeholder="e.g., Fresh Chicken"
-                    value={item.item_name}
-                    onChange={(e) => handleItemChange(index, "item_name", e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all"
-                  />
-                  <datalist id={`inventory-suggestions-${index}`}>
-                    {inventoryItems.map(inv => (
-                      <option key={inv._id} value={inv.item_name} />
-                    ))}
-                  </datalist>
+        {/* Body */}
+        <div className="p-6 overflow-y-auto custom-scrollbar flex-1">
+          {isLoading ? (
+            <Loader />
+          ) : (
+            <>
+              {existingReq && (
+                <div className={`p-4 rounded-xl mb-6 font-bold flex items-center gap-2 ${
+                  existingReq.status === "approved" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : 
+                  existingReq.status === "rejected" ? "bg-rose-50 text-rose-700 border border-rose-200" : "bg-amber-50 text-amber-700 border border-amber-200"
+                }`}>
+                  {existingReq.status === "approved" ? <CheckCircle size={20} /> : existingReq.status === "rejected" ? <XCircle size={20} /> : <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />}
+                  Status: {existingReq.status.toUpperCase()}
+                  {existingReq.admin_note && <span className="ml-auto text-xs opacity-80">Note: {existingReq.admin_note}</span>}
                 </div>
+              )}
 
-                <div className="sm:col-span-3 flex gap-3 sm:block">
-                  <div className="flex-1">
-                    <label className="text-[9px] font-bold text-slate-400 uppercase block mb-1 sm:hidden">Qty</label>
-                    <input 
-                      type="number" 
-                      placeholder="0"
-                      min="0"
-                      step="any"
-                      value={item.quantity}
-                      onChange={(e) => handleItemChange(index, "quantity", e.target.value)}
-                      className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-black text-slate-700 outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all text-center"
-                    />
+              <div className="space-y-4">
+                {items.map((item, index) => (
+                  <div key={index} className="flex flex-wrap md:flex-nowrap gap-3 items-end bg-gray-50 p-3 rounded-xl border border-gray-100">
+                    <div className="flex-1 min-w-[200px]">
+                      <label className="text-[10px] font-black uppercase text-gray-400">Item Name</label>
+                      {!existingReq || (isPending && canApprove) ? (
+                        <select
+                          value={item.is_custom ? "custom" : item.inventory_item || ""}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            const newItems = [...items];
+                            if (val === "custom") {
+                              newItems[index] = { ...item, is_custom: true, inventory_item: "", item_name: "", unit: "pcs" };
+                            } else {
+                              const selectedInv = inventoryList.find((i) => i._id === val);
+                              newItems[index] = { ...item, is_custom: false, inventory_item: val, item_name: selectedInv?.item_name || "", unit: selectedInv?.unit || "pcs" };
+                            }
+                            setItems(newItems);
+                          }}
+                          className="w-full p-2 text-sm border border-gray-200 rounded-lg outline-none focus:border-teal-500 font-bold text-gray-700"
+                        >
+                          <option value="" disabled>Select Item</option>
+                          <optgroup label="Inventory Stock">
+                            {inventoryList.map((inv) => (
+                              <option key={inv._id} value={inv._id}>
+                                {inv.item_name} (Stock: {inv.quantity_in_stock} {inv.unit})
+                              </option>
+                            ))}
+                          </optgroup>
+                          <optgroup label="Other">
+                            <option value="custom">🛒 Custom / Shopping List Item</option>
+                          </optgroup>
+                        </select>
+                      ) : (
+                        <div className="font-bold text-gray-800 mt-2">
+                          {item.item_name} {item.is_custom && <span className="text-[10px] text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md ml-2">Custom</span>}
+                        </div>
+                      )}
+                      
+                      {item.is_custom && (!existingReq || (isPending && canApprove)) && (
+                        <input
+                          type="text"
+                          placeholder="Type custom item name..."
+                          value={item.item_name}
+                          onChange={(e) => {
+                            const newItems = [...items];
+                            newItems[index].item_name = e.target.value;
+                            setItems(newItems);
+                          }}
+                          className="w-full mt-2 p-2 text-sm border border-gray-200 rounded-lg outline-none focus:border-teal-500"
+                        />
+                      )}
+                    </div>
+
+                    <div className="w-24 shrink-0">
+                      <label className="text-[10px] font-black uppercase text-gray-400">Qty</label>
+                      {!existingReq || (isPending && canApprove) ? (
+                        <input
+                          type="number" min="0.1" step="0.1" value={item.quantity}
+                          onChange={(e) => {
+                            const newItems = [...items];
+                            newItems[index].quantity = Number(e.target.value);
+                            setItems(newItems);
+                          }}
+                          className="w-full p-2 text-sm border border-gray-200 rounded-lg outline-none focus:border-teal-500 font-bold text-center"
+                        />
+                      ) : <div className="font-bold text-center mt-2">{item.quantity}</div>}
+                    </div>
+
+                    <div className="w-20 shrink-0">
+                      <label className="text-[10px] font-black uppercase text-gray-400">Unit</label>
+                      {(!existingReq || (isPending && canApprove)) && item.is_custom ? (
+                        <select
+                          value={item.unit}
+                          onChange={(e) => {
+                            const newItems = [...items];
+                            newItems[index].unit = e.target.value;
+                            setItems(newItems);
+                          }}
+                          className="w-full p-2 text-sm border border-gray-200 rounded-lg outline-none font-bold"
+                        >
+                          <option value="kg">kg</option>
+                          <option value="g">g</option>
+                          <option value="L">L</option>
+                          <option value="pcs">pcs</option>
+                          <option value="pkt">pkt</option>
+                        </select>
+                      ) : <div className="font-bold text-gray-500 mt-2 text-center bg-white border border-gray-200 rounded-lg py-1.5">{item.unit}</div>}
+                    </div>
+
+                    {!existingReq && (
+                      <button onClick={() => setItems(items.filter((_, i) => i !== index))} className="p-2 mb-0.5 text-gray-400 hover:text-rose-500 bg-white border border-gray-200 rounded-lg">
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {!existingReq && (
+                <button
+                  onClick={() => setItems([...items, { inventory_item: "", item_name: "", quantity: 1, unit: "pcs", is_custom: false }])}
+                  className="mt-4 flex items-center gap-2 text-xs font-bold text-teal-600 hover:text-teal-700 bg-teal-50 px-4 py-2 rounded-lg"
+                >
+                  <Plus size={14} /> Add Another Item
+                </button>
+              )}
+
+              {existingReq && isPending && canApprove && (
+                <div className="mt-8 pt-6 border-t border-dashed border-gray-200">
+                  <h3 className="text-sm font-black text-gray-800 uppercase mb-4">Admin Controls</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[10px] font-black uppercase text-gray-400 mb-1 block">Est. Market Cost ৳</label>
+                      <input type="number" value={estimatedCost} onChange={(e) => setEstimatedCost(Number(e.target.value))} className="w-full p-2.5 border border-gray-200 rounded-xl font-bold outline-none focus:border-teal-500" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-black uppercase text-gray-400 mb-1 block">Admin Note</label>
+                      <input type="text" placeholder="Note..." value={adminNote} onChange={(e) => setAdminNote(e.target.value)} className="w-full p-2.5 border border-gray-200 rounded-xl font-bold outline-none focus:border-teal-500" />
+                    </div>
                   </div>
                 </div>
+              )}
+            </>
+          )}
+        </div>
 
-                <div className="sm:col-span-2">
-                  <label className="text-[9px] font-bold text-slate-400 uppercase block mb-1 sm:hidden">Unit</label>
-                  <select 
-                    value={item.unit}
-                    onChange={(e) => handleItemChange(index, "unit", e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-xl px-2 py-3 text-xs font-bold text-slate-600 outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 cursor-pointer transition-all"
-                  >
-                    {["kg", "g", "L", "ml", "pcs", "pkt", "box", "dozen"].map(u => (
-                      <option key={u} value={u}>{u}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="sm:col-span-1 flex justify-end sm:justify-center mt-2 sm:mt-0">
-                  <button 
-                    type="button"
-                    onClick={() => handleRemoveRow(index)}
-                    disabled={items.length === 1}
-                    className="p-2.5 text-slate-300 hover:bg-rose-50 hover:text-rose-500 rounded-xl disabled:opacity-30 transition-colors"
-                  >
-                    <Trash2 size={18} />
-                  </button>
-                </div>
-              </div>
-            ))}
-
-            <button 
-              type="button"
-              onClick={handleAddRow}
-              className="w-full py-4 mt-2 border-2 border-dashed border-slate-200 rounded-[1.5rem] text-slate-400 text-xs font-black uppercase tracking-widest hover:border-teal-300 hover:text-teal-600 hover:bg-teal-50/50 transition-all flex items-center justify-center gap-2"
-            >
-              <Plus size={16} strokeWidth={3} /> Add Another Item
+        {/* Footer */}
+        <div className="p-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3 shrink-0">
+          <button onClick={onClose} className="px-5 py-2 text-sm font-bold text-gray-500 hover:text-gray-700">Close</button>
+          {!existingReq ? (
+            <button onClick={handleSubmit} disabled={submitMutation.isPending} className="px-6 py-2 bg-gray-900 text-white text-sm font-bold rounded-xl hover:bg-black">
+              {submitMutation.isPending ? "Submitting..." : "Submit Requisition"}
             </button>
-          </div>
-
-          {/* Budget Field */}
-          <div className="mt-10 pt-8 border-t border-slate-100">
-            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Estimated Budget (Optional)</label>
-            <div className="relative max-w-xs">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-black">৳</span>
-              <input 
-                type="number"
-                placeholder="0.00"
-                value={budget}
-                onChange={(e) => setBudget(e.target.value)}
-                className="w-full pl-10 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-lg font-black text-slate-800 outline-none focus:border-teal-500 focus:bg-white transition-all shadow-inner"
-              />
-            </div>
-          </div>
+          ) : isPending && canApprove && (
+            <>
+              <button onClick={handleReject} disabled={reject.isPending} className="px-6 py-2 bg-rose-100 text-rose-700 text-sm font-bold rounded-xl hover:bg-rose-200">Reject</button>
+              <button onClick={handleApprove} disabled={approve.isPending} className="px-6 py-2 bg-teal-600 text-white text-sm font-bold rounded-xl hover:bg-teal-700">Approve & Deduct</button>
+            </>
+          )}
         </div>
-
-        {/* 🟢 FOOTER */}
-        <div className="p-6 md:px-8 md:py-6 bg-white border-t border-slate-100 flex justify-end gap-4 shrink-0">
-          <button 
-            type="button"
-            onClick={onClose} 
-            className="px-6 py-3.5 text-sm font-bold text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-xl transition-all"
-          >
-            Cancel
-          </button>
-          <button 
-            onClick={handleSubmit}
-            disabled={isSubmitting}
-            className="px-8 py-3.5 bg-slate-900 text-white text-xs font-black uppercase tracking-widest rounded-xl hover:bg-teal-600 shadow-xl shadow-slate-900/10 disabled:opacity-50 transition-all flex items-center gap-2 active:scale-95"
-          >
-            {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} 
-            {isSubmitting ? "Submitting..." : "Submit Requisition"}
-          </button>
-        </div>
-
       </div>
     </div>
   );

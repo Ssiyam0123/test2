@@ -4,26 +4,27 @@ import { API } from "./axios";
 // REQUISITION ENDPOINTS
 // ==============================
 
-// ১. শেফ নতুন রিকোয়েস্ট পাঠাবে বা আপডেট করবে
-export const submitRequisition = async (payload) => {
-  const { data } = await API.post("/requisitions/create", payload);
+export const getClassRequisitionAPI = async (classId) => {
+  const { data } = await API.get(`/requisitions/class/${classId}`);
   return data;
 };
 
-// ২. ম্যানেজার ড্যাশবোর্ডে সব রিকোয়েস্ট (Pending & History) দেখবে
-export const fetchPendingRequisitions = async (branchId) => {
-  const { data } = await API.get(`/requisitions/branch/${branchId}/pending`);
+export const submitRequisitionAPI = async (payload) => {
+  const { data } = await API.post("/requisitions", payload);
   return data;
 };
 
-// ৩. ম্যানেজার রিকোয়েস্ট Approve করবে
-export const fulfillRequisition = async (branchId, reqId, payload) => {
-  const { data } = await API.post(`/requisitions/${branchId}/fulfill/${reqId}`, payload);
+export const approveRequisitionAPI = async ({ reqId, payload }) => {
+  const { data } = await API.put(`/requisitions/${reqId}/approve`, payload);
   return data;
 };
 
-// ৪. ম্যানেজার রিকোয়েস্ট Reject করবে
-export const rejectRequisition = async (branchId, reqId) => {
-  const { data } = await API.patch(`/requisitions/${branchId}/reject/${reqId}`);
+export const rejectRequisitionAPI = async ({ reqId, admin_note }) => {
+  const { data } = await API.put(`/requisitions/${reqId}/reject`, { admin_note });
+  return data;
+};
+
+export const fetchAllRequisitionsAPI = async (branchId) => {
+  const { data } = await API.get("/requisitions", { params: { branch: branchId } });
   return data;
 };

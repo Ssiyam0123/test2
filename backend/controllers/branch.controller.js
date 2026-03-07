@@ -5,9 +5,7 @@ import catchAsync from "../utils/catchAsync.js";
 import AppError from "../utils/AppError.js";
 import ApiResponse from "../utils/ApiResponse.js";
 
-// ==========================================
-// 🐳 [Controller: createBranch]
-// ==========================================
+
 export const createBranch = catchAsync(async (req, res, next) => {
   if (!req.isMaster) return next(new AppError("Only Super Admins can create branches", 403));
   
@@ -15,9 +13,7 @@ export const createBranch = catchAsync(async (req, res, next) => {
   res.status(201).json(new ApiResponse(201, newBranch, "Branch created"));
 });
 
-// ==========================================
-// 🐳 [Controller: updateBranch]
-// ==========================================
+
 export const updateBranch = catchAsync(async (req, res, next) => {
   const { id } = req.params;
   if (!req.isMaster && id !== req.user.branch.toString()) {
@@ -30,9 +26,7 @@ export const updateBranch = catchAsync(async (req, res, next) => {
   res.status(200).json(new ApiResponse(200, updatedBranch, "Branch updated"));
 });
 
-// ==========================================
-// 🐳 [Controller: getAllBranches]
-// ==========================================
+
 export const getAllBranches = catchAsync(async (req, res, next) => {
   // 🚀 Logic: SuperAdmin sees all, Branch Manager only sees theirs
   const filter = req.isMaster ? {} : { _id: req.user.branch };
@@ -50,9 +44,6 @@ export const getAllBranches = catchAsync(async (req, res, next) => {
   res.status(200).json(new ApiResponse(200, branches, "Branches fetched"));
 });
 
-// ==========================================
-// 🐳 [Controller: getBranchById]
-// ==========================================
 export const getBranchById = catchAsync(async (req, res, next) => {
   const { id } = req.params;
   if (!req.isMaster && id !== req.user.branch.toString()) {
@@ -65,9 +56,7 @@ export const getBranchById = catchAsync(async (req, res, next) => {
   res.status(200).json(new ApiResponse(200, branch, "Branch details fetched"));
 });
 
-// ==========================================
-// 🐳 [Controller: toggleBranchStatus]
-// ==========================================
+
 export const toggleBranchStatus = catchAsync(async (req, res, next) => {
   if (!req.isMaster) return next(new AppError("Unauthorized action", 403));
 
@@ -80,9 +69,6 @@ export const toggleBranchStatus = catchAsync(async (req, res, next) => {
   res.status(200).json(new ApiResponse(200, branch, "Branch status toggled"));
 });
 
-// ==========================================
-// 🐳 [Controller: deleteBranch]
-// ==========================================
 export const deleteBranch = catchAsync(async (req, res, next) => {
   if (!req.isMaster) return next(new AppError("Unauthorized action", 403));
 

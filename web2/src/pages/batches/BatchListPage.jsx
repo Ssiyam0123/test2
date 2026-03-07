@@ -1,23 +1,43 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus, Clock, BookOpen, Edit3, Trash2, LayoutGrid, Search, Layers } from "lucide-react";
 import { useBatches, useDeleteBatch } from "../../hooks/useBatches";
+import { useBranches } from "../../hooks/useBranches"; 
 import Loader from "../../components/Loader";
 import Swal from "sweetalert2";
 import DataTable from "../../components/common/DataTable.jsx";
-import useAuth from "../../store/useAuth"; // 🚀 Imported Zustand Store
+import useAuth from "../../store/useAuth"; 
+import BranchDropdown from "../../components/common/BranchDropdown"; 
 
 export default function BatchListPage() {
   const navigate = useNavigate();
-  const { data: batchesResponse, isLoading } = useBatches();
-  const { mutate: deleteBatch } = useDeleteBatch();
-  const [searchTerm, setSearchTerm] = useState("");
+  const { authUser, hasPermission, isMaster } = useAuth();
   
-  // 🚀 Dynamic Permission Checks
-  const { hasPermission } = useAuth();
+  // 🚀 Logic to determine if user is super admin
+  const isSuper = isMaster ? isMaster() : authUser?.role === "superadmin";
   const canManageBatches = hasPermission("manage_batches");
 
+  // 🚀 selectedBranch "" (empty) means "All Campuses"
+  const [selectedBranch, setSelectedBranch] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+
+  // 🚀 Fetch branches list for the dropdown
+  const { data: branchesRes } = useBranches({}, { enabled: !!isSuper });
+
+  // 🚀 Fetch Batches - If selectedBranch is empty, it fetches all
+  const { data: batchesResponse, isLoading } = useBatches(
+    isSuper ? (selectedBranch ? { branch: selectedBranch } : {}) : {}
+  );
+  
+  const { mutate: deleteBatch } = useDeleteBatch();
+
   const batches = batchesResponse?.data || [];
+
+  // 🚀 Search Logic
+  const filteredBatches = batches.filter(b => 
+    b.batch_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    b.course?.course_name?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const handleDelete = (id) => {
     Swal.fire({
@@ -40,11 +60,6 @@ export default function BatchListPage() {
     });
   };
 
-  const filteredBatches = batches.filter(b => 
-    b.batch_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    b.course?.course_name?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
   const columns = [
     { label: "Batch Details", className: "w-[40%]" },
     { label: "Schedule & Days", className: "hidden md:table-cell w-[30%]" },
@@ -54,8 +69,6 @@ export default function BatchListPage() {
 
   const renderBatchRow = (batch) => (
     <tr key={batch._id} className="group transition-colors duration-300 border-b border-slate-50 last:border-none hover:bg-slate-50/50">
-      
-      {/* 1. Batch Details */}
       <td className="px-6 py-4 align-middle">
         <div className="flex items-center gap-4">
           <div className="hidden sm:flex h-11 w-11 rounded-2xl bg-teal-50 text-teal-600 items-center justify-center group-hover:bg-teal-500 group-hover:text-white transition-all shadow-sm">
@@ -69,8 +82,6 @@ export default function BatchListPage() {
           </div>
         </div>
       </td>
-
-      {/* 2. Schedule & Days */}
       <td className="hidden md:table-cell px-6 py-4 align-middle">
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center gap-1.5 text-[12px] font-bold text-slate-700">
@@ -86,8 +97,6 @@ export default function BatchListPage() {
           </div>
         </div>
       </td>
-
-      {/* 3. Status */}
       <td className="px-6 py-4 align-middle">
         <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter ${
           batch.status === 'Active' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
@@ -97,46 +106,27 @@ export default function BatchListPage() {
           {batch.status}
         </span>
       </td>
-
-      {/* 4. Actions */}
       <td className="px-6 py-4 text-right align-middle">
         <div className="flex items-center justify-end gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
-          
-          <button 
-            onClick={() => navigate(`/admin/batches/${batch._id}`)}
-            className="p-2 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-xl transition-all"
-            title="Manage Workspace"
-          >
+          <button onClick={() => navigate(`/admin/batches/${batch._id}`)} className="p-2 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-xl transition-all" title="View Workspace">
             <BookOpen size={16} />
           </button>
-
-          {/* 🚀 Conditional Edit/Delete Actions */}
           {canManageBatches && (
             <>
-              <button 
-                onClick={() => navigate(`/admin/edit-batch/${batch._id}`)}
-                className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
-                title="Edit Settings"
-              >
+              <button onClick={() => navigate(`/admin/edit-batch/${batch._id}`)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all" title="Edit Batch">
                 <Edit3 size={16} />
               </button>
-              
-              <button 
-                onClick={() => handleDelete(batch._id)}
-                className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
-                title="Delete Batch"
-              >
+              <button onClick={() => handleDelete(batch._id)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all" title="Delete Batch">
                 <Trash2 size={16} />
               </button>
             </>
           )}
-
         </div>
       </td>
     </tr>
   );
 
-  if (isLoading) return <Loader />;
+  if (isLoading && batches.length === 0) return <Loader />;
 
   return (
     <div className="p-4 md:p-8 lg:p-10 bg-[#e8f0f2] min-h-screen font-sans">
@@ -146,11 +136,25 @@ export default function BatchListPage() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">Batch Inventory</h1>
-            <p className="text-slate-500 text-sm font-medium mt-1">Total {batches.length} batches active in system</p>
+            <p className="text-slate-500 text-sm font-medium mt-1">
+               {selectedBranch ? "Branch-specific results" : "Showing results from all campuses"}
+            </p>
           </div>
           
-          <div className="flex items-center gap-3">
-            <div className="relative flex-1 md:w-64">
+          <div className="flex flex-col sm:flex-row items-center gap-3">
+            {/* 🚀 BRANCH DROPDOWN (With All Campuses Option) */}
+            {isSuper && (
+              <BranchDropdown 
+                isMaster={isSuper} 
+                branches={branchesRes?.data || []} 
+                value={selectedBranch} 
+                onChange={setSelectedBranch} 
+                showAllOption={true} // 👈 ENABLED "ALL"
+                wrapperClassName="w-full sm:w-64 mb-0"
+              />
+            )}
+
+            <div className="relative w-full sm:w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
               <input 
                 type="text"
@@ -161,7 +165,6 @@ export default function BatchListPage() {
               />
             </div>
             
-            {/* 🚀 Role Guard on Create Button */}
             {canManageBatches && (
               <button 
                 onClick={() => navigate("/admin/add-batch")} 
@@ -182,7 +185,7 @@ export default function BatchListPage() {
           searchTerm={searchTerm}
           emptyStateIcon={Layers}
           emptyStateTitle="No batches found"
-          emptyStateSubtitle="There are no batches matching your search or currently active in the system."
+          emptyStateSubtitle="Try switching branches or adjusting your search term."
         />
         
       </div>

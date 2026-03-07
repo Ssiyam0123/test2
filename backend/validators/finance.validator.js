@@ -1,26 +1,15 @@
-import Joi from "joi";
-import { objectId } from "./common.js";
+import { z } from "zod";
+import { objectIdSchema } from "./common.js";
 
-// Validate a new incoming payment
-export const paymentCreateSchema = Joi.object({
-  fee_record: objectId.required(),
-  amount: Joi.number().positive().required().messages({
-    "number.positive": "Payment amount must be greater than zero.",
-    "any.required": "Payment amount is required."
-  }),
-  payment_type: Joi.string()
-    .valid("Admission Fee", "Installment", "Other")
-    .required(),
-  payment_method: Joi.string()
-    .valid("Cash", "Mobile Banking", "Bank Transfer", "Card")
-    .required(),
-  transaction_id: Joi.string().allow("").optional(),
-  remarks: Joi.string().max(200).allow("").optional()
-}).unknown(false);
+export const collectPaymentSchema = z.object({
+  fee_record: objectIdSchema,
+  amount: z.number().positive("Payment amount must be greater than zero."),
+  payment_type: z.string().trim().min(1),
+  payment_method: z.string().trim().min(1),
+  transaction_id: z.string().trim().optional().default(""),
+  remarks: z.string().trim().optional().default("")
+});
 
-// Validate manual discount updates by an admin
-export const feeUpdateSchema = Joi.object({
-  discount: Joi.number().min(0).required().messages({
-    "number.min": "Discount cannot be a negative value."
-  })
-}).unknown(false);
+export const updateDiscountSchema = z.object({
+  discount: z.number().nonnegative("Discount cannot be negative.")
+});

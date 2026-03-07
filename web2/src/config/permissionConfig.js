@@ -7,7 +7,7 @@ export const PERMISSION_MATRIX = [
     features: [
       { label: "View Global Stats", value: "view_dashboard" },
       { label: "View Branch Analytics", value: "view_branch_stats" },
-    ]
+    ],
   },
   {
     moduleName: "Student Management",
@@ -19,7 +19,7 @@ export const PERMISSION_MATRIX = [
       { label: "Edit Student Info", value: "edit_student" },
       { label: "Delete Student", value: "delete_student" },
       { label: "Add Comment/Feedback", value: "add_student_comment" },
-    ]
+    ],
   },
   {
     moduleName: "Finance & Accounts",
@@ -29,7 +29,7 @@ export const PERMISSION_MATRIX = [
       { label: "Collect Student Fees", value: "collect_fees" }, // 🚀 Wallet Button
       { label: "Add Daily Expense", value: "add_expense" },
       { label: "View Expenses", value: "view_expenses" },
-    ]
+    ],
   },
   {
     moduleName: "Batch & Classes",
@@ -37,11 +37,16 @@ export const PERMISSION_MATRIX = [
     features: [
       { label: "View Batches", value: "view_batches" },
       { label: "Create/Edit Batch", value: "manage_batches" },
-      { label: "View Class Contents", value: "view_classes" },
-      { label: "Schedule Classes", value: "manage_classes" },
+      { label: "Delete Batch", value: "delete_batch" },
+      { label: "View Class Workspace", value: "view_classes" },
+      { label: "Access Curriculum Builder", value: "manage_curriculum" },
+      { label: "Use Auto Scheduler", value: "use_auto_scheduler" },
+      { label: "Schedule/Edit Classes", value: "manage_classes" },
       { label: "Take Attendance", value: "take_attendance" },
       { label: "Mark Class Complete", value: "mark_class_complete" },
-    ]
+      { label: "Request Requisition", value: "request_requisition" },
+      { label: "View Holiday Calendar", value: "view_holidays" },
+    ],
   },
   {
     moduleName: "Courses & Syllabus",
@@ -51,7 +56,7 @@ export const PERMISSION_MATRIX = [
       { label: "Manage Courses", value: "manage_courses" },
       { label: "View Syllabus", value: "view_syllabus" },
       { label: "Manage Syllabus", value: "manage_syllabus" },
-    ]
+    ],
   },
   {
     moduleName: "Inventory System",
@@ -61,7 +66,7 @@ export const PERMISSION_MATRIX = [
       { label: "Manage Inventory", value: "manage_inventory" },
       { label: "View Requisitions", value: "view_requisitions" },
       { label: "Approve Requisitions", value: "approve_requisitions" },
-    ]
+    ],
   },
   {
     moduleName: "Employee & HR",
@@ -70,7 +75,7 @@ export const PERMISSION_MATRIX = [
       { label: "View Employee List", value: "view_employees" },
       { label: "Add/Edit Employee", value: "edit_employee" },
       { label: "Delete Employee", value: "delete_employee" },
-    ]
+    ],
   },
   {
     moduleName: "System Admin",
@@ -79,6 +84,6 @@ export const PERMISSION_MATRIX = [
       { label: "View Branches", value: "view_branches" },
       { label: "Manage Branches", value: "manage_branches" },
       { label: "Manage Roles & Access", value: "manage_roles" },
-    ]
-  }
+    ],
+  },
 ];

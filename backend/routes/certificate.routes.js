@@ -5,7 +5,7 @@ import { downloadEmployeeID } from "../controllers/employeeid.controller.js";
 
 const router = express.Router();
 
-// 🚀 Document Downloads (Only requires Login)
+// 🚀 Document Downloads (Only requires Login, no body validation needed)
 router.get("/download/:id", verifyToken, downloadCertificatePDF);
 router.get("/employeeid/download/:id", verifyToken, downloadEmployeeID);
 

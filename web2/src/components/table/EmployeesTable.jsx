@@ -59,7 +59,6 @@ const EmployeesTable = ({
     }
   };
 
-  // 🚀 DYNAMIC DELETE HANDLER
   const handleDeleteClick = (employeeId, employeeName) => {
     confirmDelete({
       title: "Delete Employee?",
@@ -107,14 +106,17 @@ const EmployeesTable = ({
       >
         <td className="px-6 py-4 align-middle">
           <div className="flex items-center gap-4">
+            
+            {/* 🚀 FIXED AVATAR: Check if the field is photo_url or just photo */}
             <Avatar
-              src={employee.photo_url}
+              src={employee.photo_url || employee.photo} 
               alt={employee.username}
-              fallbackText={employee.username}
+              fallbackText={employee.username || employee.full_name}
               isInactive={isInactive}
-              size="md"
+              sizeClass="w-12 h-12"
               className="shadow-sm"
             />
+
             <div className="flex flex-col">
               <span className="text-[14px] font-bold text-slate-800">
                 {employee.full_name}
@@ -251,7 +253,6 @@ const EmployeesTable = ({
               </CanAccess>
 
               <CanAccess permission={PERMISSIONS.DELETE_EMPLOYEE}>
-                {/* 🚀 Use the new handler here */}
                 <ActionIconButton
                   icon={Trash2}
                   variant="danger"

@@ -136,7 +136,6 @@ export default function ManageMasterSyllabus() {
       <PageHeader
         title="Master Syllabus Library"
         subtitle="Global blueprint for all batch curricula."
-        // 🚀 Role Protected Add Button
         onAdd={canManageSyllabus ? () => navigate("/admin/add-syllabus") : undefined}
         addText={canManageSyllabus ? "Add Topics" : undefined}
       />

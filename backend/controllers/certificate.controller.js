@@ -15,58 +15,45 @@ export const downloadCertificatePDF = async (req, res) => {
       return res.status(404).json({ message: "Student not found" });
     }
 
-    // 1. Initialize PDF Document (A4 Landscape)
     const doc = new PDFDocument({
       size: "A4",
       layout: "landscape",
       margin: 0,
     });
 
-    // 2. Set response headers to trigger file download
     const safeName = student.student_name.replace(/[^a-zA-Z0-9]/g, "_");
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename=CIB_Certificate_${safeName}.pdf`);
     
     doc.pipe(res);
 
-    // Asset paths
+
     const fontsPath = path.join(__dirname, "../assets/fonts");
     const imagesPath = path.join(__dirname, "../assets/images");
 
-    // ==========================================
-    // 3. BACKGROUND LAYERS & WATERMARKS
-    // ==========================================
-    
-    // Base Waves Background (Full A4 Bleed - 842x595)
+
     doc.image(`${imagesPath}/WavesBackground.png`, 0, 0, { width: 842, height: 595 });
     
     // Corner Accents and Signatures
     doc.image(`${imagesPath}/GoldCorners.png`, 0, 0, { width: 842, height: 595 });
     doc.image(`${imagesPath}/SealSignature.png`, 0, 0, { width: 842, height: 595 });
 
-    // ---------------------------------------------------------
-    // GIANT CENTER LOGO WATERMARK (Drawn BEFORE text so it sits behind)
-    // ---------------------------------------------------------
-    const logoWidth = 540; // 3x the size of 180
-    const logoX = (842 / 2) - (logoWidth / 2); // Perfectly centered horizontally (151)
     
-    // CHANGED: Moved down by 10px (was 180, now 190)
+    const logoWidth = 540; 
+    const logoX = (842 / 2) - (logoWidth / 2);
+
     const logoY = 190; 
     
     if (fs.existsSync(path.join(imagesPath, "logo.png"))) {
-        // Adding opacity parameter here if your logo isn't already faded
+        
         doc.image(`${imagesPath}/logo.png`, logoX, logoY, { width: logoWidth });
     }
-    // ---------------------------------------------------------
+    
 
-    // Outer Gold Border (The "Last Border")
+    
     doc.lineWidth(2).strokeColor("#bd9b5e").rect(20, 20, 802, 555).stroke();
 
-    // ==========================================
-    // 4. TYPOGRAPHY & TEXT (Layered on top)
-    // ==========================================
-
-    // Header 
+    
     doc.font(`${fontsPath}/Cinzel-Bold.ttf`)
        .fontSize(19)
        .fillColor("#111111")
@@ -104,10 +91,6 @@ export const downloadCertificatePDF = async (req, res) => {
        .fillColor("#111111")
        .text(student.student_name, 0, 265, { align: "center" });
 
-    // ==========================================
-    // 5. COURSE DETAILS 
-    // ==========================================
-
     // Gold Divider Line
     doc.lineWidth(1.5).strokeColor("#c5a059").moveTo(180, 370).lineTo(662, 370).stroke();
 
@@ -130,14 +113,11 @@ export const downloadCertificatePDF = async (req, res) => {
        .fillColor("#555555")
        .text(issueDate, 0, 440, { align: "center" });
 
-    // ==========================================
-    // 6. FOOTER (QR Code & Verification Text)
-    // ==========================================
+
     
     const studentUrl = `https://verification.cibdhk.com/student/${student._id}`;
     const qrCodeDataUrl = await QRCode.toDataURL(studentUrl, { margin: 0, width: 150 });
     
-    // Position Settings for Left Footer
     const qrX = 60;
     const qrSize = 55;
     const footerY = 485;

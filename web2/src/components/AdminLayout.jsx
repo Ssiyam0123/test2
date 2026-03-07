@@ -4,7 +4,8 @@ import {
   LayoutDashboard, Users, UserPlus, Briefcase, GraduationCap,
   BookPlus, CalendarDays, PlusCircle, Layers, ShieldCheck,
   LogOut, Menu, X, UserCircle, Building2, MapPin,
-  PackageSearch, BookOpen
+  PackageSearch, BookOpen,
+  Calendar1Icon
 } from "lucide-react";
 import useAuth from "../store/useAuth";
 
@@ -98,6 +99,7 @@ const AdminLayout = () => {
       items: [
         { name: "Manage Roles", href: "/admin/manage-roles", icon: ShieldCheck, permission: "manage_roles" },
         { name: "Manage Admins", href: "/admin/manage-admins", icon: ShieldCheck, permission: "manage_roles" },
+        { name: "Manage Holidays", href: "/admin/manage-holidays", icon: Calendar1Icon, permission: "manage_roles" },
       ],
     },
   ], [isSuperAdmin]);

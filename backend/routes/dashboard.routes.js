@@ -1,6 +1,6 @@
 import express from "express";
 import { getBranchStats, getDashboardStats } from "../controllers/dashboard.controller.js";
-import { verifyToken, requirePermission, injectBranchFilter } from "../middlewares/auth.js"; // 🚀 Updated Middleware
+import { verifyToken, requirePermission, injectBranchFilter } from "../middlewares/auth.js"; 
 
 const router = express.Router();
 

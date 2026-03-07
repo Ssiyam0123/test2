@@ -1,9 +1,5 @@
 import { API } from "./axios";
 
-// ==========================================
-// CLASS & SYLLABUS ENDPOINTS
-// ==========================================
-
 export const fetchBatchClasses = async (batchId) => {
   const { data } = await API.get(`/classes/batch/${batchId}`);
   return data;

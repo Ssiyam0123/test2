@@ -1,97 +1,55 @@
-import Course from "../models/course.js";
+import { z } from "zod";
 
-// 1. Check Required Fields
-export const validateCourseFields = (req, res, next) => {
-  const { course_name, course_code, duration_value,base_fee } = req.body;
-  const isPost = req.method === "POST";
-
-  const missing = [];
-  if (isPost && !course_name) missing.push("course_name");
-  if (isPost && !course_code) missing.push("course_code");
-  if (isPost && duration_value === undefined) missing.push("duration_value");
-  // Add to the checks:
-if (isPost && base_fee === undefined) missing.push("base_fee");
-if (base_fee !== undefined && isNaN(Number(base_fee))) {
-  return res.status(400).json({ message: "Base fee must be a valid number." });
-}
-
-  if (missing.length > 0) {
-    return res.status(400).json({ message: `Missing required fields: ${missing.join(", ")}` });
+// 🚀 Helper to safely parse additional_info which might come as a string or array
+const stringArraySchema = z.preprocess((val) => {
+  if (Array.isArray(val)) return val;
+  if (typeof val === "string") {
+    return val.trim() === "" ? [] : val.split(",").map(s => s.trim());
   }
+  return [];
+}, z.array(z.string()).optional().default([]));
 
-  if (duration_value !== undefined && isNaN(Number(duration_value))) {
-    return res.status(400).json({ message: "Duration value must be a valid number." });
+export const courseCreateSchema = z.object({
+  course_name: z.string().trim().min(1),
+  course_code: z.string().trim().min(1),
+  description: z.string().optional().default(""),
+  duration_value: z.coerce.number().positive(), // 🚀 Coerce string to number safely
+  duration_unit: z.enum(["days", "weeks", "months", "years"]), 
+  base_fee: z.coerce.number().nonnegative(),    // 🚀 Coerce string to number safely
+  is_active: z.coerce.boolean().default(true),  // 🚀 Convert "true"/"false" to real boolean
+  additional_info: stringArraySchema            // 🚀 Handle array/string conversions safely
+}).transform(data => ({
+  course_name: data.course_name,
+  course_code: data.course_code,
+  description: data.description,
+  duration: {
+    value: data.duration_value,
+    unit: data.duration_unit
+  },
+  base_fee: data.base_fee,
+  is_active: data.is_active,
+  additional_info: data.additional_info
+}));
+
+export const courseUpdateSchema = z.object({
+  course_name: z.string().trim().optional(),
+  course_code: z.string().trim().optional(),
+  description: z.string().optional(),
+  duration_value: z.coerce.number().positive().optional(),
+  duration_unit: z.enum(["days", "weeks", "months", "years"]).optional(),
+  base_fee: z.coerce.number().nonnegative().optional(),
+  is_active: z.coerce.boolean().optional(),
+  additional_info: stringArraySchema.optional()
+}).refine(data => Object.keys(data).length > 0, {
+  message: "At least one field is required to update",
+}).transform(data => {
+  const result = { ...data };
+  if (data.duration_value !== undefined || data.duration_unit !== undefined) {
+    result.duration = {};
+    if (data.duration_value !== undefined) result.duration.value = data.duration_value;
+    if (data.duration_unit !== undefined) result.duration.unit = data.duration_unit;
+    delete result.duration_value;
+    delete result.duration_unit;
   }
-
-  next();
-};
-
-// 2. Database Validation for Duplicates
-export const checkCourseDuplicates = async (req, res, next) => {
-  try {
-    const { course_name, course_code } = req.body;
-    const excludeDbId = req.params.id || null;
-
-    const query = { $or: [] };
-    if (course_name) query.$or.push({ course_name: new RegExp(`^${course_name.trim()}$`, "i") });
-    if (course_code) query.$or.push({ course_code: new RegExp(`^${course_code.trim()}$`, "i") });
-    if (excludeDbId) query._id = { $ne: excludeDbId };
-
-    if (query.$or.length > 0) {
-      const existingCourse = await Course.findOne(query).select("course_name course_code");
-
-      if (existingCourse) {
-        if (course_name && existingCourse.course_name.toLowerCase() === course_name.trim().toLowerCase()) {
-          return res.status(400).json({ message: "Course name already exists." });
-        }
-        if (course_code && existingCourse.course_code.toLowerCase() === course_code.trim().toLowerCase()) {
-          return res.status(400).json({ message: "Course code already exists." });
-        }
-      }
-    }
-
-    next();
-  } catch (error) {
-    res.status(500).json({ message: "Error validating course uniqueness." });
-  }
-};
-
-// 3. Sanitize and Structure Payload
-export const processCoursePayload = (req, res, next) => {
-  try {
-    const payload = { ...req.body };
-
-    // Clean strings
-    if (payload.course_name) payload.course_name = payload.course_name.trim();
-    if (payload.course_code) payload.course_code = payload.course_code.trim();
-    if (payload.description) payload.description = payload.description.trim();
-
-    // Map the separated duration variables into the nested Mongoose object
-    if (payload.duration_value !== undefined) {
-      payload.duration = {
-        value: Number(payload.duration_value),
-        unit: payload.duration_unit || "months",
-      };
-      delete payload.duration_value;
-      delete payload.duration_unit;
-    }
-
-    // Handle Booleans
-    if (payload.is_active !== undefined) {
-      payload.is_active = payload.is_active === "true" || payload.is_active === true;
-    }
-
-    // Handle stringified arrays (e.g., if sent from a text area)
-    if (typeof payload.additional_info === "string") {
-      payload.additional_info = payload.additional_info.split('\n').filter(item => item.trim() !== '');
-    }
-
-    // Clean undefined fields
-    Object.keys(payload).forEach((key) => payload[key] === undefined && delete payload[key]);
-
-    req.body = payload;
-    next();
-  } catch (error) {
-    res.status(400).json({ message: error.message });
-  }
-};
+  return result;
+});

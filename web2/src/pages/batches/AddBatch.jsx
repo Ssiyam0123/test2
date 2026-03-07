@@ -5,7 +5,9 @@ import { useCreateBatch } from "../../hooks/useBatches";
 import { useCourses } from "../../hooks/useCourses";
 import { useBranches } from "../../hooks/useBranches"; 
 import { useUsers } from "../../hooks/useUser"; 
-import { useRoles } from "../../hooks/useRoles"; // 🚀 Import roles hook
+import { useRoles } from "../../hooks/useRoles"; 
+import Swal from "sweetalert2"; // 🚀 SweetAlert Import
+import { getBatchFormSchema } from "../../validators/zodSchemas"; 
 import useAuth from "../../store/useAuth"; 
 import Loader from "../../components/Loader";
 
@@ -13,11 +15,9 @@ const AddBatch = () => {
   const navigate = useNavigate();
   const { authUser } = useAuth();
   
-  // 🚀 1. Robust PBAC Check
   const roleName = typeof authUser?.role === 'string' ? authUser.role : authUser?.role?.name;
   const isMaster = roleName === "superadmin" || authUser?.permissions?.includes("all_access");
   
-  // If Master: Starts empty. If Staff: Starts with their assigned branch.
   const [selectedBranch, setSelectedBranch] = useState(
     !isMaster ? (typeof authUser?.branch === 'object' ? authUser?.branch?._id : authUser?.branch) : ""
   );
@@ -26,7 +26,6 @@ const AddBatch = () => {
   const { data: coursesResponse, isLoading: coursesLoading } = useCourses();
   const { data: branchesResponse, isLoading: branchesLoading } = useBranches();
   
-  // 🚀 2. Fetch Roles to get the actual ObjectId for "Instructor"
   const { data: rolesResponse } = useRoles();
   const instructorRoleId = useMemo(() => {
      if (!rolesResponse?.data) return null;
@@ -34,22 +33,18 @@ const AddBatch = () => {
      return instructorRole?._id;
   }, [rolesResponse]);
 
-  // 3. DYNAMIC FETCH: Only fetch instructors for the selected branch using the true Role ID!
   const { data: instructorsResponse, isLoading: instructorsLoading } = useUsers(
     1, 100, 
     { 
       ...(instructorRoleId ? { role: instructorRoleId } : {}), 
       ...(selectedBranch ? { branch: selectedBranch } : {}) 
     },
-    { enabled: !!instructorRoleId && !!selectedBranch } // Only fetch when both IDs are ready
+    { enabled: !!instructorRoleId && !!selectedBranch } 
   );
 
   const branchOptions = useMemo(() => {
     if (!branchesResponse?.data) return [];
-    return branchesResponse.data.map(b => ({ 
-      value: b._id, 
-      label: b.branch_name 
-    }));
+    return branchesResponse.data.map(b => ({ value: b._id, label: b.branch_name }));
   }, [branchesResponse]);
 
   const courseOptions = useMemo(() => {
@@ -57,11 +52,9 @@ const AddBatch = () => {
     return coursesArray?.map((c) => ({ value: c._id, label: c.course_name })) || [];
   }, [coursesResponse]);
 
-  // 4. MAP INSTRUCTORS: Format them for the checkbox-group
   const instructorOptions = useMemo(() => {
     let instructorsArray = instructorsResponse?.data || [];
     
-    // Strict safety filter to guarantee no cross-campus contamination
     if (selectedBranch) {
       instructorsArray = instructorsArray.filter(
         inst => inst.branch === selectedBranch || inst.branch?._id === selectedBranch
@@ -75,56 +68,26 @@ const AddBatch = () => {
   }, [instructorsResponse, selectedBranch]);
 
   const batchConfig = [
-    {
-      name: "batch_name",
-      label: "Batch Title",
-      placeholder: "e.g. Morning Professional Intake",
-      required: true,
-    },
+    { name: "batch_name", label: "Batch Title", placeholder: "e.g. Morning Professional Intake", required: true },
     
-    // 🚀 5. MASTER BRANCH SELECTOR
     ...(isMaster ? [{
-      name: "branch",
-      label: "Campus / Location",
-      type: "select",
-      options: branchOptions,
-      required: true,
+      name: "branch", label: "Campus / Location", type: "select", options: branchOptions, required: true,
       defaultOption: "Select Campus",
-      onChange: (e) => {
-        const val = e?.target ? e.target.value : e; 
-        setSelectedBranch(val);
-      }
+      onChange: (e) => setSelectedBranch(e?.target ? e.target.value : e)
     }] : []),
 
-    {
-      name: "course",
-      label: "Associated Course",
-      type: "select",
-      options: courseOptions,
-      required: true,
-      defaultOption: "Select Course",
-    },
+    { name: "course", label: "Associated Course", type: "select", options: courseOptions, required: true, defaultOption: "Select Course" },
 
-    // 6. CONDITIONAL INSTRUCTORS LIST (MULTIPLE SELECT)
     ...(selectedBranch ? [{
-      name: "instructors",
-      label: "Assign Instructors (Select all that apply)",
-      type: "checkbox-group", 
-      options: instructorOptions,
-      required: true, 
+      name: "instructors", label: "Assign Instructors (Select all that apply)", type: "checkbox-group", options: instructorOptions, required: true, 
     }] : []),
 
     {
-      name: "schedule_days",
-      label: "Select Class Days",
-      type: "checkbox-group",
+      name: "schedule_days", label: "Select Class Days", type: "checkbox-group",
       options: [
-        { value: "Saturday", label: "Saturday" },
-        { value: "Sunday", label: "Sunday" },
-        { value: "Monday", label: "Monday" },
-        { value: "Tuesday", label: "Tuesday" },
-        { value: "Wednesday", label: "Wednesday" },
-        { value: "Thursday", label: "Thursday" },
+        { value: "Saturday", label: "Saturday" }, { value: "Sunday", label: "Sunday" },
+        { value: "Monday", label: "Monday" }, { value: "Tuesday", label: "Tuesday" },
+        { value: "Wednesday", label: "Wednesday" }, { value: "Thursday", label: "Thursday" },
         { value: "Friday", label: "Friday" },
       ],
       required: true,
@@ -133,28 +96,30 @@ const AddBatch = () => {
     { name: "start_time", label: "Class Start Time", type: "time", required: true },
     { name: "end_time", label: "Class End Time", type: "time", required: true },
     { name: "start_date", label: "Official Start Date", type: "date", required: true },
-    {
-      name: "status",
-      label: "Initial Status",
-      type: "select",
-      options: [
-        { value: "Upcoming", label: "Upcoming" },
-        { value: "Active", label: "Active" },
-      ],
-    },
+    { name: "status", label: "Initial Status", type: "select", options: [{ value: "Upcoming", label: "Upcoming" }, { value: "Active", label: "Active" }] },
   ];
 
   const handleSubmit = (formData, jsonPayload) => {
+    
+    // Ensure branch is included in validation payload
+    const finalBranch = !isMaster ? (typeof authUser?.branch === 'object' ? authUser?.branch?._id : authUser?.branch) : jsonPayload.branch;
+    jsonPayload.branch = finalBranch;
+
+    // 🛡️ FRONTEND ZOD VALIDATION
+    const validationResult = getBatchFormSchema.safeParse(jsonPayload);
+    
+    if (!validationResult.success) {
+      const firstError = validationResult.error.errors[0].message;
+      Swal.fire({ icon: "error", title: "Validation Failed", text: firstError });
+      return; // 🛑 Stop the API call
+    }
+
     const { start_time, end_time, ...restOfPayload } = jsonPayload;
 
     const finalPayload = {
       ...restOfPayload,
-      time_slot: {
-        start_time,
-        end_time
-      },
-      // Ensure branch is included if the user is not a master admin
-      branch: !isMaster ? (typeof authUser?.branch === 'object' ? authUser?.branch?._id : authUser?.branch) : restOfPayload.branch
+      time_slot: { start_time, end_time },
+      branch: finalBranch
     };
 
     mutate(finalPayload, { 

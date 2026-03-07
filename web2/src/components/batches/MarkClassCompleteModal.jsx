@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { X, Check, XCircle, Users, Loader2, CheckSquare, ArrowLeft } from "lucide-react";
+import toast from "react-hot-toast";
 
 export default function MarkClassCompleteModal({ 
   isOpen, onClose, classData, batchData, onSave 
@@ -12,42 +13,54 @@ export default function MarkClassCompleteModal({
       const initialAttendance = {};
       batchData.students.forEach(student => {
         const existingRecord = classData?.attendance?.find(a => a.student === student._id || a.student?._id === student._id);
-        initialAttendance[student._id] = existingRecord ? existingRecord.status : "present";
+        // 🚀 FIXED: Use Capital "Present" to match Zod Schema
+        initialAttendance[student._id] = existingRecord ? existingRecord.status : "Present";
       });
       setAttendance(initialAttendance);
     }
   }, [isOpen, batchData, classData]);
 
-  const presentCount = useMemo(() => Object.values(attendance).filter(s => s === "present").length, [attendance]);
+  const presentCount = useMemo(() => Object.values(attendance).filter(s => s === "Present").length, [attendance]);
 
   if (!isOpen) return null;
 
   const toggleAttendance = (studentId) => {
-    setAttendance(prev => ({ ...prev, [studentId]: prev[studentId] === "present" ? "absent" : "present" }));
+    // 🚀 FIXED: Use Capitalized status
+    setAttendance(prev => ({ ...prev, [studentId]: prev[studentId] === "Present" ? "Absent" : "Present" }));
   };
 
   const markAllPresent = () => {
     const allPresent = {};
-    batchData.students.forEach(s => allPresent[s._id] = "present");
+    batchData.students.forEach(s => allPresent[s._id] = "Present");
     setAttendance(allPresent);
   };
 
   const handleSubmit = async () => {
-    setIsSubmitting(true);
-    const attendanceRecords = Object.entries(attendance).map(([studentId, status]) => ({
-      student: studentId,
-      status
-    }));
+    if (!classData?._id || !batchData?._id) {
+      toast.error("Missing class or batch information.");
+      return;
+    }
 
-    // Keep existing financials intact when updating attendance
-    const payload = {
-      is_completed: true,
-      attendanceRecords,
-      financials: classData?.financials || undefined
-    };
+    setIsSubmitting(true);
+    const attendanceRecords = Object.entries(attendance).map(([studentId, status]) => {
+      const studentObj = batchData.students.find(s => s._id === studentId);
+      return {
+        student: studentId,
+        student_name: studentObj ? studentObj.student_name : "Unknown",
+        status // This is now "Present" or "Absent"
+      };
+    });
 
     try {
-      await onSave(classData._id, payload);
+      // 🚀 FIXED: Sending all required payload data dynamically
+      await onSave({
+        classId: classData._id,
+        batchId: batchData._id, 
+        attendanceRecords: attendanceRecords,
+        is_completed: true, // Mark as completed!
+        financials: classData?.financials || undefined
+      });
+      
       onClose();
     } catch (error) {
       console.error("Failed to save class data", error);
@@ -58,7 +71,7 @@ export default function MarkClassCompleteModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-100">
+      <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden border border-slate-100">
         
         {/* HEADER */}
         <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between shrink-0">
@@ -87,7 +100,7 @@ export default function MarkClassCompleteModal({
           <div className="space-y-2">
             {batchData?.students?.length > 0 ? (
               batchData.students.map((student) => {
-                const isPresent = attendance[student._id] === "present";
+                const isPresent = attendance[student._id] === "Present";
                 return (
                   <div key={student._id} onClick={() => toggleAttendance(student._id)} className={`flex items-center justify-between p-3 rounded-2xl border cursor-pointer transition-all active:scale-[0.99] ${isPresent ? "bg-white border-slate-200 shadow-sm" : "bg-rose-50/50 border-rose-100 opacity-75"}`}>
                     <div className="flex items-center gap-3">
@@ -109,18 +122,12 @@ export default function MarkClassCompleteModal({
           </div>
         </div>
 
-        {/* FOOTER WITH BACK BUTTON */}
+        {/* FOOTER */}
         <div className="p-4 bg-white border-t border-slate-100 flex items-center gap-3">
-          <button 
-            onClick={onClose}
-            className="px-6 py-4 bg-slate-100 text-slate-600 text-sm font-black uppercase tracking-widest rounded-xl hover:bg-slate-200 transition-all flex items-center gap-2"
-          >
+          <button onClick={onClose} className="px-6 py-4 bg-slate-100 text-slate-600 text-sm font-black uppercase tracking-widest rounded-xl hover:bg-slate-200 transition-all flex items-center gap-2">
             <ArrowLeft size={18} /> Back
           </button>
-          <button 
-            onClick={handleSubmit} disabled={isSubmitting}
-            className="flex-1 py-4 bg-teal-600 text-white text-sm font-black uppercase tracking-widest rounded-xl hover:bg-teal-700 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-70"
-          >
+          <button onClick={handleSubmit} disabled={isSubmitting} className="flex-1 py-4 bg-teal-600 text-white text-sm font-black uppercase tracking-widest rounded-xl hover:bg-teal-700 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-70">
             {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} />}
             {isSubmitting ? "Saving..." : "Submit Attendance"}
           </button>

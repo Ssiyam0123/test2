@@ -33,14 +33,13 @@ const StudentsTable = ({
       title: "Delete Student?",
       text: `Are you sure you want to permanently delete ${studentName}? This action cannot be undone.`,
       confirmText: "Yes, delete student",
-      onConfirm: () => onDelete(studentId) // তোর প্যারেন্ট থেকে আসা onDelete কল হচ্ছে
+      onConfirm: () => onDelete(studentId) 
     });
   };
 
   // ==========================================
   // 🛡️ DYNAMIC PBAC FLAGS
   // ==========================================
-  const canViewFinance = hasPermission("view_finance") || hasPermission("collect_fees");
   const canCollectFee = hasPermission("collect_fees");
   const canAddComment = hasPermission("add_student_comment");
   const canEdit = hasPermission("edit_student");
@@ -48,25 +47,20 @@ const StudentsTable = ({
   const canViewDetails = hasPermission("view_student_details") || hasPermission("view_students");
 
   // ==========================================
-  // 📊 DYNAMIC COLUMNS (Balance column hides if no access)
+  // 📊 DYNAMIC COLUMNS (Removed Balance Column)
   // ==========================================
   const columns = [
     { label: "Student Name", className: "w-[25%]" },
-    { label: "Branch", className: "hidden sm:table-cell w-[12%]" },
-    { label: "ID", className: "hidden md:table-cell w-[10%]" },
-    { label: "Course", className: "hidden lg:table-cell w-[18%]" },
-    canViewFinance && { label: "Balance", className: "hidden xl:table-cell w-[12%]" },
-    { label: "Status", className: "w-[8%]" },
+    { label: "Branch", className: "hidden sm:table-cell w-[15%]" },
+    { label: "ID", className: "hidden md:table-cell w-[15%]" },
+    { label: "Course", className: "hidden lg:table-cell w-[20%]" },
+    { label: "Status", className: "w-[10%]" },
     { label: "Actions", align: "right", className: "w-[15%]" },
   ].filter(Boolean);
 
   const renderStudentRow = (student) => {
     const isInactive = !student.is_active;
     const isDownloadingThis = downloadMutation.isPending && downloadMutation.variables?._id === student._id;
-
-    const netPayable = student.fee_summary?.net_payable || 0;
-    const paidAmount = student.fee_summary?.paid_amount || 0;
-    const dueAmount = netPayable - paidAmount;
 
     return (
       <tr
@@ -91,7 +85,7 @@ const StudentsTable = ({
           </div>
         </td>
 
-        {/* 2. BRANCH & BRANCH ID */}
+        {/* 2. BRANCH */}
         <td className="px-6 py-4 hidden sm:table-cell align-middle">
           <div className="flex flex-col">
             <div className="flex items-center gap-1.5">
@@ -110,40 +104,26 @@ const StudentsTable = ({
           </span>
         </td>
 
-        {/* 4. COURSE & COURSE ID */}
+        {/* 4. COURSE */}
         <td className="px-6 py-4 hidden lg:table-cell align-middle">
           <div className="flex flex-col">
             <div className="flex items-center gap-1.5">
               <BookOpen size={12} className="text-purple-400" />
-            <span className="text-[10px] text-slate-400 font-mono mt-0.5 ml-4" title="Course ID/Code">
+            <span className="text-[10px] text-slate-400 font-mono mt-0.5 ml-1" title="Course ID/Code">
               Code: {student.course?.course_code || student.course?._id?.slice(-6).toUpperCase() || "N/A"}
             </span>
             </div>
           </div>
         </td>
 
-        {/* 5. BALANCE (Role Protected) */}
-        {canViewFinance && (
-          <td className="px-6 py-4 hidden xl:table-cell align-middle">
-            <div className="flex flex-col">
-              <span className={`text-[13px] font-black ${dueAmount > 0 ? "text-rose-500" : "text-emerald-500"}`}>
-                ৳{dueAmount.toLocaleString()}
-              </span>
-              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">
-                {dueAmount > 0 ? "Outstanding" : "Settled"}
-              </span>
-            </div>
-          </td>
-        )}
-
-        {/* 6. STATUS */}
+        {/* 5. STATUS */}
         <td className="px-6 py-4 align-middle">
           <span className={`text-[13px] font-bold tracking-wide uppercase ${student.is_active ? "text-teal-500" : "text-rose-400"}`}>
             {student.is_active ? "Active" : "Inactive"}
           </span>
         </td>
 
-        {/* 7. ACTIONS (Role Protected) */}
+        {/* 6. ACTIONS (Role Protected) */}
         <td className="px-6 py-4 text-right align-middle">
           <div className="flex items-center justify-end gap-1 opacity-60 group-hover:opacity-100 transition-opacity duration-200">
             
@@ -151,7 +131,7 @@ const StudentsTable = ({
               <ActionIconButton 
                 icon={Wallet} variant="neutral" 
                 onClick={() => onPay(student)} 
-                title={dueAmount <= 0 ? "View Ledger" : "Collect Payment"} 
+                title="View Finance & Collect Payment" 
               />
             )}
             
@@ -184,7 +164,6 @@ const StudentsTable = ({
               </>
             )}
 
-            {/* 🚀 UPDATED DELETE BUTTON */}
             {canDelete && (
               <ActionIconButton 
                 icon={Trash2} 

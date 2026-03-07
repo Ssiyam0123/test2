@@ -27,6 +27,7 @@ import expenseRoutes from "./routes/expenseRoute.js";
 import inventoryRoutes from "./routes/inventory.route.js";
 import requisitionRoutes from "./routes/requisition.route.js"; 
 import certificateRoutes from "./routes/certificate.routes.js";
+import holidayRoutes from "./routes/holiday.routes.js";
 
 const app = express();
 const __dirname = path.resolve();
@@ -83,7 +84,7 @@ app.use("/api/requisitions", requisitionRoutes);
 
 // Utilities
 app.use("/api/generate-certificate", certificateRoutes);
-
+app.use("/api/holidays", holidayRoutes);
 // ==========================================
 // 🛑 GLOBAL ERROR HANDLING ARCHITECTURE
 // ==========================================

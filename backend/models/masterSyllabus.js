@@ -14,7 +14,7 @@ const masterSyllabusSchema = new mongoose.Schema(
     },
     class_type: {
       type: String,
-      enum: ["Lecture", "Lab", "Exam", "Review", "Orientation"],
+      enum: ["Lecture", "Lab", "Assessment", "Exam", "Review", "Orientation", "Other"],
       default: "Lecture",
     },
     description: {

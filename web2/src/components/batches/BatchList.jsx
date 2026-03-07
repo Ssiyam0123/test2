@@ -14,7 +14,7 @@ export default function BatchList({ batches, onSelectBatch, onDeleteBatch }) {
 
   // 🚀 DYNAMIC DELETE HANDLER WITH SWAL
   const handleDeleteClick = (e, batchId, batchName) => {
-    e.stopPropagation(); // Card-এর onClick যাতে ফায়ার না হয়
+    e.stopPropagation();
     confirmDelete({
       title: "Delete Batch?",
       text: `Are you sure you want to permanently delete "${batchName}"? All scheduled classes for this batch will be affected.`,

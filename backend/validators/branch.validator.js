@@ -1,32 +1,19 @@
-import Joi from "joi";
+import { z } from "zod";
 
-export const branchCreateSchema = Joi.object({
-  branch_name: Joi.string().required().trim(),
-  branch_code: Joi.string()
-    .pattern(/^[A-Za-z0-9\-]{2,10}$/)
-    .uppercase()
-    .required()
-    .trim()
-    .messages({
-      "string.pattern.base": "Branch code must be 2-10 alphanumeric characters (hyphens allowed)."
-    }),
-  address: Joi.string().required().trim(),
-  contact_email: Joi.string().email().lowercase().allow("").optional(),
-  contact_phone: Joi.string().allow("").optional(),
-  is_active: Joi.boolean().default(true)
+export const branchCreateSchema = z.object({
+  branch_name: z.string().trim().min(1),
+  branch_code: z.string().trim().min(1),
+  address: z.string().trim().optional().default(""),
+  contact_number: z.string().trim().optional().default(""),
+  is_active: z.boolean().default(true)
 });
 
-export const branchUpdateSchema = Joi.object({
-  branch_name: Joi.string().trim(),
-  branch_code: Joi.string()
-    .pattern(/^[A-Za-z0-9\-]{2,10}$/)
-    .uppercase()
-    .trim()
-    .messages({
-      "string.pattern.base": "Branch code must be 2-10 alphanumeric characters (hyphens allowed)."
-    }),
-  address: Joi.string().trim(),
-  contact_email: Joi.string().email().lowercase().allow(""),
-  contact_phone: Joi.string().allow(""),
-  is_active: Joi.boolean()
-}).min(1); // Ensure at least one field is provided for an update
+export const branchUpdateSchema = z.object({
+  branch_name: z.string().trim().optional(),
+  branch_code: z.string().trim().optional(),
+  address: z.string().trim().optional(),
+  contact_number: z.string().trim().optional(),
+  is_active: z.boolean().optional()
+}).refine(data => Object.keys(data).length > 0, {
+  message: "At least one field is required to update",
+});

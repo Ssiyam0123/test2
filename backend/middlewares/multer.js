@@ -16,12 +16,10 @@ if (!fs.existsSync(employeeUploadDir)) {
 // 2. Local Disk Storage Configuration
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    // FIX: Check for "/users/" since the route was updated for the unified User model
-    // (Kept "/employees/" just in case you have legacy routes)
     if (req.originalUrl.includes("/employees/") || req.originalUrl.includes("/users/")) {
       cb(null, employeeUploadDir);
     } else {
-      cb(null, studentUploadDir); // Default fallback for students
+      cb(null, studentUploadDir); 
     }
   },
   filename: (req, file, cb) => {
@@ -50,7 +48,6 @@ export const upload = multer({
 export const deleteLocalFile = (relativePath) => {
   if (!relativePath) return;
   try {
-    // Strict check to prevent directory traversal attacks
     if (!relativePath.startsWith("/uploads/")) return;
     
     const absolutePath = path.join(process.cwd(), "public", relativePath);

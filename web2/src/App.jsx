@@ -44,15 +44,18 @@ import AddInventory from "./pages/inventory/AddInventory.jsx";
 import ManageMasterSyllabus from "./pages/master-syllabus/ManageMasterSyllabus.jsx";
 import AddMasterSyllabus from "./pages/master-syllabus/AddMasterSyllabus.jsx";
 
+
+import StudentFinance from "./pages/finance/StudentFinance";
+
+// 🚀 SETTINGS / HOLIDAYS
+import ManageHolidays from "./pages/setting/ManageHolidays.jsx";
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: { staleTime: 5 * 60 * 1000, cacheTime: 10 * 60 * 1000, retry: 1, refetchOnWindowFocus: false },
   },
 });
 
-// ==========================================
-// PBAC ROUTE GUARDS
-// ==========================================
 const ProtectedRoute = ({ children }) => {
   const { authUser } = useAuth();
   return authUser ? children : <Navigate to="/login" replace />;
@@ -71,26 +74,21 @@ const RoleGuard = ({ requiredPermission }) => {
   return <Outlet context={context} />;
 };
 
-// 🚀 TRAFFIC CONTROLLER FOR THE DASHBOARD
 const AdminIndex = () => {
   const { hasPermission, isMaster } = useAuth(); 
   
-  // 1. Superadmins get global dashboard
   if (isMaster()) {
     return <Dashboard />;
   } 
   
-  // 2. Branch Admins / Staff with dashboard access get branch dashboard
   if (hasPermission("view_dashboard")) {
     return <BranchDashboard />;
   }
 
-  // 3. Fallback for instructors/staff who don't have dashboard access
   if (hasPermission("view_students")) {
     return <Navigate to="/admin/all-students" replace />;
   }
   
-  // 4. Ultimate Fallback (Kono access nai)
   return (
     <div className="p-8 text-center font-bold text-slate-500 mt-20">
       Access Denied: Please contact System Administrator.
@@ -167,7 +165,12 @@ function App() {
               <Route path="batches/:id" element={<ManageBatches />} />
               <Route path="add-batch" element={<AddBatch />} />
               <Route path="edit-batch/:id" element={<BatchFormContainer />} />
+              
+              {/* 🚀 HOLIDAY ROUTE */}
+              <Route path="manage-holidays" element={<ManageHolidays />} />
             </Route>
+
+            <Route path="/admin/student-finance/:id" element={<StudentFinance />} />
 
             <Route element={<RoleGuard requiredPermission="view_branches" />}>
               <Route path="branches" element={<AllBranches />} />

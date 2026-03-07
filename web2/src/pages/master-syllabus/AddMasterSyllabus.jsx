@@ -17,10 +17,8 @@ export default function AddMasterSyllabus({ mode = "add" }) {
   const navigate = useNavigate();
   const { id } = useParams();
 
-  // ১. ডাটাবেজ থেকে সব টপিক আনা (যাতে ম্যাক্সিমাম সিরিয়াল বের করা যায়)
   const { data: allTopicsRes, isLoading: loadingAll } = useMasterTopics();
   
-  // ২. এডিট মোড হলে ওই নির্দিষ্ট টপিকের ডাটা আনা
   const { data: editData, isLoading: loadingEdit } = useMasterSyllabusDetails(id, { 
     enabled: mode === "edit" && !!id 
   });
@@ -30,15 +28,12 @@ export default function AddMasterSyllabus({ mode = "add" }) {
 
   const [topics, setTopics] = useState([]);
 
-  // 🚀 অটো-সিরিয়াল সেট করার লজিক (শুধুমাত্র Add মোডে)
   useEffect(() => {
     if (mode === "add" && allTopicsRes?.data) {
-      // ডাটাবেজের সর্বোচ্চ order_index খুঁজে বের করা
       const currentMax = allTopicsRes.data.length > 0 
         ? Math.max(...allTopicsRes.data.map(t => t.order_index || 0)) 
         : 0;
 
-      // ৫টা নতুন রো সেট করা যা ম্যাক্সিমাম নাম্বারের পর থেকে শুরু হবে
       setTopics([
         { topic: "", category: "General", class_type: "Lecture", order_index: currentMax + 1, description: "" },
         { topic: "", category: "General", class_type: "Lecture", order_index: currentMax + 2, description: "" },
@@ -47,7 +42,6 @@ export default function AddMasterSyllabus({ mode = "add" }) {
     }
   }, [allTopicsRes, mode]);
 
-  // 🚀 এডিট মোডে শুধুমাত্র ওই ১টি টপিক সেট করা
   useEffect(() => {
     if (mode === "edit" && editData?.data) {
       setTopics([{ ...editData.data }]);
@@ -56,7 +50,8 @@ export default function AddMasterSyllabus({ mode = "add" }) {
 
   const handleRowChange = (index, field, value) => {
     const updated = [...topics];
-    updated[index][field] = value;
+    // 🚀 Ensure order_index stays a number
+    updated[index][field] = field === "order_index" ? Number(value) : value;
     setTopics(updated);
   };
 
@@ -74,7 +69,7 @@ export default function AddMasterSyllabus({ mode = "add" }) {
   };
 
   const removeRow = (index) => {
-    if (mode === "edit") return; // এডিট মোডে রো রিমুভ বন্ধ
+    if (mode === "edit") return; 
     setTopics(topics.filter((_, i) => i !== index));
   };
 
@@ -90,9 +85,18 @@ export default function AddMasterSyllabus({ mode = "add" }) {
               <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
                 
                 <div className="md:col-span-3 flex gap-3">
-                   <div className="w-10 h-10 shrink-0 bg-gray-900 text-white rounded-xl flex items-center justify-center text-xs font-black">
-                      {item.order_index}
+                   {/* 🚀 FIXED: order_index is now an editable input field instead of a static div */}
+                   <div className="shrink-0 w-12">
+                      <label className="text-[9px] font-black text-gray-400 uppercase mb-1 block ml-1 text-center">S.No</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={item.order_index}
+                        onChange={(e) => handleRowChange(idx, "order_index", e.target.value)}
+                        className="w-full h-10 bg-gray-900 text-white rounded-xl text-center text-xs font-black focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all"
+                      />
                    </div>
+                   
                    <div className="flex-1">
                       <label className="text-[9px] font-black text-gray-400 uppercase mb-1 block ml-1">Category</label>
                       <select
@@ -127,6 +131,9 @@ export default function AddMasterSyllabus({ mode = "add" }) {
                     <option value="Lab">Lab</option>
                     <option value="Exam">Exam</option>
                     <option value="Orientation">Orientation</option>
+                    <option value="Assessment">Assessment</option>
+                    <option value="Review">Review</option>
+                    <option value="Other">Other</option>
                   </select>
                 </div>
 

@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import * as ClassAPI from "../api/class.api";
+import { API } from "../api/axios";
 
 // ==============================
 // FETCH QUERIES (GET)
@@ -79,19 +80,27 @@ export const useScheduleClass = (batchId) => {
   });
 };
 
-export const useUpdateClassAttendance = (batchId) => {
+export const useUpdateClassAttendance = () => {
   const queryClient = useQueryClient();
+  
   return useMutation({
-    mutationFn: ({ classId, payload }) => ClassAPI.updateClassAttendance(classId, payload),
-    onSuccess: async () => {
-      // Invalidate everything this report touches
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["batchClasses", batchId] }),
-        queryClient.invalidateQueries({ queryKey: ["batch", batchId] }), 
-        queryClient.invalidateQueries({ queryKey: ["expenses"] })
-      ]);
-      toast.success("Class report saved successfully!");
+    mutationFn: async ({ classId, batchId, ...payload }) => {
+      if (!classId) throw new Error("Class ID is missing");
+      const response = await API.put(`/classes/${classId}/attendance`, payload);
+      return { data: response.data, batchId }; 
     },
-    onError: (error) => toast.error(error?.response?.data?.message || "Failed to submit class report"),
+    onSuccess: ({ batchId }) => {
+      toast.success("Class updated successfully!");
+      
+      // 🚀 FIXED: Refresh both specific and general cache to force UI update
+      queryClient.invalidateQueries({ queryKey: ["classes"] });
+      queryClient.invalidateQueries({ queryKey: ["batchClasses"] }); // This will refresh ALL batch classes
+      if (batchId) {
+        queryClient.invalidateQueries({ queryKey: ["batchClasses", batchId] }); 
+      }
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.message || error.message || "Failed to update");
+    }
   });
 };

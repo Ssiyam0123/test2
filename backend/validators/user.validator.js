@@ -1,75 +1,69 @@
-import Joi from "joi";
-import { objectId } from "./common.js";
+import { z } from "zod";
+import { objectIdSchema } from "./common.js";
 
 const nameRegex = /^[a-zA-Z\s\-'.]+$/;
 
-export const userCreateSchema = Joi.object({
-  username: Joi.string().alphanum().min(3).max(30).required(),
-  email: Joi.string().email().required().lowercase(),
-  password: Joi.string().min(6).required(),
-  full_name: Joi.string().pattern(nameRegex).required().messages({
-    "string.pattern.base": "Invalid name format. Only letters, spaces, hyphens, and dots allowed."
-  }),
-  employee_id: Joi.string().required(),
-  joining_date: Joi.date().allow("").optional(),
-  phone: Joi.string().required(),
-  designation: Joi.string().allow(""),
-  department: Joi.string().allow(""),
+export const userCreateSchema = z.object({
+  username: z.string().min(3).max(30).regex(/^[a-zA-Z0-9]+$/, "Only alphanumeric characters allowed"),
+  email: z.string().email().toLowerCase(),
+  password: z.string().min(6),
+  full_name: z.string().regex(nameRegex, "Invalid name format. Only letters, spaces, hyphens, and dots allowed."),
+  employee_id: z.string().min(1),
   
-  branch: objectId.required(),
-  role: objectId.required(),
+  joining_date: z.string().optional(), 
   
-  // Flat social links from the frontend
-  facebook: Joi.string().allow("").optional(),
-  linkedin: Joi.string().allow("").optional(),
-  twitter: Joi.string().allow("").optional(),
-  instagram: Joi.string().allow("").optional(),
-  others: Joi.string().allow("").optional(),
+  phone: z.string().min(1),
+  designation: z.string().optional().default(""),
+  department: z.string().optional().default(""),
   
-  photo: Joi.any().optional(),
-  photo_url: Joi.string().allow("").optional()
-}).unknown(true); // Allows div-basic, div-job, etc. to pass without crashing
-
-
-export const updateUserSchema = Joi.object({
-  full_name: Joi.string().pattern(nameRegex).messages({
-    "string.pattern.base": "Invalid name format. Only letters, spaces, hyphens, and dots allowed."
-  }),
-  email: Joi.string().email().lowercase(),
-  username: Joi.string().alphanum().min(3).max(30),
-  phone: Joi.string(),
-  designation: Joi.string().allow(""),
-  department: Joi.string().allow(""),
-  status: Joi.string().valid("Active", "On Leave", "Resigned"),
+  branch: objectIdSchema,
+  role: objectIdSchema,
+  status: z.string().optional().default("Active"), 
   
-  branch: objectId,
+  facebook: z.string().optional().default(""),
+  linkedin: z.string().optional().default(""),
+  twitter: z.string().optional().default(""),
+  instagram: z.string().optional().default(""),
+  others: z.string().optional().default(""),
   
-  // 🚀 PBAC FIX: Allow ObjectId updates for roles
-  role: objectId,
-  
-  employee_id: Joi.string().allow("").optional(),
-  joining_date: Joi.date().allow("").optional(),
-  
-  // Flat social links
-  facebook: Joi.string().allow("").optional(),
-  linkedin: Joi.string().allow("").optional(),
-  twitter: Joi.string().allow("").optional(),
-  instagram: Joi.string().allow("").optional(),
-  others: Joi.string().allow("").optional(),
-
-  photo: Joi.any().optional(),
-  photo_url: Joi.string().allow("").optional()
-}).unknown(true).min(1); // Unknown(true) ignores the UI artifacts
-
-
-export const roleUpdateSchema = Joi.object({
-  // 🚀 PBAC FIX: Role updates via UI dropdown must send a valid MongoDB ObjectId
-  role: objectId.required()
+  photo: z.any().optional()
 });
 
-export const loginSchema = Joi.object({
-  // Allow the frontend to send either email or username
-  email: Joi.string().email().optional(),
-  username: Joi.string().optional(),
-  password: Joi.string().required()
-}).or('email', 'username'); // Joi rule: At least one of these two MUST be provided
+export const updateUserSchema = z.object({
+  full_name: z.string().regex(nameRegex, "Invalid name format.").optional(),
+  email: z.string().email().toLowerCase().optional(),
+  username: z.string().min(3).max(30).regex(/^[a-zA-Z0-9]+$/).optional(),
+  phone: z.string().optional(),
+  designation: z.string().optional(),
+  department: z.string().optional(),
+  status: z.enum(["Active", "On Leave", "Resigned"]).optional(),
+  
+  branch: objectIdSchema.optional(),
+  role: objectIdSchema.optional(),
+  
+  employee_id: z.string().optional(),
+  joining_date: z.string().optional(), 
+  
+  facebook: z.string().optional(),
+  linkedin: z.string().optional(),
+  twitter: z.string().optional(),
+  instagram: z.string().optional(),
+  others: z.string().optional(),
+
+  photo: z.any().optional()
+}).refine(data => Object.keys(data).length > 0, {
+  message: "At least one field must be provided for update",
+});
+
+export const roleUpdateSchema = z.object({
+  role: objectIdSchema
+});
+
+export const loginSchema = z.object({
+  email: z.string().email().optional(),
+  username: z.string().optional(),
+  password: z.string().min(1, "Password is required")
+}).refine(data => data.email || data.username, {
+  message: "Either email or username must be provided",
+  path: ["email", "username"], 
+});

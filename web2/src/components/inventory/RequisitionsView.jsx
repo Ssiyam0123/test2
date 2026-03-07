@@ -1,21 +1,35 @@
-import React from "react";
-import { ClipboardList, CheckCircle2, XCircle } from "lucide-react";
-import { usePendingRequisitions, useFulfillRequisition, useRejectRequisition } from "../../hooks/useRequisitions";
-import useAuth from "../../store/useAuth";
+import React, { useMemo } from "react";
+import { ClipboardList, CheckCircle2, ShoppingBag } from "lucide-react";
+import { useAllRequisitions } from "../../hooks/useRequisitions"; 
 import Loader from "../../components/Loader";
 
-export default function RequisitionsView({ branchId }) {
-  const { hasPermission } = useAuth();
-  const { data: res, isLoading } = usePendingRequisitions(branchId);
-  const fulfillMutation = useFulfillRequisition(branchId);
-  const rejectMutation = useRejectRequisition(branchId);
+export default function RequisitionsView({ branchId }) { 
+  const { data: res, isLoading } = useAllRequisitions(branchId);
+  console.log(res)
+  // 🚀 EXTENDED EXTRACTION: Added a few more common backend patterns
+  const reqList = useMemo(() => {
+    if (!res) return [];
+    if (Array.isArray(res)) return res;
+    if (Array.isArray(res?.data)) return res.data;
+    if (Array.isArray(res?.data?.data)) return res.data.data;
+    if (Array.isArray(res?.requisitions)) return res.requisitions;
+    if (Array.isArray(res?.data?.requisitions)) return res.data.requisitions;
+    return [];
+  }, [res]);
 
   if (isLoading) return <div className="py-20 flex justify-center"><Loader /></div>;
 
-  const pending = res?.data?.filter(r => r.status === "pending") || [];
+  const pending = reqList.filter(r => r.status?.toLowerCase() === "pending");
 
   return (
     <div className="bg-white rounded-[2rem] border border-slate-200 shadow-xl overflow-hidden animate-in fade-in duration-300">
+      
+      {/* 🛑 DEBUG BOX: এটা স্ক্রিনে দেখাবে ব্যাকএন্ড কী পাঠাচ্ছে */}
+      <div className="p-4 bg-slate-900 text-green-400 text-xs overflow-auto max-h-60 border-b-4 border-red-500">
+        <p className="text-white font-bold mb-2">👇 Bhai, ei black box er lekha gula amake copy kore de:</p>
+        <pre>{JSON.stringify(res, null, 2)}</pre>
+      </div>
+
       <div className="p-6 bg-amber-50/50 flex items-center justify-between border-b border-slate-100">
         <div className="flex items-center gap-2 text-amber-700">
           <ClipboardList size={20} />
@@ -35,37 +49,19 @@ export default function RequisitionsView({ branchId }) {
               key={req._id} 
               className="group p-5 border border-slate-200 rounded-2xl bg-white hover:border-amber-300 hover:shadow-md transition-all duration-300 cursor-default"
             >
-              <div className="flex justify-between items-start">
+              <div className="flex justify-between items-center">
                 <div>
-                  <h3 className="font-black text-slate-800 text-sm">{req.class_content?.topic || "Custom Request"}</h3>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase mt-1">Requested By: <span className="text-indigo-600">{req.requested_by?.full_name}</span></p>
+                  <h4 className="font-bold text-slate-800">{req.class_content?.topic || "Custom Request"}</h4>
+                  <p className="text-xs font-bold text-slate-400 mt-1">By: {req.requested_by?.full_name || req.requested_by?.username || "Admin / Instructor"}</p>
                 </div>
-                
-                {hasPermission("approve_requisitions") && (
-                  <div className="flex items-center gap-2">
-                    <button 
-                      onClick={() => rejectMutation.mutate(req._id)}
-                      className="p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-500 rounded-xl transition-colors"
-                      title="Reject"
-                    >
-                      <XCircle size={18} />
-                    </button>
-                    {/* 🚀 No cost field, just direct approval with 0 cost */}
-                    <button 
-                      onClick={() => fulfillMutation.mutate({ reqId: req._id, actual_cost: 0 })}
-                      disabled={fulfillMutation.isPending}
-                      className="bg-emerald-500 text-white px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 shadow-sm shadow-emerald-200 transition-all active:scale-95"
-                    >
-                      Approve
-                    </button>
-                  </div>
-                )}
+                <span className="bg-amber-100 text-amber-700 text-[10px] font-black px-3 py-1 rounded-lg uppercase">Pending</span>
               </div>
 
-              {/* 🚀 HIDDEN DETAILS: Only shows on hover */}
               <div className="max-h-0 opacity-0 overflow-hidden group-hover:max-h-[500px] group-hover:opacity-100 group-hover:mt-4 transition-all duration-500 ease-in-out">
                 <div className="pt-4 border-t border-slate-100">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Requested Ingredients:</p>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1">
+                    <ShoppingBag size={12} /> Requested Ingredients:
+                  </p>
                   <div className="flex flex-wrap gap-2">
                     {req.items?.map((item, idx) => (
                       <span key={idx} className="px-3 py-1.5 bg-slate-50 text-slate-700 text-[11px] font-bold rounded-lg border border-slate-200 capitalize shadow-sm">
@@ -78,7 +74,6 @@ export default function RequisitionsView({ branchId }) {
                   </div>
                 </div>
               </div>
-
             </div>
           ))
         )}

@@ -5,20 +5,19 @@ const StudentFilters = ({
   searchTerm,
   onSearchChange,
   filterOptions,
-  filters, // 🚀 প্যারেন্ট থেকে সরাসরি স্টেট রিসিভ করবে
+  filters, 
   initialFilters = {},
   onFilterChange,
   isLoading = false,
 }) => {
   
-  // 🚀 নিজস্ব স্টেট রিমুভ করা হয়েছে। এখন সে সরাসরি প্যারেন্টকে আপডেট জানাবে।
   const handleFilterChange = (key, value) => {
     onFilterChange({ ...filters, [key]: value });
   };
 
   const clearFilters = () => {
     onSearchChange("");
-    onFilterChange(initialFilters); // 🚀 প্যারেন্টকে রিসেট করতে বলবে
+    onFilterChange(initialFilters); 
   };
 
   const searchConfig = {

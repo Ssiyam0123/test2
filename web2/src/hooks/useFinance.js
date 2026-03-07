@@ -1,7 +1,26 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as PaymentAPI from "../api/payment.api";
 import toast from "react-hot-toast";
-
+import { downloadReceiptAPI } from "../api/finance.api";
+// ...
+export const useDownloadReceipt = () => {
+  return useMutation({
+    mutationFn: downloadReceiptAPI,
+    onSuccess: (blob, txnId) => {
+      // ফাইলটা ব্রাউজারে সেভ করার লজিক
+      const url = window.URL.createObjectURL(
+        new Blob([blob], { type: "application/pdf" }),
+      );
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `Receipt_${txnId}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    },
+    onError: () => toast.error("Failed to download receipt"),
+  });
+};
 export const useCampusFees = (filters = {}) => {
   return useQuery({
     queryKey: ["campus-fees", filters],
@@ -24,13 +43,13 @@ export const useCollectPayment = () => {
 
   return useMutation({
     mutationFn: PaymentAPI.collectPayment,
-    onSuccess: async (res) => { 
+    onSuccess: async (res) => {
       toast.success(res.message || "Payment collected successfully!");
-      
+
       await queryClient.invalidateQueries({ queryKey: ["student-finance"] });
       await queryClient.invalidateQueries({ queryKey: ["campus-fees"] });
-      
-      await queryClient.invalidateQueries({ queryKey: ["students"] }); 
+
+      await queryClient.invalidateQueries({ queryKey: ["students"] });
     },
     onError: (err) => {
       toast.error(err.response?.data?.message || "Failed to process payment.");
@@ -43,19 +62,16 @@ export const useUpdateFeeDiscount = () => {
 
   return useMutation({
     mutationFn: PaymentAPI.updateFeeDiscount,
-    onSuccess: async () => { 
+    onSuccess: async () => {
       toast.success("Scholarship/Discount applied!");
-      
 
       await queryClient.invalidateQueries({ queryKey: ["student-finance"] });
       await queryClient.invalidateQueries({ queryKey: ["campus-fees"] });
-      
-      await queryClient.invalidateQueries({ queryKey: ["students"] }); 
+
+      await queryClient.invalidateQueries({ queryKey: ["students"] });
     },
     onError: (err) => {
       toast.error(err.response?.data?.message || "Failed to update discount.");
     },
   });
 };
-
-

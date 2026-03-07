@@ -4,8 +4,9 @@ import { useCreateCourse, useUpdateCourse, useCourse } from "../../hooks/useCour
 import EntityForm from "../../components/common/EntityForm";
 import Loader from "../../components/Loader";
 import { Check, ChevronDown, Plus } from "lucide-react";
-import toast from "react-hot-toast";
-import useAuth from "../../store/useAuth"; // 🚀 Added for any future role-based form constraints
+import Swal from "sweetalert2";
+import { courseFormSchema } from "../../validators/zodSchemas"; 
+import useAuth from "../../store/useAuth";
 
 const additionalInfoOptions = [
   { value: "haccp&hygiene", label: "HACCP & Hygiene" },
@@ -36,7 +37,7 @@ const AddCourse = ({ mode = "add" }) => {
         course_code: courseData.course_code || "",
         duration_value: courseData.duration?.value?.toString() || "",
         duration_unit: courseData.duration?.unit || "months",
-        base_fee: courseData.base_fee?.toString() || "", // <--- ADDED
+        base_fee: courseData.base_fee?.toString() || "", 
         description: courseData.description || "",
         additional_info: infoArray,
         is_active: courseData.is_active ?? true,
@@ -44,8 +45,7 @@ const AddCourse = ({ mode = "add" }) => {
     }
     return {
       course_name: "", course_code: "", duration_value: "", duration_unit: "months",
-      base_fee: "", // <--- ADDED
-      description: "", additional_info: [], is_active: true,
+      base_fee: "", description: "", additional_info: [], is_active: true,
     };
   }, [mode, courseData]);
 
@@ -134,30 +134,45 @@ const AddCourse = ({ mode = "add" }) => {
     { name: "duration_unit", label: "Duration Unit", type: "select", required: true, options: [
       { value: 'days', label: 'Days' }, { value: 'months', label: 'Months' }, { value: 'years', label: 'Years' }
     ]},
-    { name: "base_fee", label: "Course Base Fee (BDT)", type: "number", placeholder: "e.g., 50000", required: true, props: { min: "0" } }, // <--- ADDED
+    { name: "base_fee", label: "Course Base Fee (BDT)", type: "number", placeholder: "e.g., 50000", required: true, props: { min: "0" } }, 
     { name: "additional_info", type: "custom", fullWidth: true, render: renderMultiSelect },
     { name: "description", label: "Course Description", type: "textarea", rows: "4", fullWidth: true, placeholder: "Enter detailed course description..." },
     { name: "is_active", label: "Course is Active & Enrolling", type: "checkbox" }
   ];
 
   const handleSubmit = async (formDataInstance, rawData) => {
-    if (Number(rawData.duration_value) <= 0) return toast.error("Valid duration required");
-    if (Number(rawData.base_fee) < 0) return toast.error("Base fee cannot be negative"); // <--- ADDED
+    
+    // 🛡️ FRONTEND ZOD VALIDATION
+    const validationResult = courseFormSchema.safeParse(rawData);
+    if (!validationResult.success) {
+      const firstError = validationResult.error.errors[0].message;
+      Swal.fire({ icon: "error", title: "Validation Failed", text: firstError });
+      return;
+    }
+
+    // 🚀 FIXED: Safely parsing additional_info to ensure it's an array
+    const parsedAdditionalInfo = Array.isArray(rawData.additional_info) 
+        ? rawData.additional_info 
+        : (rawData.additional_info ? String(rawData.additional_info).split(',') : []);
 
     const coursePayload = {
       course_name: String(rawData.course_name).trim(),
       course_code: String(rawData.course_code).trim(),
       duration_value: Number(rawData.duration_value),
       duration_unit: rawData.duration_unit,
-      base_fee: Number(rawData.base_fee), // <--- ADDED
-      description: String(rawData.description).trim(),
-      additional_info: rawData.additional_info,
-      is_active: rawData.is_active,
+      base_fee: Number(rawData.base_fee), 
+      description: String(rawData.description || "").trim(),
+      additional_info: parsedAdditionalInfo,
+      // 🚀 FIXED: Boolean coercion for FormData checkboxes
+      is_active: rawData.is_active === true || rawData.is_active === "true",
     };
 
     try {
-      if (mode === "edit") await updateCourse.mutateAsync({ id, ...coursePayload });
-      else await createCourse.mutateAsync(coursePayload);
+      if (mode === "edit") {
+        await updateCourse.mutateAsync({ id, ...coursePayload });
+      } else {
+        await createCourse.mutateAsync(coursePayload);
+      }
       setTimeout(() => navigate("/admin/all-courses"), 1000);
     } catch (error) {
       // Handled by tanstack
@@ -169,7 +184,6 @@ const AddCourse = ({ mode = "add" }) => {
   if (isLoading && mode === "edit" && !courseData) return <Loader />;
 
   return (
-    // 🚀 Ekhane bg-[#e8f0f2] deya hoyeche onnano page er shathe match korar jonno
     <div className="min-h-screen bg-[#e8f0f2] py-8 px-4 font-sans text-slate-800">
       <EntityForm
         title={mode === "edit" ? "Edit Course Details" : "Create New Course"}

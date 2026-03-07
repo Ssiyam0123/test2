@@ -1,66 +1,75 @@
-import Joi from "joi";
-import { objectId } from "./common.js";
+import { z } from "zod";
+import { objectIdSchema } from "./common.js";
 
-export const batchSchema = Joi.object({
-  batch_name: Joi.string().required().trim(),
-  course: objectId.required(),
-  instructors: Joi.array().items(objectId).default([]),
-  branch: objectId.required(),
-  start_date: Joi.date().required(),
-  schedule_days: Joi.array()
-    .items(
-      Joi.string().valid(
-        "Saturday",
-        "Sunday",
-        "Monday",
-        "Tuesday",
-        "Wednesday",
-        "Thursday",
-        "Friday",
-      ),
-    )
-    .min(1)
-    .required(),
+const daysEnum = z.enum([
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+]);
 
-  time_slot: Joi.object({
-    start_time: Joi.string().required(),
-    end_time: Joi.string().required(),
-  }).required(),
+const objectIdArraySchema = z.preprocess((val) => {
+  if (Array.isArray(val)) return val;
+  if (typeof val === "string") {
+    return val.trim() === "" ? [] : val.split(",").map((s) => s.trim());
+  }
+  return [];
+}, z.array(objectIdSchema).optional().default([]));
 
-  status: Joi.string()
-    .valid("Active", "Upcoming", "Completed", "Inactive")
+const scheduleDaysSchema = z.preprocess((val) => {
+  if (Array.isArray(val)) return val;
+  if (typeof val === "string") {
+    return val.trim() === "" ? [] : val.split(",").map((s) => s.trim());
+  }
+  return [];
+}, z.array(daysEnum).min(1));
+
+export const batchCreateSchema = z.object({
+  batch_name: z.string().trim().min(1),
+  course: objectIdSchema,
+  branch: objectIdSchema.optional(),
+
+  instructors: objectIdArraySchema,
+
+  start_date: z.string().min(1),
+  end_date: z.string().nullable().optional(),
+
+  time_slot: z.object({
+    start_time: z.string().min(1),
+    end_time: z.string().min(1),
+  }),
+
+  schedule_days: scheduleDaysSchema,
+
+  status: z
+    .enum(["Upcoming", "Active", "Completed", "On Hold"])
     .default("Upcoming"),
 });
 
-export const classAttendanceSchema = Joi.object({
-  attendanceRecords: Joi.array()
-    .items(
-      Joi.object({
-        student: objectId.required(),
-        status: Joi.string().valid("present", "absent").required(),
-      }),
-    )
-    .required(),
-  instructorId: objectId.allow(null).optional(),
-  is_completed: Joi.boolean().optional(),
-  financials: Joi.object({
-    budget: Joi.number().min(0).optional(),
-    actual_cost: Joi.number().min(0).optional(),
-    expense_notes: Joi.string().allow("").optional(),
-  }).optional(),
-});
+export const batchUpdateSchema = z
+  .object({
+    batch_name: z.string().trim().optional(),
+    course: objectIdSchema.optional(),
 
-export const requisitionSchema = Joi.object({
-  requisition: Joi.array()
-    .items(
-      Joi.object({
-        item_name: Joi.string().required().trim(),
-        quantity: Joi.number().positive().required(),
-        unit: Joi.string()
-          .valid("kg", "g", "L", "ml", "pcs", "pkt", "box", "dozen")
-          .required(),
-      }),
-    )
-    .min(1)
-    .required(),
-});
+    instructors: objectIdArraySchema.optional(),
+
+    start_date: z.string().optional(),
+    end_date: z.string().nullable().optional(),
+
+    time_slot: z
+      .object({
+        start_time: z.string().optional(),
+        end_time: z.string().optional(),
+      })
+      .optional(),
+
+    schedule_days: scheduleDaysSchema.optional(),
+
+    status: z.enum(["Upcoming", "Active", "Completed"]).optional(),
+  })
+  .refine((data) => Object.keys(data).length > 0, {
+    message: "At least one field is required to update",
+  });

@@ -1,14 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { Check, X, Save, UserX } from "lucide-react";
 import Avatar from "../../components/common/Avatar";
-import { useUpdateClassAttendance } from "../../hooks/useBatches"; // Import the hook
+import { useUpdateClassAttendance } from "../../hooks/useBatches"; 
 import toast from "react-hot-toast";
 
 const AttendancePanel = ({ selectedClass, batchStudents }) => {
   const [attendanceState, setAttendanceState] = useState({});
   
-  // Use the React Query Mutation
-  const { mutate: updateAttendance, isPending: isSaving } = useUpdateClassAttendance(selectedClass.batch_id || selectedClass.batch);
+  const { mutate: updateAttendance, isPending: isSaving } = useUpdateClassAttendance();
 
   useEffect(() => {
     if (selectedClass) {
@@ -16,7 +15,7 @@ const AttendancePanel = ({ selectedClass, batchStudents }) => {
       if (selectedClass.attendance?.length > 0) {
         selectedClass.attendance.forEach(record => {
           const studentId = typeof record.student === 'object' ? record.student._id : record.student;
-          initialState[studentId] = record.status;
+          initialState[studentId] = record.status; // Fetched from DB
         });
       }
       setAttendanceState(initialState);
@@ -26,24 +25,34 @@ const AttendancePanel = ({ selectedClass, batchStudents }) => {
   const markAttendance = (studentId, status) => {
     setAttendanceState(prev => ({
       ...prev,
-      [studentId]: prev[studentId] === status ? null : status // Toggle behavior
+      [studentId]: prev[studentId] === status ? null : status 
     }));
   };
 
   const handleSaveAttendance = () => {
-    const attendanceRecords = Object.keys(attendanceState).map(studentId => {
-      const studentObj = batchStudents.find(s => s._id === studentId);
-      return {
-        student: studentId,
-        student_name: studentObj ? studentObj.student_name : "Unknown Student",
-        status: attendanceState[studentId]
-      };
-    });
+    if (!selectedClass || !selectedClass._id) {
+      toast.error("Error: Class information is missing.");
+      return;
+    }
 
-    // Execute mutation
+    const attendanceRecords = Object.keys(attendanceState)
+      .map(studentId => {
+        const studentObj = batchStudents.find(s => s._id === studentId);
+        return {
+          student: studentId,
+          student_name: studentObj ? studentObj.student_name : "Unknown Student",
+          status: attendanceState[studentId]
+        };
+      })
+      .filter(record => record.status !== null);
+
+    const batchId = typeof selectedClass.batch === 'object' ? selectedClass.batch._id : selectedClass.batch;
+
     updateAttendance({ 
       classId: selectedClass._id, 
+      batchId: batchId,
       attendanceRecords 
+      // is_completed is not sent here, so it remains unchanged!
     });
   };
 
@@ -62,7 +71,6 @@ const AttendancePanel = ({ selectedClass, batchStudents }) => {
 
   return (
     <div className="flex flex-col h-full bg-white">
-      {/* Sticky Header for Mobile */}
       <div className="sticky top-0 z-20 p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/90 backdrop-blur-md">
         <div className="min-w-0">
           <h3 className="text-sm font-black text-gray-800 truncate">
@@ -75,7 +83,6 @@ const AttendancePanel = ({ selectedClass, batchStudents }) => {
         </span>
       </div>
 
-      {/* List Section */}
       <div className="flex-1 overflow-y-auto p-3 space-y-2 custom-scrollbar">
         {validStudents.map((student) => {
           const status = attendanceState[student._id];
@@ -83,36 +90,32 @@ const AttendancePanel = ({ selectedClass, batchStudents }) => {
           return (
             <div 
               key={student._id} 
-              onClick={() => markAttendance(student._id, 'present')}
+              onClick={() => markAttendance(student._id, 'Present')}
               className={`flex items-center justify-between p-3 rounded-2xl border transition-all active:scale-[0.98] cursor-pointer ${
-                status === 'present' ? 'border-teal-200 bg-teal-50/50' : 
-                status === 'absent' ? 'border-red-200 bg-red-50/50' : 
+                status === 'Present' ? 'border-teal-200 bg-teal-50/50' : 
+                status === 'Absent' ? 'border-red-200 bg-red-50/50' : 
                 'border-gray-100 bg-white shadow-sm'
               }`}
             >
               <div className="flex items-center gap-3">
-                <Avatar 
-                  src={student.photo_url} 
-                  fallbackText={student.student_name} 
-                  size="sm" 
-                />
+                <Avatar src={student.photo_url} fallbackText={student.student_name} size="sm" />
                 <div className="leading-tight">
                   <p className="text-xs font-bold text-gray-800">{student.student_name}</p>
                   <p className="text-[9px] text-gray-400 font-medium uppercase tracking-tighter">{student.student_id}</p>
                 </div>
               </div>
 
-              {/* Action Buttons */}
               <div className="flex items-center gap-1.5 bg-white p-1 rounded-xl border border-gray-100" onClick={(e) => e.stopPropagation()}>
+                {/* 🚀 FIXED: Passing Capitalized Statuses */}
                 <button
-                  onClick={() => markAttendance(student._id, 'present')}
-                  className={`p-1.5 rounded-lg transition-all ${status === 'present' ? 'bg-teal-500 text-white shadow-lg shadow-teal-200' : 'text-gray-300'}`}
+                  onClick={() => markAttendance(student._id, 'Present')}
+                  className={`p-1.5 rounded-lg transition-all ${status === 'Present' ? 'bg-teal-500 text-white shadow-lg shadow-teal-200' : 'text-gray-300'}`}
                 >
                   <Check size={14} strokeWidth={3} />
                 </button>
                 <button
-                  onClick={() => markAttendance(student._id, 'absent')}
-                  className={`p-1.5 rounded-lg transition-all ${status === 'absent' ? 'bg-red-500 text-white shadow-lg shadow-red-200' : 'text-gray-300'}`}
+                  onClick={() => markAttendance(student._id, 'Absent')}
+                  className={`p-1.5 rounded-lg transition-all ${status === 'Absent' ? 'bg-red-500 text-white shadow-lg shadow-red-200' : 'text-gray-300'}`}
                 >
                   <X size={14} strokeWidth={3} />
                 </button>
@@ -122,7 +125,6 @@ const AttendancePanel = ({ selectedClass, batchStudents }) => {
         })}
       </div>
 
-      {/* Save Button with Bottom Safe Area Padding */}
       <div className="p-4 border-t border-gray-100 bg-white pb-6 md:pb-4">
         <button
           onClick={handleSaveAttendance}

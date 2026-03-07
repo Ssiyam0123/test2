@@ -1,18 +1,20 @@
 import express from "express";
 import * as ctrl from "../controllers/mastersyllabus.controller.js";
 import { verifyToken, requirePermission } from "../middlewares/auth.js";
+import { validate } from "../middlewares/validate.js";
+import { createMasterSyllabusSchema, updateMasterSyllabusSchema } from "../validators/masterSyllabus.validator.js"; // 🚀 Zod Added
 
 const router = express.Router();
 
 router.use(verifyToken);
 
-// Read: গ্লোবাল লাইব্রেরি থেকে ডেটা আনা
+// Read
 router.get("/", requirePermission("view_courses"), ctrl.getAllMasterTopics);
 router.get("/topic/:id", requirePermission("view_courses"), ctrl.getSyllabusTopicById);
 
-// Write: অ্যাডমিনরা ম্যানেজ করবে
-router.post("/", requirePermission("manage_courses"), ctrl.createMasterSyllabus);
-router.put("/topic/:id", requirePermission("manage_courses"), ctrl.updateMasterSyllabus);
+// Write
+router.post("/", requirePermission("manage_courses"), validate(createMasterSyllabusSchema), ctrl.createMasterSyllabus);
+router.put("/topic/:id", requirePermission("manage_courses"), validate(updateMasterSyllabusSchema), ctrl.updateMasterSyllabus);
 router.delete("/topic/:id", requirePermission("manage_courses"), ctrl.deleteMasterSyllabus);
 
 export default router;

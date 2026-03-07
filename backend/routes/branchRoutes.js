@@ -3,11 +3,10 @@ import * as ctrl from "../controllers/branch.controller.js";
 import { getBranchStats } from "../controllers/dashboard.controller.js";
 import { verifyToken, requirePermission } from "../middlewares/auth.js";
 import { validate } from "../middlewares/validate.js";
-import { branchCreateSchema, branchUpdateSchema } from "../validators/branch.validator.js";
+import { branchCreateSchema, branchUpdateSchema } from "../validators/branch.validator.js"; // 🚀 Zod Schema
 
 const router = express.Router();
 
-// 🚀 Authentication applies to all routes below
 router.use(verifyToken);
 
 // ==========================================
