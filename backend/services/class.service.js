@@ -30,6 +30,7 @@ export const fetchBatchClasses = async (batchId, branchFilter) => {
 
 export const insertClassesToSyllabus = async (batchId, classesData, branchFilter) => {
   return await executeTransaction(async (session) => {
+    // 🚀 FIXED: Get batch details to ensure we have the branch ID
     const batch = await Batch.findOne({ _id: batchId, ...branchFilter }).session(session);
     if (!batch) throw new AppError("Batch not found or unauthorized.", 404);
 
@@ -37,18 +38,20 @@ export const insertClassesToSyllabus = async (batchId, classesData, branchFilter
     
     const formattedClasses = classArray.map((cls) => ({
       batch: batchId,
-      branch: batch.branch,
+      branch: batch.branch, // 🚀 MANDATORY: Fix for the 500 error
       topic: cls.topic,
-      class_number: cls.order_index || cls.class_number, 
+      class_number: Number(cls.class_number || cls.order_index), 
       class_type: cls.class_type || "Lecture",
       content_details: cls.description ? [cls.description] : [], 
       date_scheduled: null,
       is_completed: false
     }));
 
+    // Bulk Insert
     const newClasses = await ClassContent.insertMany(formattedClasses, { session });
     const newIds = newClasses.map((c) => c._id);
 
+    // Sync references in Batch model
     await Batch.findByIdAndUpdate(batchId, {
       $push: { class_contents: { $each: newIds } }
     }, { session });

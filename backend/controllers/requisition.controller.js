@@ -24,12 +24,15 @@ export const rejectClassRequisition = catchAsync(async (req, res) => {
   res.status(200).json(new ApiResponse(200, requisition, "Requisition rejected"));
 });
 
-// 🚀 FIXED: Directly use Requisition model here
 export const getAllRequisitions = catchAsync(async (req, res) => {
-  const requisitions = await Requisition.find(req.branchFilter)
-    .populate("class_content", "topic class_number")
-    .populate("requested_by", "full_name")
-    .sort({ createdAt: -1 })
-    .lean();
-  res.status(200).json(new ApiResponse(200, requisitions, "All requisitions fetched"));
+
+  const filter = { ...req.branchFilter };
+  
+  if (req.query.branch) {
+    filter.branch = req.query.branch;
+  }
+
+  const requisitions = await ReqService.getAllRequisitions(filter);
+  
+  res.status(200).json(new ApiResponse(200, requisitions, "All requisitions fetched successfully"));
 });

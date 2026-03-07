@@ -92,7 +92,7 @@ export const modifyUser = async (userId, updateData, file, isMaster, adminBranch
     if (!updateData.password) delete updateData.password;
     if (file) {
       if (targetUser.photo_url) deleteLocalFile(targetUser.photo_url);
-      updateData.photo_url = `/uploads/${file.filename}`;
+      updateData.photo_url = `/uploads/employees/${file.filename}`;
     }
 
     updateData.social_links = {

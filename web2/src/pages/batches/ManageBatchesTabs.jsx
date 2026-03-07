@@ -6,7 +6,7 @@ import useAuth from "../../store/useAuth"; // 🚀 Zustand Store
 import { useConfirmToast } from "../../components/ConfirmToast.jsx"; 
 
 import BatchHeader from "../../components/batches/BatchHeader";
-import BatchList from "../../components/batches/BatchList";
+import BatchCard from "../../components/batches/BatchCard.jsx";
 import Loader from "../../components/Loader";
 import BranchDropdown from "../../components/common/BranchDropdown"; 
 
@@ -82,7 +82,7 @@ export default function ManageBatchesTabs() {
             wrapperClassName="flex justify-end mb-4"
           />
 
-          <BatchList 
+          <BatchCard 
             batches={filteredBatches} 
             onSelectBatch={(batch) => navigate(`/admin/batches/${batch._id}`)} 
             onDeleteBatch={handleDeleteBatch}

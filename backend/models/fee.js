@@ -9,7 +9,6 @@ const feeSchema = new mongoose.Schema(
     total_amount: { type: Number, required: true }, 
     discount: { type: Number, default: 0 },
     
-    // Audit trail for discount overrides
     discount_history: [{
       previous_discount: { type: Number },
       new_discount: { type: Number },

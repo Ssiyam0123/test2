@@ -9,9 +9,6 @@ const useAuth = create((set, get) => ({
   isLoggingIn: false,
   onlineUsers: [],
 
-  // ==========================================
-  // 🛡️ ROLE & PERMISSION HELPERS
-  // ==========================================
   hasPermission: (permission) => {
     const { authUser } = get(); 
     
@@ -32,9 +29,7 @@ const useAuth = create((set, get) => ({
     return authUser?.role?.name === "superadmin";
   },
 
-  // ==========================================
-  // 🔐 AUTH ACTIONS
-  // ==========================================
+
   checkAuth: async () => {
     try {
       const res = await API.get("/auth/check");

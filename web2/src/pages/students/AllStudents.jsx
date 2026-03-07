@@ -44,6 +44,7 @@ const AllStudents = () => {
   const limit = 20;
 
   const isSuper = isMaster();
+  console.log(isSuper)
   const canAddStudent = hasPermission("add_student");
 
   // Determine branch ID for API calls

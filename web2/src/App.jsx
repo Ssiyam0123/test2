@@ -1,5 +1,12 @@
 import React, { useEffect } from "react";
-import { BrowserRouter as Router, Routes, Route, Navigate, Outlet, useOutletContext } from "react-router-dom";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+  Outlet,
+  useOutletContext,
+} from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 
@@ -12,7 +19,7 @@ import PublicLayout from "./components/PublicLayout";
 // PUBLIC & AUTH PAGES
 import LoginPage from "./pages/LoginPage";
 import Dashboard from "./pages/Dashboard";
-import BranchDashboard from "./pages/BranchDashboard"; 
+import BranchDashboard from "./pages/BranchDashboard";
 import SearchStudent from "./pages/student-public/SearchStudent.jsx";
 import StudentDetails from "./pages/student-public/StudentDetails.jsx";
 import EmployeeDetails from "./pages/employee-public/EmployeeDetails.jsx";
@@ -32,7 +39,7 @@ import ManageBatchesTabs from "./pages/batches/ManageBatchesTabs.jsx";
 import ManageBatches from "./pages/batches/ManageBatches.jsx";
 import BatchListPage from "./pages/batches/BatchListPage.jsx";
 import AddBatch from "./pages/batches/AddBatch.jsx";
-import BatchFormContainer from "./components/batches/BatchFormContainer.jsx";
+// import BatchFormContainer from "./components/batches/BatchFormContainer.jsx";
 import ManageBranches from "./pages/branches/ManageBranches.jsx";
 import BranchDetails from "./pages/branches/BranchDetails.jsx";
 import AllBranches from "./pages/branches/AllBranches.jsx";
@@ -44,7 +51,6 @@ import AddInventory from "./pages/inventory/AddInventory.jsx";
 import ManageMasterSyllabus from "./pages/master-syllabus/ManageMasterSyllabus.jsx";
 import AddMasterSyllabus from "./pages/master-syllabus/AddMasterSyllabus.jsx";
 
-
 import StudentFinance from "./pages/finance/StudentFinance";
 
 // 🚀 SETTINGS / HOLIDAYS
@@ -52,7 +58,12 @@ import ManageHolidays from "./pages/setting/ManageHolidays.jsx";
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { staleTime: 5 * 60 * 1000, cacheTime: 10 * 60 * 1000, retry: 1, refetchOnWindowFocus: false },
+    queries: {
+      staleTime: 5 * 60 * 1000,
+      cacheTime: 10 * 60 * 1000,
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
   },
 });
 
@@ -63,24 +74,24 @@ const ProtectedRoute = ({ children }) => {
 
 // RoleGuard ekhon shudhu hasPermission use korbe
 const RoleGuard = ({ requiredPermission }) => {
-  const { hasPermission } = useAuth(); 
-  const context = useOutletContext(); 
+  const { hasPermission } = useAuth();
+  const context = useOutletContext();
 
   if (!hasPermission(requiredPermission)) {
     toast.error("You do not have permission to view this page.");
     return <Navigate to="/admin" replace />;
   }
-  
+
   return <Outlet context={context} />;
 };
 
 const AdminIndex = () => {
-  const { hasPermission, isMaster } = useAuth(); 
-  
+  const { hasPermission, isMaster } = useAuth();
+
   if (isMaster()) {
     return <Dashboard />;
-  } 
-  
+  }
+
   if (hasPermission("view_dashboard")) {
     return <BranchDashboard />;
   }
@@ -88,7 +99,7 @@ const AdminIndex = () => {
   if (hasPermission("view_students")) {
     return <Navigate to="/admin/all-students" replace />;
   }
-  
+
   return (
     <div className="p-8 text-center font-bold text-slate-500 mt-20">
       Access Denied: Please contact System Administrator.
@@ -118,9 +129,21 @@ function App() {
             <Route path="/employee/:id" element={<EmployeeDetails />} />
           </Route>
 
-          <Route path="/login" element={authUser ? <Navigate to="/admin" replace /> : <LoginPage />} />
+          <Route
+            path="/login"
+            element={
+              authUser ? <Navigate to="/admin" replace /> : <LoginPage />
+            }
+          />
 
-          <Route path="/admin" element={<ProtectedRoute><AdminLayout /></ProtectedRoute>}>
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute>
+                <AdminLayout />
+              </ProtectedRoute>
+            }
+          >
             <Route index element={<AdminIndex />} />
 
             <Route element={<RoleGuard requiredPermission="view_students" />}>
@@ -138,10 +161,16 @@ function App() {
               <Route path="employee/:id" element={<EmployeeDetails />} />
             </Route>
             <Route element={<RoleGuard requiredPermission="add_employee" />}>
-              <Route path="add-employee" element={<AddEmployeeForm mode="add" />} />
+              <Route
+                path="add-employee"
+                element={<AddEmployeeForm mode="add" />}
+              />
             </Route>
             <Route element={<RoleGuard requiredPermission="edit_employee" />}>
-              <Route path="update-employee/:id" element={<UpdateEmployee mode="edit" />} />
+              <Route
+                path="update-employee/:id"
+                element={<UpdateEmployee mode="edit" />}
+              />
             </Route>
 
             <Route element={<RoleGuard requiredPermission="view_courses" />}>
@@ -149,12 +178,24 @@ function App() {
             </Route>
             <Route element={<RoleGuard requiredPermission="manage_courses" />}>
               <Route path="add-course" element={<AddCourse />} />
-              <Route path="update-course/:id" element={<AddCourse mode="edit" />} />
-              
+              <Route
+                path="update-course/:id"
+                element={<AddCourse mode="edit" />}
+              />
+
               {/* SYLLABUS ROUTES */}
-              <Route path="manage-syllabus" element={<ManageMasterSyllabus />} />
-              <Route path="add-syllabus" element={<AddMasterSyllabus mode="add" />} />
-              <Route path="update-syllabus/:id" element={<AddMasterSyllabus mode="edit" />} />
+              <Route
+                path="manage-syllabus"
+                element={<ManageMasterSyllabus />}
+              />
+              <Route
+                path="add-syllabus"
+                element={<AddMasterSyllabus mode="add" />}
+              />
+              <Route
+                path="update-syllabus/:id"
+                element={<AddMasterSyllabus mode="edit" />}
+              />
             </Route>
 
             <Route element={<RoleGuard requiredPermission="view_classes" />}>
@@ -164,13 +205,15 @@ function App() {
               <Route path="manage-batches" element={<ManageBatchesTabs />} />
               <Route path="batches/:id" element={<ManageBatches />} />
               <Route path="add-batch" element={<AddBatch />} />
-              <Route path="edit-batch/:id" element={<BatchFormContainer />} />
-              
+              <Route path="edit-batch/:id" element={<AddBatch />} />
               {/* 🚀 HOLIDAY ROUTE */}
               <Route path="manage-holidays" element={<ManageHolidays />} />
             </Route>
 
-            <Route path="/admin/student-finance/:id" element={<StudentFinance />} />
+            <Route
+              path="/admin/student-finance/:id"
+              element={<StudentFinance />}
+            />
 
             <Route element={<RoleGuard requiredPermission="view_branches" />}>
               <Route path="branches" element={<AllBranches />} />
@@ -179,14 +222,22 @@ function App() {
             <Route element={<RoleGuard requiredPermission="manage_branches" />}>
               <Route path="manage-branches" element={<ManageBranches />} />
               <Route path="manage-branches/:id" element={<BranchDetails />} />
-              <Route path="add-branch" element={<ManageBranchForm mode="add" />} />
-              <Route path="update-branch/:id" element={<ManageBranchForm mode="edit" />} />
+              <Route
+                path="add-branch"
+                element={<ManageBranchForm mode="add" />}
+              />
+              <Route
+                path="update-branch/:id"
+                element={<ManageBranchForm mode="edit" />}
+              />
             </Route>
 
             <Route element={<RoleGuard requiredPermission="view_inventory" />}>
               <Route path="inventory" element={<ManageInventory />} />
             </Route>
-            <Route element={<RoleGuard requiredPermission="manage_inventory" />}>
+            <Route
+              element={<RoleGuard requiredPermission="manage_inventory" />}
+            >
               <Route path="add-inventory" element={<AddInventory />} />
             </Route>
 

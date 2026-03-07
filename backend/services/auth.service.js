@@ -56,14 +56,12 @@ export const registerNewUser = async (userData) => {
     if (existingUser.employee_id === employee_id) throw new AppError("Employee ID already exists", 400);
   }
 
-  // 🚀 Resolve Role ID
   let roleId = role;
   if (!roleId || !mongoose.Types.ObjectId.isValid(roleId)) {
     const dbRole = await Role.findOne({ name: roleId || "instructor" }).lean();
     if (dbRole) roleId = dbRole._id;
   }
 
-  // 🚀 Create User
   const user = new User({
     email, username, password, full_name, employee_id,
     phone, designation: designation || "Staff", department: department || "General",

@@ -35,7 +35,12 @@ export const getEmployeeFormSchema = (mode) => z.object({
   role: z.string().min(1, "Role selection is required"),
   password: mode === "add" 
     ? z.string().min(6, "Password must be at least 6 characters") 
-    : z.string().optional().or(z.literal(""))
+    : z.string().optional().or(z.literal("")),
+  facebook: z.string().url("Invalid URL").optional().or(z.literal("")),
+  linkedin: z.string().url("Invalid URL").optional().or(z.literal("")),
+  twitter: z.string().url("Invalid URL").optional().or(z.literal("")),
+  instagram: z.string().url("Invalid URL").optional().or(z.literal("")),
+  others: z.string().url("Invalid URL").optional().or(z.literal(""))
 });
 
 

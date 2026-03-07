@@ -4,7 +4,7 @@ import DataFilters from '../common/DataFilters';
 const EmployeeFilters = ({ 
   searchTerm, 
   onSearchChange, 
-  filterOptions, // Includes branches and roles now
+  filterOptions, 
   onFilterChange, 
   initialFilters = {}, 
   isLoading = false 
@@ -31,7 +31,7 @@ const EmployeeFilters = ({
 
   const clearFilters = () => {
     const cleared = { 
-      branch: "all", 
+      branch: filters.branch, // 🚀 Keep the current branch selected even on clear
       status: "all", 
       department: "all", 
       role: "all", 
@@ -51,20 +51,9 @@ const EmployeeFilters = ({
   };
 
   const filterConfig = [
-    // CONDITIONAL BRANCH FILTER
-    ...(filterOptions?.branches?.length > 0 ? [{
-      key: "branch",
-      label: "Campus / Branch",
-      type: "select",
-      color: "indigo",
-      options: filterOptions.branches.map((b) => ({
-        value: b._id ? String(b._id) : String(b),
-        label: b.branch_name ? String(b.branch_name) : String(b),
-      })),
-    }] : []),
-
+    // 🚀 Branch Filter removed from here
     { 
-      key: "status", label: "Employment Status", type: "select", color: "green",
+      key: "status", label: "Status", type: "select", color: "green",
       options: [
         { value: "Active", label: "Active" },
         { value: "On Leave", label: "On Leave" },
@@ -80,21 +69,18 @@ const EmployeeFilters = ({
         { value: "Support Staff", label: "Support Staff" }
       ] 
     },
-    // 🚀 DYNAMIC ROLE FILTER 
-    ...(filterOptions?.roles?.length > 0 ? [{
+    { 
       key: "role", 
-      label: "System Role", 
+      label: "Role", 
       type: "select", 
       color: "purple",
-      options: filterOptions.roles.map((r) => ({
-        // Search filters need the ObjectId to query the database!
+      options: (filterOptions?.roles || []).map((r) => ({
         value: r._id,
         label: r.name.charAt(0).toUpperCase() + r.name.slice(1)
       }))
-    }] : []),
-    
-    { key: "date_from", label: "Joining Date From", type: "date", color: "red" },
-    { key: "date_to", label: "Joining Date To", type: "date", color: "red" }
+    },
+    { key: "date_from", label: "From", type: "date", color: "red" },
+    { key: "date_to", label: "To", type: "date", color: "red" }
   ];
 
   return (

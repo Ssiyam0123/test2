@@ -11,7 +11,6 @@ export const login = catchAsync(async (req, res) => {
 
   const user = await AuthService.authenticateUser(email, password);
   
-  // 🚀 Token Generation (HTTP concern, stays in controller)
   const token = generateToken(user._id, user.role?.name, res);
 
   res.status(200).json({

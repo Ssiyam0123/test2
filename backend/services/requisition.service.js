@@ -101,3 +101,15 @@ export const rejectRequisition = async (reqId, adminNote, adminId, branchFilter)
   if (!req) throw new AppError("Requisition not found or already processed.", 404);
   return req;
 };
+
+
+
+// সব রিকুইজিশন ব্রাঞ্চ অনুযায়ী ফেচ করার সার্ভিস
+export const getAllRequisitions = async (branchFilter) => {
+  return await Requisition.find(branchFilter)
+    .populate("class_content", "topic class_number") // ক্লাসের নাম ও নম্বর দেখানোর জন্য
+    .populate("batch", "batch_name") // কোন ব্যাচ তা জানার জন্য
+    .populate("requested_by", "full_name username") // কে রিকোয়েস্ট করেছে
+    .sort({ createdAt: -1 }) // নতুনগুলো আগে দেখাবে
+    .lean();
+};

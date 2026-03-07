@@ -15,6 +15,7 @@ import TableSkeleton from "../../components/common/TableSkeleton.jsx";
 import DataErrorState from "../../components/common/DataErrorState.jsx";
 import EmployeeFilters from "../../components/Search_filter/EmployeeFilters.jsx";
 import EmployeesTable from "../../components/table/EmployeesTable.jsx";
+import BranchDropdown from "../../components/common/BranchDropdown.jsx"; // 🚀 Import Dropdown
 import { useBranches } from "../../hooks/useBranches.js";
 import { useRoles } from "../../hooks/useRoles.js";
 
@@ -65,14 +66,10 @@ const AllEmployees = () => {
       if (activeFilters.branch === "all") delete activeFilters.branch;
     }
 
-    if (debouncedSearch) {
-      activeFilters.search = debouncedSearch;
-    }
+    if (debouncedSearch) activeFilters.search = debouncedSearch;
 
     Object.entries(activeFilters).forEach(([key, value]) => {
-      if (value === "all" || value === "") {
-        delete activeFilters[key];
-      }
+      if (value === "all" || value === "") delete activeFilters[key];
     });
 
     return activeFilters;
@@ -82,9 +79,7 @@ const AllEmployees = () => {
     page,
     limit,
     queryFilters,
-    {
-      enabled: isMaster ? true : !!branchId,
-    },
+    { enabled: isMaster ? true : !!branchId }
   );
 
   const deleteUserMutation = useDeleteUser();
@@ -94,17 +89,15 @@ const AllEmployees = () => {
   const employees = data?.data || [];
   const pagination = data?.pagination;
 
-  const combinedFilterOptions = useMemo(() => {
-    return {
-      branches: isMaster ? branchesRes?.data || [] : [],
-    };
-  }, [branchesRes?.data, isMaster]);
+  // 🚀 Roles options passed to filters
+  const filterOptions = useMemo(() => ({
+    roles: rolesRes?.data || []
+  }), [rolesRes]);
 
   useEffect(() => {
     setPage(1);
   }, [queryFilters]);
 
-  // 🚀 FIXED: Directly mutate here, Swal is handled in the child
   const handleDelete = (id) => {
     if (id === currentUserId) return toast.error("You cannot delete your own account.");
     deleteUserMutation.mutate(id);
@@ -121,12 +114,7 @@ const AllEmployees = () => {
     updateRoleMutation.mutate({ id, role: newRole });
   };
 
-  if (!isMaster && !branchId)
-    return (
-      <div className="p-6">
-        <TableSkeleton rows={8} />
-      </div>
-    );
+  if (!isMaster && !branchId) return <div className="p-6"><TableSkeleton rows={8} /></div>;
 
   return (
     <div className="p-6 max-w-[1600px] mx-auto min-h-screen relative">
@@ -135,9 +123,17 @@ const AllEmployees = () => {
         subtitle="Manage and export staff records."
         showExport={true}
         disableExport={isLoading || employees.length === 0}
-        onExport={() => { /* handleExport */ }}
         onAdd={canAddEmployee ? () => navigate("/admin/add-employee") : null}
         addText="Add Employee"
+      />
+
+      {/* 🚀 Standalone Branch Dropdown */}
+      <BranchDropdown 
+        isMaster={isMaster}
+        branches={branchesRes?.data || []}
+        value={filters.branch}
+        onChange={(val) => setFilters(prev => ({ ...prev, branch: val }))}
+        wrapperClassName="flex justify-end mb-4"
       />
 
       <div className="mb-6">
@@ -145,8 +141,8 @@ const AllEmployees = () => {
           searchTerm={searchTerm}
           onSearchChange={setSearchTerm}
           onFilterChange={setFilters}
-          filterOptions={combinedFilterOptions}
-          initialFilters={INITIAL_FILTERS}
+          filterOptions={filterOptions} // Pass roles here
+          initialFilters={filters}
           isLoading={isLoading}
         />
       </div>
@@ -162,11 +158,7 @@ const AllEmployees = () => {
               employees={employees}
               roles={rolesRes?.data || []} 
               currentUserId={currentUserId}
-              currentUserRole={
-                typeof authUser?.role === "string"
-                  ? authUser.role
-                  : authUser?.role?.name
-              }
+              currentUserRole={typeof authUser?.role === "string" ? authUser.role : authUser?.role?.name}
               pagination={pagination}
               onDelete={handleDelete} 
               onToggleStatus={handleToggleStatus}
@@ -176,11 +168,7 @@ const AllEmployees = () => {
               onEdit={(id) => navigate(`/admin/update-employee/${id}`)}
               deleteLoading={deleteUserMutation.isPending}
               toggleLoading={updateStatusMutation.isPending}
-              roleLoadingId={
-                updateRoleMutation.isPending
-                  ? updateRoleMutation.variables?.id
-                  : null
-              }
+              roleLoadingId={updateRoleMutation.isPending ? updateRoleMutation.variables?.id : null}
               page={page}
               onPageChange={setPage}
               searchTerm={debouncedSearch}
