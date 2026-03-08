@@ -9,8 +9,9 @@ import ActionIconButton from "../common/ActionIconButton.jsx";
 import Avatar from "../common/Avatar.jsx";
 import { useNavigate } from "react-router-dom";
 import useAuth from "../../store/useAuth.js";
+import { PERMISSIONS } from "../../config/permissionConfig.js";
 
-// 🚀 IMPORT THE REUSABLE SWAL DELETE UTILITY
+// IMPORT THE REUSABLE SWAL DELETE UTILITY
 import { confirmDelete } from "../../utils/swalUtils"; 
 
 const StudentsTable = ({
@@ -27,7 +28,7 @@ const StudentsTable = ({
     downloadMutation.mutate(student);
   };
 
-  // 🚀 DYNAMIC DELETE HANDLER
+  // DYNAMIC DELETE HANDLER
   const handleDeleteClick = (studentId, studentName) => {
     confirmDelete({
       title: "Delete Student?",
@@ -38,16 +39,16 @@ const StudentsTable = ({
   };
 
   // ==========================================
-  // 🛡️ DYNAMIC PBAC FLAGS
+  // DYNAMIC PBAC FLAGS
   // ==========================================
-  const canCollectFee = hasPermission("collect_fees");
-  const canAddComment = hasPermission("add_student_comment");
-  const canEdit = hasPermission("edit_student");
-  const canDelete = hasPermission("delete_student");
-  const canViewDetails = hasPermission("view_student_details") || hasPermission("view_students");
+  const canCollectFee = hasPermission(PERMISSIONS.COLLECT_FEES);
+  const canAddComment = hasPermission(PERMISSIONS.ADD_STUDENT_COMMENT);
+  const canEdit = hasPermission(PERMISSIONS.EDIT_STUDENT);
+  const canDelete = hasPermission(PERMISSIONS.DELETE_STUDENT);
+  const canViewDetails = hasPermission(PERMISSIONS.VIEW_STUDENT_DETAILS) || hasPermission(PERMISSIONS.VIEW_STUDENTS);
 
   // ==========================================
-  // 📊 DYNAMIC COLUMNS (Removed Balance Column)
+  // DYNAMIC COLUMNS (Removed Balance Column)
   // ==========================================
   const columns = [
     { label: "Student Name", className: "w-[25%]" },

@@ -6,13 +6,7 @@ const router = express.Router();
 
 router.use(verifyToken);
 
-// ==========================================
-// READ ROUTES
-// ==========================================
-// Global stats (Usually for Superadmin)
-router.get("/stats", requirePermission("view_dashboard"), getDashboardStats);
-
-// Branch specific stats (Secured by injectBranchFilter)
+router.get("/stats", requirePermission("view_dashboard"), injectBranchFilter, getDashboardStats);
 router.get("/branch-stats/:branchId", requirePermission("view_dashboard"), injectBranchFilter, getBranchStats);
 
 export default router;

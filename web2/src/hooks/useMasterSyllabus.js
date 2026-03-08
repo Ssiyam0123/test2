@@ -2,7 +2,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import * as SyllabusAPI from "../api/masterSyllabus.api";
 
-// ১. সব টপিক ফেচ করার জন্য
 export const useMasterTopics = (params = {}) => {
   return useQuery({
     queryKey: ["master-topics", params],
@@ -10,7 +9,6 @@ export const useMasterTopics = (params = {}) => {
   });
 };
 
-// ২. একটি নির্দিষ্ট টপিক এডিট করার জন্য ডাটা আনা
 export const useMasterSyllabusDetails = (id, options = {}) => {
   return useQuery({
     queryKey: ["syllabus-topic", id],
@@ -19,47 +17,39 @@ export const useMasterSyllabusDetails = (id, options = {}) => {
   });
 };
 
-// ৩. নতুন টপিক অ্যাড করার জন্য
 export const useAddMasterSyllabus = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (payload) => SyllabusAPI.addMasterSyllabus(payload),
+    mutationFn: SyllabusAPI.addMasterSyllabus,
     onSuccess: () => {
+      toast.success("Topic added successfully!");
       queryClient.invalidateQueries({ queryKey: ["master-topics"] });
     },
-    onError: (error) => {
-      toast.error(error?.response?.data?.message || "Failed to add syllabus.");
-    }
+    onError: (error) => toast.error(error?.response?.data?.message || "Failed to add syllabus.")
   });
 };
 
-// 🚀 ৪. টপিক আপডেট করার জন্য (যেটা তোর এরর দিচ্ছিল)
 export const useUpdateMasterSyllabus = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, payload }) => SyllabusAPI.updateMasterSyllabus(id, payload),
-    onSuccess: (res, variables) => {
+    mutationFn: SyllabusAPI.updateMasterSyllabus,
+    onSuccess: (_, variables) => {
+      toast.success("Topic updated successfully!");
       queryClient.invalidateQueries({ queryKey: ["syllabus-topic", variables.id] });
       queryClient.invalidateQueries({ queryKey: ["master-topics"] });
-      toast.success("Topic updated successfully!");
     },
-    onError: (error) => {
-      toast.error(error?.response?.data?.message || "Update failed.");
-    }
+    onError: (error) => toast.error(error?.response?.data?.message || "Update failed.")
   });
 };
 
-// ৫. টপিক ডিলিট করার জন্য
 export const useDeleteMasterSyllabus = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id) => SyllabusAPI.deleteMasterSyllabus(id),
+    mutationFn: SyllabusAPI.deleteMasterSyllabus,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["master-topics"] });
       toast.success("Topic removed from library.");
+      queryClient.invalidateQueries({ queryKey: ["master-topics"] });
     },
-    onError: (error) => {
-      toast.error(error?.response?.data?.message || "Delete failed.");
-    }
+    onError: (error) => toast.error(error?.response?.data?.message || "Delete failed.")
   });
 };

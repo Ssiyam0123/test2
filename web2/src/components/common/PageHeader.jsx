@@ -1,42 +1,27 @@
-import React from "react";
-import { Plus, Download } from "lucide-react";
+import React from 'react';
+import { Plus } from 'lucide-react';
+import PermissionGuard from './PermissionGuard';
 
-const PageHeader = ({ 
-  title, 
-  subtitle, 
-  onAdd, 
-  addText = "Add", 
-  onExport, 
-  disableExport = false, 
-  showExport = false 
-}) => {
+const PageHeader = ({ title, subtitle, onAdd, addText, addPermission = "all_access" }) => {
   return (
-    <div className="flex flex-col md:flex-row md:items-center justify-between mb-8">
+    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 tracking-tight">{title}</h1>
-        {subtitle && <p className="text-sm text-gray-500">{subtitle}</p>}
+        <h1 className="text-2xl font-black text-slate-800 tracking-tight">{title}</h1>
+        {subtitle && <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">{subtitle}</p>}
       </div>
-      
-      <div className="flex items-center gap-3 mt-4 md:mt-0">
-        {showExport && onExport && (
-          <button
-            onClick={onExport}
-            disabled={disableExport}
-            className="flex items-center space-x-2 px-4 py-2 bg-white border border-gray-300 text-sm font-medium rounded-lg hover:bg-gray-50 transition-all shadow-sm disabled:opacity-50"
+
+      {onAdd && addText && (
+        // 🚀 Button will automatically hide if user lacks permission
+        <PermissionGuard requiredPermission={addPermission}>
+          <button 
+            onClick={onAdd} 
+            className="flex items-center justify-center gap-2 px-6 py-3.5 bg-teal-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-teal-700 transition-all shadow-lg shadow-teal-600/20 active:scale-95"
           >
-            <Download size={16} /> <span>Export CSV</span>
+            <Plus size={16} strokeWidth={3} />
+            {addText}
           </button>
-        )}
-        
-        {onAdd && (
-          <button
-            onClick={onAdd}
-            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-all shadow-sm"
-          >
-            <Plus size={16} /> <span>{addText}</span>
-          </button>
-        )}
-      </div>
+        </PermissionGuard>
+      )}
     </div>
   );
 };

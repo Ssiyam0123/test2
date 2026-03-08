@@ -4,16 +4,21 @@ import { deleteLocalFile } from "../middlewares/multer.js";
 import { generateEmployeeId } from "../lib/utils.js";
 import AppError from "../utils/AppError.js";
 
+// Fetch Users with Pagination & Filters
 export const fetchUsers = async (filters, page, limit) => {
-  const skip = (parseInt(page) - 1) * parseInt(limit);
+  const pageNum = parseInt(page) || 1;
+  const limitNum = parseInt(limit) || 20;
+  const skip = (pageNum - 1) * limitNum;
 
   const [users, total] = await Promise.all([
     User.find(filters)
+      .select("-password")
       .populate("branch", "branch_name branch_code")
       .populate("role", "name is_system_role permissions")
+      .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(parseInt(limit))
-      .sort({ createdAt: -1 }),
+      .limit(limitNum)
+      .lean(),
     User.countDocuments(filters)
   ]);
 
@@ -21,24 +26,27 @@ export const fetchUsers = async (filters, page, limit) => {
     users,
     pagination: {
       total,
-      page: parseInt(page),
-      pages: Math.ceil(total / limit)
+      page: pageNum,
+      pages: Math.ceil(total / limitNum)
     }
   };
 };
 
+// Fetch Single User
 export const fetchUserById = async (userId, branchFilter) => {
   const user = await User.findOne({ _id: userId, ...branchFilter })
     .select("-password")
     .populate("branch", "branch_name branch_code")
-    .populate("role", "name is_system_role permissions");
+    .populate("role", "name is_system_role permissions")
+    .lean();
 
   if (!user) throw new AppError("User not found or access denied.", 404);
   return user;
 };
 
+// Create New User 
 export const createUser = async (userData, file, isMaster, adminBranch) => {
-  let uploadedFilePath = file ? file.path : null;
+  const uploadedFilePath = file ? `/uploads/employees/${file.filename}` : null;
 
   try {
     const requestedRole = await Role.findById(userData.role);
@@ -51,9 +59,11 @@ export const createUser = async (userData, file, isMaster, adminBranch) => {
       }
     }
 
-    if (file) userData.photo_url = `/uploads/employees/${file.filename}`;
+    if (userData.password === "") delete userData.password;
 
+    if (uploadedFilePath) userData.photo_url = uploadedFilePath;
     userData.employee_id = await generateEmployeeId(requestedRole.name);
+    
     userData.social_links = {
       facebook: userData.facebook || "",
       linkedin: userData.linkedin || "",
@@ -62,21 +72,32 @@ export const createUser = async (userData, file, isMaster, adminBranch) => {
       custom: userData.others || "",
     };
 
+    delete userData.facebook;
+    delete userData.linkedin;
+    delete userData.twitter;
+    delete userData.instagram;
+    delete userData.others;
+
     const newUser = new User(userData);
     await newUser.save();
     
-    return newUser;
+    const userObj = newUser.toObject();
+    delete userObj.password;
+    return userObj;
+
   } catch (error) {
     if (uploadedFilePath) deleteLocalFile(uploadedFilePath);
     throw error;
   }
 };
 
+// Modify Existing User
 export const modifyUser = async (userId, updateData, file, isMaster, adminBranch, branchFilter) => {
-  let uploadedFilePath = file ? file.path : null;
+  const uploadedFilePath = file ? `/uploads/employees/${file.filename}` : null;
 
   try {
-    const targetUser = await User.findOne({ _id: userId, ...branchFilter });
+    // 🚀 THE MAGIC FIX: added .select("+password") 
+    const targetUser = await User.findOne({ _id: userId, ...branchFilter }).select("+password");
     if (!targetUser) throw new AppError("User not found or access denied.", 404);
 
     if (!isMaster) {
@@ -86,13 +107,14 @@ export const modifyUser = async (userId, updateData, file, isMaster, adminBranch
           throw new AppError("Action blocked: Cannot elevate role to Master level.", 403);
         }
       }
-      updateData.branch = adminBranch;
+      updateData.branch = adminBranch; 
     }
 
-    if (!updateData.password) delete updateData.password;
-    if (file) {
-      if (targetUser.photo_url) deleteLocalFile(targetUser.photo_url);
-      updateData.photo_url = `/uploads/employees/${file.filename}`;
+    if (!updateData.password || updateData.password === "") delete updateData.password;
+
+    if (uploadedFilePath) {
+      if (targetUser.photo_url) deleteLocalFile(targetUser.photo_url); 
+      updateData.photo_url = uploadedFilePath;
     }
 
     updateData.social_links = {
@@ -103,38 +125,54 @@ export const modifyUser = async (userId, updateData, file, isMaster, adminBranch
       custom: updateData.others ?? targetUser.social_links?.custom ?? "",
     };
 
-    Object.assign(targetUser, updateData);
-    await targetUser.save();
+    delete updateData.facebook;
+    delete updateData.linkedin;
+    delete updateData.twitter;
+    delete updateData.instagram;
+    delete updateData.others;
 
-    return await targetUser.populate([
+    Object.assign(targetUser, updateData);
+    await targetUser.save(); // 🚀 Now Mongoose won't panic because password is present!
+
+    await targetUser.populate([
       { path: "branch", select: "branch_name branch_code" },
       { path: "role", select: "name is_system_role permissions" }
     ]);
+
+    const userObj = targetUser.toObject();
+    delete userObj.password; // সিকিউরিটির জন্য রেসপন্স থেকে আবার ডিলিট করে দিচ্ছি
+    return userObj;
+
   } catch (error) {
     if (uploadedFilePath) deleteLocalFile(uploadedFilePath);
     throw error;
   }
 };
 
+// Delete User
 export const removeUser = async (userId, branchFilter) => {
   const targetUser = await User.findOne({ _id: userId, ...branchFilter });
-  if (!targetUser) throw new AppError("User not found or access denied.", 404);
+  if (!targetUser) throw new AppError("User not found or already deleted.", 404);
 
   if (targetUser.photo_url) deleteLocalFile(targetUser.photo_url);
   await User.findByIdAndDelete(userId);
 };
 
+// Quick Status/Role Toggles
 export const changeUserStatus = async (userId, status, branchFilter) => {
-  const user = await User.findOne({ _id: userId, ...branchFilter }).select("-password");
-  if (!user) throw new AppError("User not found or access denied.", 404);
+  const user = await User.findOneAndUpdate(
+    { _id: userId, ...branchFilter },
+    { status },
+    { new: true }
+  ).select("-password");
 
-  user.status = status;
-  await user.save();
+  if (!user) throw new AppError("User not found or access denied.", 404);
   return user;
 };
 
 export const changeUserRole = async (userId, roleId, isMaster, branchFilter) => {
-  const user = await User.findOne({ _id: userId, ...branchFilter });
+  // 🚀 FIX: added .select("+password") here too, because we call .save() below
+  const user = await User.findOne({ _id: userId, ...branchFilter }).select("+password");
   if (!user) throw new AppError("User not found or access denied.", 404);
 
   const requestedRole = await Role.findById(roleId);
@@ -155,11 +193,16 @@ export const changeUserRole = async (userId, roleId, isMaster, branchFilter) => 
 };
 
 export const deleteUserImage = async (userId, branchFilter) => {
-  const user = await User.findOne({ _id: userId, ...branchFilter }).select("-password");
+  // 🚀 FIX: added .select("+password") because we call .save() below
+  const user = await User.findOne({ _id: userId, ...branchFilter }).select("+password");
   if (!user) throw new AppError("User not found or access denied.", 404);
 
   if (user.photo_url) deleteLocalFile(user.photo_url);
   user.photo_url = "";
+  
   await user.save();
-  return user;
+  
+  const userObj = user.toObject();
+  delete userObj.password;
+  return userObj;
 };

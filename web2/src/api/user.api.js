@@ -3,10 +3,9 @@ import { API } from "./axios.js";
 export const fetchUsers = async (page = 1, limit = 30, filters = {}) => {
   const params = new URLSearchParams({ page, limit, ...filters });
   const { data } = await API.get(`/users/all?${params}`);
-  return data;
+  return data; // Same pagination logic as students
 };
 
-// 🚀 FIXED: Unwrapping ApiResponse data
 export const fetchUserById = async (id) => {
   const { data } = await API.get(`/users/${id}`);
   return data.data; 
@@ -15,39 +14,39 @@ export const fetchUserById = async (id) => {
 export const fetchUserBySearch = async (query) => {
   if (!query.trim()) throw new Error("Search query is required");
   const { data } = await API.get(`/users/search?query=${encodeURIComponent(query.trim())}`);
-  return data;
+  return data.data;
 };
 
 export const addUser = async (formData) => {
   const { data } = await API.post("/users/create", formData, {
     headers: { "Content-Type": "multipart/form-data" },
   });
-  return data;
+  return data.data;
 };
 
 export const updateUser = async ({ id, formData }) => {
   const { data } = await API.put(`/users/${id}`, formData, {
     headers: { "Content-Type": "multipart/form-data" },
   });
-  return data;
+  return data.data;
 };
 
 export const updateUserStatus = async ({ id, status }) => {
   const { data } = await API.patch(`/users/update-status/${id}`, { status });
-  return data;
+  return data.data;
 };
 
 export const updateUserRole = async ({ id, role }) => {
   const { data } = await API.patch(`/users/${id}/role`, { role });
-  return data;
+  return data.data;
 };
 
 export const deleteUser = async (id) => {
   const { data } = await API.delete(`/users/${id}`);
-  return data;
+  return data.data;
 };
 
 export const removeUserPhoto = async (id) => {
   const { data } = await API.delete(`/users/${id}/image`);
-  return data;
+  return data.data;
 };

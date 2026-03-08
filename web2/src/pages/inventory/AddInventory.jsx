@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Package,
   Plus,
@@ -11,10 +11,11 @@ import {
 import { useNavigate } from "react-router-dom";
 import EntityForm from "../../components/common/EntityForm";
 import { useAddStockPurchase } from "../../hooks/useInventory";
-import { useBranches } from "../../hooks/useBranches"; // 🚀 Added
+import { useBranches } from "../../hooks/useBranches";
 import useAuth from "../../store/useAuth";
 import Loader from "../../components/Loader";
-import BranchDropdown from "../../components/common/BranchDropdown"; // 🚀 Added
+import BranchDropdown from "../../components/common/BranchDropdown";
+import { toast } from "react-hot-toast";
 
 const CATEGORIES = [
   "Meat",
@@ -27,7 +28,7 @@ const CATEGORIES = [
 ];
 const UNITS = ["kg", "g", "L", "ml", "pcs", "pkt", "box", "dozen"];
 
-// ... DynamicStockField component (Keep as it is) ...
+// --- DynamicStockField Component ---
 const DynamicStockField = ({ value = [], onChange }) => {
   const handleAddItem = () => {
     onChange([
@@ -37,7 +38,9 @@ const DynamicStockField = ({ value = [], onChange }) => {
   };
 
   const handleRemoveItem = (index) => {
-    onChange(value.filter((_, i) => i !== index));
+    if (value.length > 1) {
+      onChange(value.filter((_, i) => i !== index));
+    }
   };
 
   const handleItemChange = (index, field, val) => {
@@ -46,51 +49,53 @@ const DynamicStockField = ({ value = [], onChange }) => {
     onChange(newItems);
   };
 
-  const grandTotal = value.reduce(
-    (sum, item) => sum + (Number(item.rowTotal) || 0),
-    0,
+  const grandTotal = useMemo(
+    () => value.reduce((sum, item) => sum + (Number(item.rowTotal) || 0), 0),
+    [value],
   );
 
   return (
-    <div className="w-full bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden mb-6">
-      <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-2.5">
-          <div className="p-2 bg-teal-100 rounded-xl text-teal-600">
+    <div className="w-full bg-white rounded-[2rem] border border-slate-200 shadow-xl overflow-hidden mb-8">
+      <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-teal-600 rounded-2xl text-white shadow-lg shadow-teal-200">
             <Package size={20} />
           </div>
           <h3 className="text-sm font-black uppercase tracking-widest text-slate-700">
             Purchase Line Items
           </h3>
         </div>
-        <div className="flex items-center gap-3 bg-white px-4 py-2 rounded-2xl border border-slate-200 shadow-sm">
-          <Calculator size={16} className="text-teal-500" />
-          <span className="text-xs font-bold text-slate-500 uppercase tracking-tighter">
-            Running Total:
-          </span>
-          <span className="text-base font-black text-teal-600">
-            ৳{grandTotal.toLocaleString()}
-          </span>
+        <div className="flex items-center gap-4 bg-white px-5 py-2.5 rounded-2xl border border-slate-200 shadow-sm">
+          <div className="flex flex-col">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter leading-none">
+              Total Amount
+            </span>
+            <span className="text-xl font-black text-teal-600">
+              ৳{grandTotal.toLocaleString()}
+            </span>
+          </div>
+          <Calculator size={20} className="text-slate-300" />
         </div>
       </div>
 
-      <div className="p-4 lg:p-6 overflow-x-auto custom-scrollbar">
-        <div className="space-y-3 min-w-[800px]">
-          {/* Header Labels */}
-          <div className="flex gap-3 px-2 mb-1">
-            <label className="flex-[2] text-[10px] font-black text-slate-400 uppercase tracking-widest">
+      <div className="p-6 overflow-x-auto custom-scrollbar">
+        <div className="space-y-4 min-w-[850px]">
+          {/* Header */}
+          <div className="flex gap-4 px-2">
+            <label className="flex-[2.5] text-[10px] font-black text-slate-400 uppercase tracking-widest">
               Product Description
             </label>
-            <label className="flex-1 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">
+            <label className="flex-1 text-[10px] font-black text-slate-400 uppercase tracking-widest">
               Category
             </label>
             <label className="w-24 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">
-              Quantity
+              Qty
             </label>
             <label className="w-24 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">
               Unit
             </label>
             <label className="w-32 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">
-              Price (৳)
+              Row Total (৳)
             </label>
             <div className="w-10"></div>
           </div>
@@ -98,7 +103,7 @@ const DynamicStockField = ({ value = [], onChange }) => {
           {value.map((item, index) => (
             <div
               key={index}
-              className="flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-300"
+              className="flex items-center gap-4 group animate-in fade-in slide-in-from-top-1"
             >
               <input
                 type="text"
@@ -107,20 +112,19 @@ const DynamicStockField = ({ value = [], onChange }) => {
                 onChange={(e) =>
                   handleItemChange(index, "name", e.target.value)
                 }
-                placeholder="e.g. Fresh Chicken Breast"
-                className="flex-[2] px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:bg-white focus:ring-4 focus:ring-teal-500/5 focus:border-teal-500 outline-none transition-all"
+                placeholder="Item name..."
+                className="flex-[2.5] px-4 py-3.5 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm font-bold text-slate-700 focus:bg-white focus:border-teal-500 outline-none transition-all"
               />
-
               <select
                 required
                 value={item.category}
                 onChange={(e) =>
                   handleItemChange(index, "category", e.target.value)
                 }
-                className="flex-1 px-2 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:bg-white outline-none cursor-pointer transition-all"
+                className="flex-1 px-3 py-3.5 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm font-bold text-slate-700 focus:bg-white focus:border-teal-500 outline-none appearance-none"
               >
                 <option value="" disabled>
-                  Select...
+                  Category
                 </option>
                 {CATEGORIES.map((c) => (
                   <option key={c} value={c}>
@@ -128,7 +132,6 @@ const DynamicStockField = ({ value = [], onChange }) => {
                   </option>
                 ))}
               </select>
-
               <input
                 type="number"
                 required
@@ -136,17 +139,16 @@ const DynamicStockField = ({ value = [], onChange }) => {
                 step="any"
                 value={item.qty}
                 onChange={(e) => handleItemChange(index, "qty", e.target.value)}
-                placeholder="0.00"
-                className="w-24 px-2 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:bg-white outline-none text-center transition-all"
+                placeholder="0"
+                className="w-24 px-2 py-3.5 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm font-black text-center outline-none focus:border-teal-500 focus:bg-white"
               />
-
               <select
                 required
                 value={item.unit}
                 onChange={(e) =>
                   handleItemChange(index, "unit", e.target.value)
                 }
-                className="w-24 px-2 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:bg-white outline-none cursor-pointer transition-all"
+                className="w-24 px-2 py-3.5 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm font-bold text-center outline-none"
               >
                 {UNITS.map((u) => (
                   <option key={u} value={u}>
@@ -154,90 +156,98 @@ const DynamicStockField = ({ value = [], onChange }) => {
                   </option>
                 ))}
               </select>
-
               <input
                 type="number"
                 required
                 min="0"
-                step="any"
                 value={item.rowTotal}
                 onChange={(e) =>
                   handleItemChange(index, "rowTotal", e.target.value)
                 }
                 placeholder="0.00"
-                className="w-32 px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-black text-slate-800 focus:bg-white outline-none text-right transition-all"
+                className="w-32 px-4 py-3.5 bg-slate-100/50 border-2 border-slate-100 rounded-2xl text-sm font-black text-right text-teal-700 outline-none focus:bg-white focus:border-teal-500"
               />
-
               <button
                 type="button"
                 onClick={() => handleRemoveItem(index)}
-                disabled={value.length === 1}
-                className="w-10 h-10 flex items-center justify-center text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all disabled:opacity-0"
+                className="w-10 h-10 flex items-center justify-center text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
               >
-                <Trash2 size={16} />
+                <Trash2 size={18} />
               </button>
             </div>
           ))}
 
-          <div className="flex items-center justify-between pt-6 mt-4">
-            <button
-              type="button"
-              onClick={handleAddItem}
-              className="flex items-center justify-center gap-2 text-xs font-black text-teal-600 bg-teal-50 hover:bg-teal-100 px-5 py-3 rounded-xl transition-all active:scale-95 uppercase tracking-widest"
-            >
-              <Plus size={16} strokeWidth={3} /> Add New Row
-            </button>
-            <div className="text-right pr-12">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">
-                Grand Total Amount
-              </span>
-              <span className="text-3xl font-black text-slate-800 tracking-tighter">
-                ৳{grandTotal.toLocaleString()}
-              </span>
-            </div>
-          </div>
+          <button
+            type="button"
+            onClick={handleAddItem}
+            className="mt-4 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-teal-600 hover:bg-teal-50 px-6 py-4 rounded-2xl border-2 border-dashed border-teal-100 transition-all active:scale-95"
+          >
+            <Plus size={16} strokeWidth={3} /> Add Item to Invoice
+          </button>
         </div>
       </div>
     </div>
   );
 };
 
+// --- Main Page Component ---
 export default function AddInventory() {
   const navigate = useNavigate();
-  const { authUser, isMaster } = useAuth();
+  const { authUser, isMaster: checkMaster } = useAuth();
 
-  // 🚀 Logic to determine if user is super admin
-  const isSuper = isMaster ? isMaster() : authUser?.role === "superadmin";
+  // FIXED: Call checkMaster() function correctly
+  const isSuper = checkMaster();
 
-  // 🚀 Local state for branch selection (for Super Admin)
   const [selectedBranch, setSelectedBranch] = useState("");
 
-  // 🚀 Fetch branches for dropdown
-  const { data: branchesRes } = useBranches({}, { enabled: !!isSuper });
+  // FIXED: Directly receive branches array
+  const { data: branches = [] } = useBranches({}, { enabled: !!isSuper });
 
-  // 🚀 Set default branch on load
+  // Initializing branch
   useEffect(() => {
-    if (isSuper && branchesRes?.data?.length > 0 && !selectedBranch) {
-      setSelectedBranch(branchesRes.data[0]._id);
-    } else if (!isSuper) {
-      const branchId =
-        typeof authUser?.branch === "object"
-          ? authUser?.branch?._id
-          : authUser?.branch;
-      setSelectedBranch(branchId);
+    if (isSuper && branches.length > 0 && !selectedBranch) {
+      setSelectedBranch(branches[0]._id);
+    } else if (!isSuper && authUser?.branch) {
+      const bId =
+        typeof authUser.branch === "object"
+          ? authUser.branch._id
+          : authUser.branch;
+      setSelectedBranch(bId);
     }
-  }, [isSuper, branchesRes, authUser, selectedBranch]);
+  }, [isSuper, branches, authUser, selectedBranch]);
 
-  // Use the selected branch for the mutation
   const addStockMutation = useAddStockPurchase(selectedBranch);
 
-  if (!selectedBranch && !isSuper) {
-    return (
-      <div className="h-screen bg-[#e8f0f2] flex items-center justify-center">
-        <Loader />
-      </div>
-    );
-  }
+  const handleSubmit = async (formDataObj, rawFormData) => {
+    const { items, supplier, notes } = rawFormData;
+
+    if (!selectedBranch) return toast.error("Please select a target branch");
+
+    const payload = {
+      items: items.map((i) => ({
+        item_name: i.name,
+        category: i.category,
+        quantity: Number(i.qty),
+        unit: i.unit,
+        total_price: Number(i.rowTotal),
+      })),
+      total_cost: items.reduce(
+        (sum, item) => sum + (Number(item.rowTotal) || 0),
+        0,
+      ),
+      supplier: supplier || "Direct Purchase",
+      notes: notes || "",
+      branch: selectedBranch,
+    };
+
+    try {
+      await addStockMutation.mutateAsync(payload);
+      toast.success("Inventory updated and ledger record posted!");
+      navigate("/admin/inventory");
+    } catch (error) {
+      // toast is already handled in mutation onError usually
+    }
+  };
 
   const formConfig = [
     {
@@ -248,97 +258,67 @@ export default function AddInventory() {
         <DynamicStockField value={value || []} onChange={onChange} />
       ),
     },
-    { divider: true, title: "Invoice & Logistics", icon: FileText },
+    { divider: true, title: "Transaction Details", icon: FileText },
     {
       name: "supplier",
-      label: "Shop / Vendor Name",
+      label: "Vendor / Store",
       type: "text",
-      placeholder: "e.g. Karwan Bazar Wholesale",
-      required: false,
+      placeholder: "Karwan Bazar, Shop #42...",
       icon: Store,
     },
     {
       name: "notes",
-      label: "Reference / Internal Notes",
+      label: "Transaction Reference",
       type: "text",
-      placeholder: "Describe what this bazar is for...",
+      placeholder: "e.g. Bazar for Batch 14 graduation",
       fullWidth: true,
     },
   ];
 
-  const handleSubmit = async (formDataObj, rawFormData) => {
-    const { items, supplier, notes } = rawFormData;
-    const total_cost = items.reduce(
-      (acc, curr) => acc + (Number(curr.rowTotal) || 0),
-      0,
+  if (!selectedBranch && !isSuper)
+    return (
+      <div className="h-screen flex justify-center items-center">
+        <Loader />
+      </div>
     );
 
-    const payload = {
-      items: items.map((i) => ({
-        item_name: i.name,
-        category: i.category,
-        quantity: Number(i.qty),
-        unit: i.unit,
-        total_price: Number(i.rowTotal),
-      })),
-      total_cost,
-      supplier: supplier || "",
-      notes,
-      branch: selectedBranch, // 🚀 Uses the state value (can be changed by Super Admin)
-    };
-
-    try {
-      await addStockMutation.mutateAsync(payload);
-      navigate("/admin/inventory");
-    } catch (error) {
-      console.error("Stock addition failed", error);
-    }
-  };
-
   return (
-    <div className="min-h-screen p-4 md:p-8 lg:p-10 font-sans">
+    <div className="min-h-screen p-6 md:p-12 bg-[#F8FAFC]">
       <div className="max-w-6xl mx-auto">
-        {/* HEADER SECTION */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10 animate-in fade-in slide-in-from-left-4 duration-500">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div>
             <button
               onClick={() => navigate(-1)}
-              className="flex items-center gap-1.5 text-[10px] font-black text-slate-400 hover:text-teal-600 uppercase tracking-[0.2em] mb-4 transition-all w-fit group"
+              className="flex items-center gap-2 text-[10px] font-black text-slate-400 hover:text-teal-600 uppercase tracking-[0.2em] mb-6 transition-all group"
             >
               <ArrowLeft
                 size={14}
                 className="group-hover:-translate-x-1 transition-transform"
-              />{" "}
-              Back to Pantry
+              />
+              Back to Inventory
             </button>
-            <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">
+            <h1 className="text-4xl font-black text-slate-900 tracking-tight">
               Log Stock Purchase
             </h1>
-            <p className="text-slate-500 text-sm font-medium mt-1">
-              Record new inventory arrival and update financial ledger records.
+            <p className="text-slate-500 text-sm font-bold mt-2">
+              Record arrival of ingredients and auto-update stock levels.
             </p>
           </div>
 
-          {/* 🚀 SUPER ADMIN BRANCH SELECTOR */}
           {isSuper && (
-            <div className="flex flex-col items-start md:items-end gap-2">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                Target Campus
-              </span>
-              <BranchDropdown
-                isMaster={isSuper}
-                branches={branchesRes?.data || []}
-                value={selectedBranch}
-                onChange={setSelectedBranch}
-                showAllOption={false}
-                wrapperClassName="w-full md:w-64"
-              />
-            </div>
+            <BranchDropdown
+              isMaster={isSuper}
+              branches={branches} // FIXED: Using the clean branches array
+              value={selectedBranch}
+              onChange={setSelectedBranch}
+              showAllOption={false}
+              wrapperClassName="w-full md:w-64"
+            />
           )}
         </div>
 
-        {/* FORM CONTAINER */}
-        <div className="p-4 md:p-8">
+        {/* FIXED: Removed the white background and shadow from the form container */}
+        <div className="animate-in fade-in slide-in-from-bottom-8 duration-700">
           <EntityForm
             config={formConfig}
             initialData={{
@@ -350,7 +330,7 @@ export default function AddInventory() {
             onCancel={() => navigate("/admin/inventory")}
             isLoading={addStockMutation.isPending}
             buttonText="Post to Inventory & Ledger"
-            buttonColor="bg-slate-900 hover:bg-teal-600 shadow-xl shadow-slate-900/10"
+            buttonColor="bg-slate-900 hover:bg-teal-600"
             gridCols="grid-cols-1 md:grid-cols-2"
           />
         </div>

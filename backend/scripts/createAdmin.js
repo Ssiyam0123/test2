@@ -11,8 +11,8 @@ const createAdmin = async () => {
     await mongoose.connect(process.env.MONGO_URI || "mongodb://localhost:27017/cibdhk");
     console.log("🚀 MongoDB Connected...");
 
-    const adminEmail = "admin@gmail.com";
-    const adminUsername = "superadmin";
+    const adminEmail = "admin12@gmail.com";
+    const adminUsername = "suiii";
 
     // 🚀 2. FETCH THE SUPERADMIN ROLE FROM THE DATABASE
     const superAdminRole = await Role.findOne({ name: "superadmin" });
@@ -38,10 +38,8 @@ const createAdmin = async () => {
       email: adminEmail,
       full_name : "siyam",
       password: "123456", 
-      
-      role: superAdminRole._id, // 🚀 3. ASSIGN THE MONGODB OBJECT ID
-      
-      employee_id: "ADM-001",   // Fixed typo: changed from User_id to employee_id to match your schema
+      role: superAdminRole._id, 
+      employee_id: "ADM-001",   
       phone: "01700000000",
       designation: "Super Admin",
       department: "Management",

@@ -1,8 +1,6 @@
 import * as ReqService from "../services/requisition.service.js";
 import catchAsync from "../utils/catchAsync.js";
 import ApiResponse from "../utils/ApiResponse.js";
-// 🚀 ADD THIS IMPORT
-import Requisition from "../models/requisition.js"; 
 
 export const getClassRequisition = catchAsync(async (req, res) => {
   const requisition = await ReqService.getRequisitionByClass(req.params.classId, req.branchFilter);
@@ -25,14 +23,12 @@ export const rejectClassRequisition = catchAsync(async (req, res) => {
 });
 
 export const getAllRequisitions = catchAsync(async (req, res) => {
-
   const filter = { ...req.branchFilter };
   
-  if (req.query.branch) {
+  if (req.query.branch && req.query.branch !== "all") {
     filter.branch = req.query.branch;
   }
 
   const requisitions = await ReqService.getAllRequisitions(filter);
-  
   res.status(200).json(new ApiResponse(200, requisitions, "All requisitions fetched successfully"));
 });

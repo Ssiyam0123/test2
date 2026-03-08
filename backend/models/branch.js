@@ -23,7 +23,6 @@ const branchSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Index for fast branch-code lookups
 branchSchema.index({ branch_code: 1 });
 
 

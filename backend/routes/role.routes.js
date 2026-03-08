@@ -7,10 +7,9 @@ import { verifyToken, requirePermission } from "../middlewares/auth.js";
 const router = express.Router();
 
 router.use(verifyToken);
-
-router.post("/", requirePermission("manage_roles"), validate(createRoleSchema), createRole);
 router.get("/", requirePermission("manage_roles"), getRoles);
 router.get("/:id", requirePermission("manage_roles"), getRoleById);
+router.post("/", requirePermission("manage_roles"), validate(createRoleSchema), createRole);
 router.put("/:id", requirePermission("manage_roles"), validate(updateRoleSchema), updateRole);
 router.delete("/:id", requirePermission("manage_roles"), deleteRole);
 

@@ -1,26 +1,28 @@
-import React, { useState, useEffect } from "react";
-import { Check, X, Save, UserX } from "lucide-react";
+import React, { useState, useEffect, useMemo } from "react";
+import { Check, X, Save, UserX, Loader2 } from "lucide-react";
 import Avatar from "../../components/common/Avatar";
-import { useUpdateClassAttendance } from "../../hooks/useBatches"; 
+import { useUpdateClassAttendance } from "../../hooks/useClasses"; // 🚀 Ensure correct hook import
 import toast from "react-hot-toast";
 
 const AttendancePanel = ({ selectedClass, batchStudents }) => {
   const [attendanceState, setAttendanceState] = useState({});
   
+  // 🚀 Fetch mutation hook
   const { mutate: updateAttendance, isPending: isSaving } = useUpdateClassAttendance();
 
   useEffect(() => {
     if (selectedClass) {
       const initialState = {};
-      if (selectedClass.attendance?.length > 0) {
-        selectedClass.attendance.forEach(record => {
-          const studentId = typeof record.student === 'object' ? record.student._id : record.student;
-          initialState[studentId] = record.status; // Fetched from DB
-        });
-      }
+      // Initialize with existing records or default to null
+      batchStudents.forEach(student => {
+        const existing = selectedClass.attendance?.find(a => 
+          (a.student?._id || a.student) === student._id
+        );
+        initialState[student._id] = existing ? existing.status : null;
+      });
       setAttendanceState(initialState);
     }
-  }, [selectedClass]);
+  }, [selectedClass, batchStudents]);
 
   const markAttendance = (studentId, status) => {
     setAttendanceState(prev => ({
@@ -30,56 +32,55 @@ const AttendancePanel = ({ selectedClass, batchStudents }) => {
   };
 
   const handleSaveAttendance = () => {
-    if (!selectedClass || !selectedClass._id) {
-      toast.error("Error: Class information is missing.");
-      return;
+    if (!selectedClass?._id) {
+      return toast.error("Class ID is missing.");
     }
 
-    const attendanceRecords = Object.keys(attendanceState)
-      .map(studentId => {
-        const studentObj = batchStudents.find(s => s._id === studentId);
-        return {
-          student: studentId,
-          student_name: studentObj ? studentObj.student_name : "Unknown Student",
-          status: attendanceState[studentId]
-        };
-      })
-      .filter(record => record.status !== null);
+    // 🚀 MATCHES BACKEND ZOD: List of { student, status }
+    const attendanceRecords = Object.entries(attendanceState)
+      .filter(([_, status]) => status !== null)
+      .map(([studentId, status]) => ({
+        student: studentId,
+        status: status // Strictly "Present" or "Absent"
+      }));
 
-    const batchId = typeof selectedClass.batch === 'object' ? selectedClass.batch._id : selectedClass.batch;
+    const batchId = selectedClass.batch?._id || selectedClass.batch;
 
+    // 🚀 EXACT MATCH FOR REACT QUERY HOOK: { classId, batchId, payload }
     updateAttendance({ 
       classId: selectedClass._id, 
       batchId: batchId,
-      attendanceRecords 
-      // is_completed is not sent here, so it remains unchanged!
+      payload: {
+        attendanceRecords,
+        is_completed: selectedClass.is_completed // Keep status sync
+      }
+    }, {
+      onSuccess: () => toast.success("Records updated successfully!")
     });
   };
 
-  const validStudents = Array.isArray(batchStudents) 
-    ? batchStudents.filter(s => s && s._id)
-    : [];
+  const validStudents = useMemo(() => 
+    Array.isArray(batchStudents) ? batchStudents.filter(s => s && s._id) : []
+  , [batchStudents]);
 
   if (validStudents.length === 0) {
     return (
-      <div className="p-10 text-center text-gray-400">
+      <div className="p-10 text-center text-slate-300 border-2 border-dashed border-slate-100 rounded-3xl">
         <UserX className="mx-auto mb-3 opacity-20" size={48} />
-        <p className="text-sm font-bold">No students found in this batch.</p>
+        <p className="text-sm font-bold uppercase tracking-widest text-slate-400">No students enrolled.</p>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-full bg-white">
-      <div className="sticky top-0 z-20 p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/90 backdrop-blur-md">
+    <div className="flex flex-col h-full bg-white animate-in slide-in-from-right-4 duration-300">
+      <div className="sticky top-0 z-20 p-4 border-b border-slate-100 flex justify-between items-center bg-white/80 backdrop-blur-md">
         <div className="min-w-0">
-          <h3 className="text-sm font-black text-gray-800 truncate">
-            Class {selectedClass.class_number}
-          </h3>
-          <p className="text-[10px] font-bold text-teal-600 truncate">{selectedClass.topic}</p>
+          <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">Class Roster</h3>
+          <p className="text-[10px] font-bold text-teal-600 truncate uppercase tracking-widest">#{selectedClass.class_number} • {selectedClass.topic}</p>
         </div>
-        <span className="shrink-0 text-[10px] font-black bg-teal-100 text-teal-800 px-2 py-1 rounded-lg">
-          {validStudents.length} ENROLLED
+        <span className="shrink-0 text-[10px] font-black bg-slate-900 text-white px-3 py-1 rounded-lg">
+          {validStudents.length} TOTAL
         </span>
       </div>
 
@@ -92,32 +93,33 @@ const AttendancePanel = ({ selectedClass, batchStudents }) => {
               key={student._id} 
               onClick={() => markAttendance(student._id, 'Present')}
               className={`flex items-center justify-between p-3 rounded-2xl border transition-all active:scale-[0.98] cursor-pointer ${
-                status === 'Present' ? 'border-teal-200 bg-teal-50/50' : 
-                status === 'Absent' ? 'border-red-200 bg-red-50/50' : 
-                'border-gray-100 bg-white shadow-sm'
+                status === 'Present' ? 'border-teal-200 bg-teal-50/50 shadow-sm' : 
+                status === 'Absent' ? 'border-rose-200 bg-rose-50/50 shadow-sm' : 
+                'border-slate-100 bg-white hover:border-slate-300'
               }`}
             >
               <div className="flex items-center gap-3">
                 <Avatar src={student.photo_url} fallbackText={student.student_name} size="sm" />
                 <div className="leading-tight">
-                  <p className="text-xs font-bold text-gray-800">{student.student_name}</p>
-                  <p className="text-[9px] text-gray-400 font-medium uppercase tracking-tighter">{student.student_id}</p>
+                  <p className={`text-xs font-bold ${status === 'Absent' ? 'text-slate-400 line-through' : 'text-slate-800'}`}>
+                    {student.student_name}
+                  </p>
+                  <p className="text-[9px] text-slate-400 font-black uppercase tracking-tighter">{student.student_id}</p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-1.5 bg-white p-1 rounded-xl border border-gray-100" onClick={(e) => e.stopPropagation()}>
-                {/* 🚀 FIXED: Passing Capitalized Statuses */}
+              <div className="flex items-center gap-1.5 bg-white p-1 rounded-xl border border-slate-100 shadow-inner" onClick={(e) => e.stopPropagation()}>
                 <button
                   onClick={() => markAttendance(student._id, 'Present')}
-                  className={`p-1.5 rounded-lg transition-all ${status === 'Present' ? 'bg-teal-500 text-white shadow-lg shadow-teal-200' : 'text-gray-300'}`}
+                  className={`p-1.5 rounded-lg transition-all ${status === 'Present' ? 'bg-teal-500 text-white shadow-md' : 'text-slate-200 hover:text-teal-500'}`}
                 >
-                  <Check size={14} strokeWidth={3} />
+                  <Check size={14} strokeWidth={4} />
                 </button>
                 <button
                   onClick={() => markAttendance(student._id, 'Absent')}
-                  className={`p-1.5 rounded-lg transition-all ${status === 'Absent' ? 'bg-red-500 text-white shadow-lg shadow-red-200' : 'text-gray-300'}`}
+                  className={`p-1.5 rounded-lg transition-all ${status === 'Absent' ? 'bg-rose-500 text-white shadow-md' : 'text-slate-200 hover:text-rose-500'}`}
                 >
-                  <X size={14} strokeWidth={3} />
+                  <X size={14} strokeWidth={4} />
                 </button>
               </div>
             </div>
@@ -125,14 +127,14 @@ const AttendancePanel = ({ selectedClass, batchStudents }) => {
         })}
       </div>
 
-      <div className="p-4 border-t border-gray-100 bg-white pb-6 md:pb-4">
+      <div className="p-4 border-t border-slate-100 bg-slate-50/50">
         <button
           onClick={handleSaveAttendance}
-          disabled={isSaving || Object.keys(attendanceState).length === 0}
-          className="w-full py-4 bg-[#1e293b] hover:bg-slate-800 text-white text-[11px] font-black tracking-[0.2em] uppercase rounded-2xl flex items-center justify-center gap-2 transition-all disabled:opacity-30 shadow-xl active:scale-[0.95]"
+          disabled={isSaving}
+          className="w-full py-4 bg-slate-900 hover:bg-teal-600 text-white text-[11px] font-black tracking-[0.2em] uppercase rounded-2xl flex items-center justify-center gap-2 transition-all disabled:opacity-50 shadow-xl active:scale-95"
         >
-          <Save size={16} />
-          {isSaving ? "Syncing..." : "Update Records"}
+          {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+          {isSaving ? "Syncing Database..." : "Save Daily Records"}
         </button>
       </div>
     </div>

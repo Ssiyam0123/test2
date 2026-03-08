@@ -42,3 +42,4 @@ export const removeTopic = async (id) => {
   if (!deletedTopic) throw new AppError("Topic not found", 404);
   return deletedTopic;
 };
+

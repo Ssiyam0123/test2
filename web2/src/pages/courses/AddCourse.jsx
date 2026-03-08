@@ -140,9 +140,9 @@ const AddCourse = ({ mode = "add" }) => {
     { name: "is_active", label: "Course is Active & Enrolling", type: "checkbox" }
   ];
 
-  const handleSubmit = async (formDataInstance, rawData) => {
+  const handleSubmit = (formDataInstance, rawData) => {
     
-    // 🛡️ FRONTEND ZOD VALIDATION
+    // FRONTEND ZOD VALIDATION
     const validationResult = courseFormSchema.safeParse(rawData);
     if (!validationResult.success) {
       const firstError = validationResult.error.errors[0].message;
@@ -150,7 +150,6 @@ const AddCourse = ({ mode = "add" }) => {
       return;
     }
 
-    // 🚀 FIXED: Safely parsing additional_info to ensure it's an array
     const parsedAdditionalInfo = Array.isArray(rawData.additional_info) 
         ? rawData.additional_info 
         : (rawData.additional_info ? String(rawData.additional_info).split(',') : []);
@@ -163,19 +162,17 @@ const AddCourse = ({ mode = "add" }) => {
       base_fee: Number(rawData.base_fee), 
       description: String(rawData.description || "").trim(),
       additional_info: parsedAdditionalInfo,
-      // 🚀 FIXED: Boolean coercion for FormData checkboxes
       is_active: rawData.is_active === true || rawData.is_active === "true",
     };
 
-    try {
-      if (mode === "edit") {
-        await updateCourse.mutateAsync({ id, ...coursePayload });
-      } else {
-        await createCourse.mutateAsync(coursePayload);
-      }
-      setTimeout(() => navigate("/admin/all-courses"), 1000);
-    } catch (error) {
-      // Handled by tanstack
+    // FIXED: Navigation logic moved to onSuccess
+    const mutationConfig = { onSuccess: () => navigate("/admin/all-courses") };
+
+    if (mode === "edit") {
+      // FIXED: Passed coursePayload inside the 'formData' key to match the API expectation
+      updateCourse.mutate({ id, formData: coursePayload }, mutationConfig);
+    } else {
+      createCourse.mutate(coursePayload, mutationConfig);
     }
   };
 

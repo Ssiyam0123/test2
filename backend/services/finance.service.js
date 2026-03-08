@@ -4,7 +4,9 @@ import Payment from "../models/payment.js";
 import Student from "../models/student.js";
 import AppError from "../utils/AppError.js";
 
-// 🛠️ HELPER: Conditional Transaction Execution
+// ==========================================
+// 🛠️ HELPER: Safe Transaction Execution
+// ==========================================
 const executeTransaction = async (callback) => {
   const session = await mongoose.startSession();
   const isReplicaSet = mongoose.connection.getClient().topology.description.type.includes("ReplicaSet");
@@ -22,6 +24,9 @@ const executeTransaction = async (callback) => {
   }
 };
 
+// ==========================================
+// 🟢 Process Payment
+// ==========================================
 export const processPayment = async (paymentData, userId, branchFilter) => {
   return await executeTransaction(async (session, isReplicaSet) => {
     const opts = isReplicaSet ? { session } : {};
@@ -53,9 +58,12 @@ export const processPayment = async (paymentData, userId, branchFilter) => {
   });
 };
 
+// ==========================================
+// 🟢 Fetch Student Finance Data
+// ==========================================
 export const fetchStudentFinance = async (studentId, branchFilter) => {
   const fee_summary = await Fee.findOne({ student: studentId, ...branchFilter })
-    .populate("student", "student_name student_id photo_url") // 🚀 FIXED: Added Student Populate
+    .populate("student", "student_name student_id photo_url contact_number") 
     .populate("course", "course_name base_fee")
     .populate("discount_history.updated_by", "full_name")
     .lean();
@@ -70,6 +78,9 @@ export const fetchStudentFinance = async (studentId, branchFilter) => {
   return { fee_summary, transactions };
 };
 
+// ==========================================
+// 🟢 Fetch Campus Fees List
+// ==========================================
 export const fetchCampusFees = async (queryParams, branchFilter) => {
   const { status, search } = queryParams;
   let filter = { ...branchFilter };
@@ -81,7 +92,8 @@ export const fetchCampusFees = async (queryParams, branchFilter) => {
       ...branchFilter,
       $or: [
         { student_name: { $regex: search, $options: "i" } },
-        { student_id: { $regex: search, $options: "i" } }
+        { student_id: { $regex: search, $options: "i" } },
+        { contact_number: { $regex: search, $options: "i" } } // 🚀 Added contact_number for consistency
       ]
     }).select("_id").lean();
     
@@ -89,12 +101,15 @@ export const fetchCampusFees = async (queryParams, branchFilter) => {
   }
 
   return await Fee.find(filter)
-    .populate("student", "student_name student_id photo_url")
+    .populate("student", "student_name student_id photo_url contact_number")
     .populate("course", "course_name")
     .sort({ createdAt: -1 })
     .lean();
 };
 
+// ==========================================
+// 🟢 Modify Fee Discount
+// ==========================================
 export const modifyFeeDiscount = async (feeId, newDiscount, userId, branchFilter) => {
   const fee = await Fee.findOne({ _id: feeId, ...branchFilter });
   if (!fee) throw new AppError("Fee record not found or access denied.", 404);
@@ -112,8 +127,9 @@ export const modifyFeeDiscount = async (feeId, newDiscount, userId, branchFilter
   if (fee.paid_amount >= newNetPayable) newStatus = "Paid";
   else if (fee.paid_amount > 0) newStatus = "Partial";
 
-  const updatedFee = await Fee.findByIdAndUpdate(
-    feeId,
+  // 🚀 Fixed: Used findOneAndUpdate with branchFilter to prevent cross-branch ID hacking
+  const updatedFee = await Fee.findOneAndUpdate(
+    { _id: feeId, ...branchFilter },
     {
       $set: { discount: newDiscount, net_payable: newNetPayable, status: newStatus },
       $push: {
@@ -126,7 +142,7 @@ export const modifyFeeDiscount = async (feeId, newDiscount, userId, branchFilter
       }
     },
     { new: true } 
-  );
+  ).lean();
 
   return { isUnchanged: false, fee: updatedFee };
 };

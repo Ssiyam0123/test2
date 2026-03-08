@@ -14,7 +14,7 @@ const BranchDashboard = () => {
 
   // 🚀 Fetch the real data using the hook!
   const { data: statsRes, isLoading, isError } = useBranchStats(branchId);
-  const dashboardData = statsRes?.data;
+  const dashboardData = statsRes;
 
   // Handle Loading State
   if (isLoading) {

@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
-import { useAddUser, useUpdateUser } from "../../hooks/useUser.js";
+import { useAddUser, useUpdateUser } from "../../hooks//useUser.js"; // Fixed hook path
 import { useBranches } from "../../hooks/useBranches.js";
 import { useRoles } from "../../hooks/useRoles.js";
 import EntityForm from "../../components/common/EntityForm.jsx";
@@ -12,42 +12,45 @@ import { getEmployeeFormSchema } from "../../validators/zodSchemas.js";
 const AddEmployeeForm = ({ mode = "add", data = null, isLoading }) => {
   const navigate = useNavigate();
   const { authUser } = useAuth();
+  
+  // FIX 1: Safely extract branchId from context or authUser
   const context = useOutletContext() || {};
-  const { branchId } = context;
+  const branchId = context?.branchId || authUser?.branch?._id || authUser?.branch;
+
+  // Hoisted isMaster to the top so it can be used cleanly everywhere
+  const isMaster =
+    authUser?.permissions?.includes("all_access") ||
+    authUser?.role?.name === "superadmin" ||
+    authUser?.role === "superadmin";
 
   const addUserMutation = useAddUser();
   const updateUserMutation = useUpdateUser();
+  
   const { data: branchesResponse } = useBranches();
   const { data: rolesResponse, isFetching: rolesFetching } = useRoles();
 
   const [selectedBranch, setSelectedBranch] = useState(
-    data?.branch?._id || data?.branch || branchId,
+    data?.branch?._id || data?.branch || branchId || ""
   );
 
   useEffect(() => {
-    if (mode === "add" && branchId) setSelectedBranch(branchId);
-  }, [branchId, mode]);
+    if (mode === "add" && branchId && !selectedBranch) {
+      setSelectedBranch(branchId);
+    }
+  }, [branchId, mode, selectedBranch]);
 
+  // FIX 2: Safe Array extraction for Dropdowns
   const branchOptions = useMemo(() => {
-    if (!branchesResponse?.data) return [];
-    return branchesResponse.data.map((b) => ({
+    const branches = Array.isArray(branchesResponse) ? branchesResponse : branchesResponse?.data || [];
+    return branches.map((b) => ({
       value: b._id,
       label: b.branch_name,
     }));
   }, [branchesResponse]);
 
   const roleOptions = useMemo(() => {
-    if (!rolesResponse?.data) return [];
-    const userRole = (
-      typeof authUser?.role === "string"
-        ? authUser.role
-        : authUser?.role?.name || ""
-    ).toLowerCase();
-    const isMaster =
-      authUser?.permissions?.includes("all_access") ||
-      userRole === "superadmin";
-
-    return rolesResponse.data
+    const roles = Array.isArray(rolesResponse) ? rolesResponse : rolesResponse?.data || [];
+    return roles
       .filter((role) => {
         if (isMaster) return true;
         const targetRoleName = role.name.toLowerCase();
@@ -60,7 +63,7 @@ const AddEmployeeForm = ({ mode = "add", data = null, isLoading }) => {
         value: role._id,
         label: role.name.charAt(0).toUpperCase() + role.name.slice(1),
       }));
-  }, [rolesResponse, authUser]);
+  }, [rolesResponse, isMaster]);
 
   const initialData = useMemo(() => {
     if (mode === "edit" && data) {
@@ -82,7 +85,7 @@ const AddEmployeeForm = ({ mode = "add", data = null, isLoading }) => {
         instagram: data.social_links?.instagram || "",
         others: data.social_links?.custom || "",
         photo_url: data.photo_url || "",
-        branch: data.branch?._id || data.branch || branchId,
+        branch: data.branch?._id || data.branch || branchId || "",
       };
     }
     return {
@@ -105,11 +108,6 @@ const AddEmployeeForm = ({ mode = "add", data = null, isLoading }) => {
       branch: branchId || "",
     };
   }, [mode, data, branchId]);
-
-  const isMaster =
-    authUser?.permissions?.includes("all_access") ||
-    authUser?.role?.name === "superadmin" ||
-    authUser?.role === "superadmin";
 
   const employeeConfig = [
     { divider: true, name: "div-basic", title: "Basic Information" },
@@ -242,7 +240,7 @@ const AddEmployeeForm = ({ mode = "add", data = null, isLoading }) => {
       return;
     }
 
-    // 🚀 Clean up empty password for Edit
+    // Clean up empty password for Edit
     if (mode === "edit" && !formData.get("password")) {
       formData.delete("password");
     }
@@ -263,7 +261,8 @@ const AddEmployeeForm = ({ mode = "add", data = null, isLoading }) => {
     }
   };
 
-  if (!branchId || (isLoading && mode === "edit")) return <Loader />;
+  // Solved Infinite Loading
+  if ((!branchId && !isMaster) || (isLoading && mode === "edit")) return <Loader />;
 
   return (
     <div className="min-h-screen py-8 px-4">
@@ -271,6 +270,11 @@ const AddEmployeeForm = ({ mode = "add", data = null, isLoading }) => {
         key={data?._id || "new-emp"}
         title={
           mode === "edit" ? "Edit Employee Profile" : "Register New Employee"
+        }
+        subtitle={
+          mode === "edit"
+            ? "Update the system access and personal details of the employee."
+            : "Set up a new staff member and assign their system access roles."
         }
         config={employeeConfig}
         initialData={initialData}

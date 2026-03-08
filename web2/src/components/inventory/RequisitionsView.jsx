@@ -1,35 +1,52 @@
-import React, { useMemo } from "react";
-import { ClipboardList, CheckCircle2, ShoppingBag } from "lucide-react";
-import { useAllRequisitions } from "../../hooks/useRequisitions"; 
+import React, { useState } from "react";
+import { ClipboardList, CheckCircle2, ShoppingBag, Check, X, Loader2 } from "lucide-react";
+import { useAllRequisitions, useApproveRequisition, useRejectRequisition } from "../../hooks/useRequisitions"; 
 import Loader from "../../components/Loader";
+import { toast } from "react-hot-toast"; // assuming you use react-hot-toast
 
 export default function RequisitionsView({ branchId }) { 
-  const { data: res, isLoading } = useAllRequisitions(branchId);
-  console.log(res)
-  // 🚀 EXTENDED EXTRACTION: Added a few more common backend patterns
-  const reqList = useMemo(() => {
-    if (!res) return [];
-    if (Array.isArray(res)) return res;
-    if (Array.isArray(res?.data)) return res.data;
-    if (Array.isArray(res?.data?.data)) return res.data.data;
-    if (Array.isArray(res?.requisitions)) return res.requisitions;
-    if (Array.isArray(res?.data?.requisitions)) return res.data.requisitions;
-    return [];
-  }, [res]);
+  const { data: requisitions = [], isLoading } = useAllRequisitions(branchId);
+  
+  const approveMutation = useApproveRequisition();
+  const rejectMutation = useRejectRequisition();
+
+  // local loading state to track which ID is being processed
+  const [processingId, setProcessingId] = useState(null);
 
   if (isLoading) return <div className="py-20 flex justify-center"><Loader /></div>;
 
-  const pending = reqList.filter(r => r.status?.toLowerCase() === "pending");
+  const pending = requisitions.filter(r => r.status?.toLowerCase() === "pending");
+
+  const handleApprove = async (id) => {
+    setProcessingId(id);
+    try {
+      await approveMutation.mutateAsync({ id, payload: {} }); 
+      toast.success("Requisition Approved & Stock Updated!");
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Approval Failed");
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleReject = async (id) => {
+    const note = window.prompt("Enter rejection reason (optional):");
+    if (note === null) return; 
+
+    setProcessingId(id);
+    try {
+      await rejectMutation.mutateAsync({ id, admin_note: note });
+      toast.success("Requisition Rejected");
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Rejection Failed");
+    } finally {
+      setProcessingId(null);
+    }
+  };
 
   return (
     <div className="bg-white rounded-[2rem] border border-slate-200 shadow-xl overflow-hidden animate-in fade-in duration-300">
       
-      {/* 🛑 DEBUG BOX: এটা স্ক্রিনে দেখাবে ব্যাকএন্ড কী পাঠাচ্ছে */}
-      <div className="p-4 bg-slate-900 text-green-400 text-xs overflow-auto max-h-60 border-b-4 border-red-500">
-        <p className="text-white font-bold mb-2">👇 Bhai, ei black box er lekha gula amake copy kore de:</p>
-        <pre>{JSON.stringify(res, null, 2)}</pre>
-      </div>
-
       <div className="p-6 bg-amber-50/50 flex items-center justify-between border-b border-slate-100">
         <div className="flex items-center gap-2 text-amber-700">
           <ClipboardList size={20} />
@@ -47,31 +64,50 @@ export default function RequisitionsView({ branchId }) {
           pending.map(req => (
             <div 
               key={req._id} 
-              className="group p-5 border border-slate-200 rounded-2xl bg-white hover:border-amber-300 hover:shadow-md transition-all duration-300 cursor-default"
+              className="group p-5 border border-slate-200 rounded-2xl bg-white hover:border-amber-300 hover:shadow-md transition-all duration-300"
             >
-              <div className="flex justify-between items-center">
+              <div className="flex justify-between items-start">
                 <div>
                   <h4 className="font-bold text-slate-800">{req.class_content?.topic || "Custom Request"}</h4>
-                  <p className="text-xs font-bold text-slate-400 mt-1">By: {req.requested_by?.full_name || req.requested_by?.username || "Admin / Instructor"}</p>
+                  <p className="text-[10px] font-black text-indigo-600 mt-1 uppercase tracking-tighter">
+                    {req.batch?.batch_name || "N/A"} • Class {req.class_content?.class_number}
+                  </p>
+                  <p className="text-xs font-bold text-slate-400 mt-1">
+                    By: {req.requested_by?.full_name || "Instructor"}
+                  </p>
                 </div>
-                <span className="bg-amber-100 text-amber-700 text-[10px] font-black px-3 py-1 rounded-lg uppercase">Pending</span>
+
+                {/* ACTION BUTTONS */}
+                <div className="flex gap-2">
+                  <button 
+                    disabled={processingId === req._id}
+                    onClick={() => handleReject(req._id)}
+                    className="p-2 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-100 transition-colors disabled:opacity-50"
+                  >
+                    <X size={18} strokeWidth={3} />
+                  </button>
+                  <button 
+                    disabled={processingId === req._id}
+                    onClick={() => handleApprove(req._id)}
+                    className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 shadow-lg shadow-emerald-200 transition-all disabled:opacity-50"
+                  >
+                    {processingId === req._id ? <Loader2 size={16} className="animate-spin" /> : <Check size={18} strokeWidth={3} />}
+                    <span className="text-xs font-black uppercase tracking-widest">Approve</span>
+                  </button>
+                </div>
               </div>
 
-              <div className="max-h-0 opacity-0 overflow-hidden group-hover:max-h-[500px] group-hover:opacity-100 group-hover:mt-4 transition-all duration-500 ease-in-out">
-                <div className="pt-4 border-t border-slate-100">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1">
-                    <ShoppingBag size={12} /> Requested Ingredients:
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {req.items?.map((item, idx) => (
-                      <span key={idx} className="px-3 py-1.5 bg-slate-50 text-slate-700 text-[11px] font-bold rounded-lg border border-slate-200 capitalize shadow-sm">
-                        {item.item_name} <span className="text-amber-600 ml-1 font-black">x{item.quantity} {item.unit}</span>
-                      </span>
-                    ))}
-                    {(!req.items || req.items.length === 0) && (
-                      <span className="text-xs text-slate-400 italic">No items specified.</span>
-                    )}
-                  </div>
+              {/* Details on Hover / Always visible section */}
+              <div className="mt-4 pt-4 border-t border-slate-50">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1">
+                  <ShoppingBag size={12} /> Items to Issue:
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {req.items?.map((item, idx) => (
+                    <span key={idx} className="px-3 py-1.5 bg-slate-50 text-slate-700 text-[11px] font-bold rounded-lg border border-slate-200 capitalize">
+                      {item.item_name} <span className="text-amber-600 ml-1 font-black font-mono">x{item.quantity} {item.unit}</span>
+                    </span>
+                  ))}
                 </div>
               </div>
             </div>

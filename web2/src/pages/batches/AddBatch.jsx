@@ -13,59 +13,67 @@ import Loader from "../../components/Loader";
 
 const AddBatch = () => {
   const { id, batchId } = useParams(); 
-
   const editId = id || batchId;
   const isEditMode = !!editId;
   
   const navigate = useNavigate();
-  const { authUser } = useAuth();
-  
-  const roleName = typeof authUser?.role === 'string' ? authUser.role : authUser?.role?.name;
-  const isMaster = roleName === "superadmin" || authUser?.permissions?.includes("all_access");
-  
+  const { authUser, isMaster: checkMaster } = useAuth();
+  const isMaster = typeof checkMaster === 'function' ? checkMaster() : false;
+
   const [selectedBranch, setSelectedBranch] = useState(
-    !isMaster ? (typeof authUser?.branch === 'object' ? authUser?.branch?._id : authUser?.branch) : ""
+    !isMaster ? (authUser?.branch?._id || authUser?.branch) : ""
   );
 
-  const { data: batchRes, isLoading: batchLoading } = useBatchById(editId);
-  
-  const batchData = isEditMode ? (batchRes?.data?.data || batchRes?.data || batchRes) : null;
-
+  const { data: batchData, isLoading: batchLoading } = useBatchById(editId);
   const { mutate: createBatch, isPending: isCreating } = useCreateBatch();
   const { mutate: updateBatch, isPending: isUpdating } = useUpdateBatch();
   const isPending = isCreating || isUpdating;
 
-  const { data: coursesResponse, isLoading: coursesLoading } = useCourses();
-  const { data: branchesResponse, isLoading: branchesLoading } = useBranches();
-  
-  const { data: rolesResponse } = useRoles();
+  // 🚀 ১. ডাটা এক্সট্রাকশন (তোর রিকোয়ারমেন্ট অনুযায়ী)
+  const { data: coursesRes, isLoading: coursesLoading } = useCourses();
+  const courses = coursesRes?.data || []; // শুধুমাত্র কোর্স .data দিয়ে এক্সট্রাক্ট হচ্ছে
+
+  const { data: branches = [], isLoading: branchesLoading } = useBranches();
+  const { data: roles = [] } = useRoles();
+
   const instructorRoleId = useMemo(() => {
-     if (!rolesResponse?.data) return null;
-     const instructorRole = rolesResponse.data.find(r => r.name.toLowerCase() === "instructor");
-     return instructorRole?._id;
-  }, [rolesResponse]);
+     return roles.find(r => r?.name?.toLowerCase() === "instructor")?._id;
+  }, [roles]);
 
   useEffect(() => {
     if (isEditMode && batchData) {
-      const branchId = batchData.branch?._id || batchData.branch;
-      if (branchId) setSelectedBranch(branchId);
+      const bId = batchData.branch?._id || batchData.branch;
+      if (bId) setSelectedBranch(bId);
     }
   }, [isEditMode, batchData]);
 
-  const { data: instructorsResponse } = useUsers(
+  // 🚀 ২. ক্লিন API প্যারামিটার (যাতে undefined না যায়)
+  const userFilters = useMemo(() => {
+    const filters = {};
+    if (instructorRoleId) filters.role = instructorRoleId;
+    if (selectedBranch) filters.branch = selectedBranch;
+    return filters;
+  }, [instructorRoleId, selectedBranch]);
+
+  const { data: instructorsRes } = useUsers(
     1, 100, 
-    { 
-      ...(instructorRoleId ? { role: instructorRoleId } : {}), 
-      ...(selectedBranch ? { branch: selectedBranch } : {}) 
-    },
+    userFilters,
     { enabled: !!instructorRoleId && !!selectedBranch } 
   );
+  
+  // useUsers সাধারণত paginated ডাটা দেয়, তাই সেফটির জন্য চেক রাখা হলো
+  const instructors = Array.isArray(instructorsRes?.data) ? instructorsRes.data : (Array.isArray(instructorsRes) ? instructorsRes : []);
 
   const initialData = useMemo(() => {
-    if (!isEditMode) return {}; 
-    if (!batchData || Object.keys(batchData).length === 0) return null;
+    if (!isEditMode) return { schedule_days: [], status: "Active" }; 
+    if (!batchData) return null;
     
-    // console.log("Loaded Batch Data for Edit:", batchData);
+    // 🛡️ সেফ ডেট পার্সিং (যাতে ইনভ্যালিড ডেটের কারণে পেজ ক্র্যাশ না করে)
+    let safeStartDate = "";
+    if (batchData.start_date) {
+      const d = new Date(batchData.start_date);
+      if (!isNaN(d.getTime())) safeStartDate = d.toISOString().split('T')[0];
+    }
 
     return {
       batch_name: batchData.batch_name || "",
@@ -75,58 +83,35 @@ const AddBatch = () => {
       schedule_days: batchData.schedule_days || [],
       start_time: batchData.time_slot?.start_time || "",
       end_time: batchData.time_slot?.end_time || "",
-      start_date: batchData.start_date ? new Date(batchData.start_date).toISOString().split('T')[0] : "",
+      start_date: safeStartDate,
       status: batchData.status || "Active"
     };
   }, [isEditMode, batchData]);
 
-  const branchOptions = useMemo(() => {
-    if (!branchesResponse?.data) return [];
-    return branchesResponse.data.map(b => ({ value: b._id, label: b.branch_name }));
-  }, [branchesResponse]);
-
-  const courseOptions = useMemo(() => {
-    const coursesArray = Array.isArray(coursesResponse) ? coursesResponse : coursesResponse?.data;
-    return coursesArray?.map((c) => ({ value: c._id, label: c.course_name })) || [];
-  }, [coursesResponse]);
-
-  const instructorOptions = useMemo(() => {
-    let instructorsArray = instructorsResponse?.data || [];
-    if (selectedBranch && !isEditMode) {
-      instructorsArray = instructorsArray.filter(inst => inst.branch === selectedBranch || inst.branch?._id === selectedBranch);
-    }
-    return instructorsArray.map((inst) => ({
-      value: inst._id,
-      label: inst.full_name, 
-    }));
-  }, [instructorsResponse, selectedBranch, isEditMode]);
-
   const batchConfig = [
     { name: "batch_name", label: "Batch Title", placeholder: "e.g. Morning Professional Intake", required: true },
-    
     ...(isMaster ? [{
-      name: "branch", label: "Campus / Location", type: "select", options: branchOptions, required: true,
+      name: "branch", label: "Campus / Location", type: "select", 
+      options: branches.map(b => ({ value: b._id, label: b.branch_name })), 
+      required: true,
       defaultOption: "Select Campus",
       onChange: (e) => setSelectedBranch(e?.target ? e.target.value : e)
     }] : []),
-
-    { name: "course", label: "Associated Course", type: "select", options: courseOptions, required: true, defaultOption: "Select Course" },
-
-    ...(selectedBranch ? [{
-      name: "instructors", label: "Assign Instructors (Select all that apply)", type: "checkbox-group", options: instructorOptions, required: true, 
-    }] : []),
-
+    { 
+      name: "course", label: "Associated Course", type: "select", 
+      options: courses.map(c => ({ value: c._id, label: c.course_name })), 
+      required: true, defaultOption: "Select Course" 
+    },
+    {
+      name: "instructors", label: "Assign Instructors", type: "checkbox-group", 
+      options: instructors.map(inst => ({ value: inst._id, label: inst.full_name })), 
+      required: true, 
+    },
     {
       name: "schedule_days", label: "Select Class Days", type: "checkbox-group",
-      options: [
-        { value: "Saturday", label: "Saturday" }, { value: "Sunday", label: "Sunday" },
-        { value: "Monday", label: "Monday" }, { value: "Tuesday", label: "Tuesday" },
-        { value: "Wednesday", label: "Wednesday" }, { value: "Thursday", label: "Thursday" },
-        { value: "Friday", label: "Friday" },
-      ],
+      options: ["Saturday", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday"].map(d => ({ value: d, label: d })),
       required: true,
     },
-
     { name: "start_time", label: "Class Start Time", type: "time", required: true },
     { name: "end_time", label: "Class End Time", type: "time", required: true },
     { name: "start_date", label: "Official Start Date", type: "date", required: true },
@@ -134,35 +119,60 @@ const AddBatch = () => {
   ];
 
   const handleSubmit = (formData, jsonPayload) => {
-    const finalBranch = !isMaster ? (typeof authUser?.branch === 'object' ? authUser?.branch?._id : authUser?.branch) : jsonPayload.branch;
-    jsonPayload.branch = finalBranch;
-
-    const mode = isEditMode ? "edit" : "add";
-    const validationResult = getBatchFormSchema(mode).safeParse(jsonPayload);
+    const finalBranch = !isMaster ? (authUser?.branch?._id || authUser?.branch) : jsonPayload.branch;
     
-    if (!validationResult.success) {
-      const firstError = validationResult.error.errors[0].message;
-      Swal.fire({ icon: "error", title: "Validation Failed", text: firstError });
-      return; 
+    if (!finalBranch) {
+      return Swal.fire("Error", "Please select a valid campus/branch.", "error");
     }
 
-    const { start_time, end_time, ...restOfPayload } = jsonPayload;
-    const finalPayload = {
-      ...restOfPayload,
-      time_slot: { start_time, end_time },
-      branch: finalBranch
+    // 🚀 ৩. SECURITY FIX: পুরনো ব্রাঞ্চের ইন্সট্রাক্টর ফিল্টার আউট করা
+    const validInstructorIds = instructors.map(inst => inst._id);
+    const safeInstructors = (jsonPayload.instructors || []).filter(id => validInstructorIds.includes(id));
+
+    // যদি ইউজার ব্রাঞ্চ চেঞ্জ করার পর নতুন ইন্সট্রাক্টর সিলেক্ট করতে ভুলে যায়
+    if (safeInstructors.length === 0 && (jsonPayload.instructors || []).length > 0) {
+      return Swal.fire("Instructor Mismatch", "The selected instructors do not belong to the chosen branch. Please re-assign instructors for this branch.", "error");
+    }
+
+    const payloadToValidate = { 
+      ...jsonPayload, 
+      branch: finalBranch,
+      instructors: safeInstructors 
+    };
+    
+    const validationResult = getBatchFormSchema(isEditMode ? "edit" : "add").safeParse(payloadToValidate);
+    
+    if (!validationResult.success) {
+      const errorIssues = validationResult.error?.issues || validationResult.error?.errors || [];
+      const firstError = errorIssues[0]?.message || "Please fill all required fields correctly.";
+      return Swal.fire({ icon: "error", title: "Validation Failed", text: firstError });
+    }
+
+    const { start_time, end_time, ...rest } = payloadToValidate;
+    const finalPayload = { 
+      ...rest, 
+      time_slot: { start_time, end_time } 
+    };
+
+    const mutationOptions = { 
+      onSuccess: () => {
+        Swal.fire("Success!", `Batch successfully ${isEditMode ? "updated" : "created"}.`, "success");
+        navigate("/admin/manage-batches");
+      },
+      onError: (err) => {
+        const errorMsg = err.response?.data?.message || err.message || "Failed to connect to server.";
+        Swal.fire("Server Error", `Operation failed: ${errorMsg}`, "error");
+      }
     };
 
     if (isEditMode) {
-      updateBatch({ id: editId, ...finalPayload }, { onSuccess: () => navigate("/admin/manage-batches") });
+      updateBatch({ id: editId, ...finalPayload }, mutationOptions);
     } else {
-      createBatch(finalPayload, { onSuccess: () => navigate("/admin/manage-batches") });
+      createBatch(finalPayload, mutationOptions);
     }
   };
 
-  const isReady = !isEditMode || (isEditMode && initialData && Object.keys(initialData).length > 0);
-
-  if (coursesLoading || branchesLoading || (isEditMode && batchLoading) || !isReady) {
+  if (coursesLoading || branchesLoading || (isEditMode && batchLoading) || (isEditMode && !initialData)) {
     return <Loader />;
   }
 
@@ -171,13 +181,14 @@ const AddBatch = () => {
       <EntityForm
         key={editId || "add"} 
         title={isEditMode ? "Update Batch" : "Initialize Batch"}
-        subtitle={isEditMode ? `Editing configurations for ${initialData.batch_name}` : "Select the specific days and times to generate a custom schedule."}
+        subtitle={isEditMode ? `Editing configurations for ${initialData?.batch_name || 'Batch'}` : "Generate a custom schedule for a new intake."}
         config={batchConfig}
         initialData={initialData} 
         onSubmit={handleSubmit}
         isLoading={isPending}
         buttonText={isEditMode ? "Save Changes" : "Create Batch"}
         onCancel={() => navigate("/admin/manage-batches")}
+        buttonColor="bg-slate-900 hover:bg-teal-600 shadow-xl"
       />
     </div>
   );

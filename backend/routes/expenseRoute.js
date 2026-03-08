@@ -4,10 +4,6 @@ import { verifyToken, requirePermission, injectBranchFilter } from "../middlewar
 
 const router = express.Router();
 
-// ==========================================
-// READ ROUTES
-// ==========================================
-// 🚀 SECURED: Tied to view_finance, and strictly locked to user's branch
 router.get("/", verifyToken, requirePermission("view_finance"), injectBranchFilter, getExpenses);
 
 export default router;

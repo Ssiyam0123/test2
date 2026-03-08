@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCourses, useDeleteCourse, useToggleCourseStatus } from "../../hooks/useCourses";
-import useAuth from "../../store/useAuth"; // 🚀 Import useAuth for PBAC
-import { PERMISSIONS } from "../../utils/permissions"; // 🚀 Import Permissions Dictionary
-import { confirmDelete } from "../../utils/swalUtils"; // 🚀 Import Swal Utility
+import useAuth from "../../store/useAuth"; 
+import { confirmDelete } from "../../utils/swalUtils"; 
+import PermissionGuard from "../../components/common/PermissionGuard"; 
+import { PERMISSIONS } from "../../config/permissionConfig";
 
 // Components
 import CourseFilters from "../../components/Search_filter/CourseFilters";
@@ -17,11 +18,10 @@ import { Edit, Trash2, BookOpen, Hash, Clock, Power, PowerOff } from "lucide-rea
 
 const AllCourses = () => {
   const navigate = useNavigate();
-  const { authUser } = useAuth(); // 🚀 Extract auth user
+  const { authUser, hasPermission } = useAuth();
   
-  // 🚀 PBAC DYNAMIC SECURITY CHECKS
   const isMaster = authUser?.permissions?.includes("all_access") || authUser?.role === "superadmin" || authUser?.role?.name === "superadmin";
-  const canManageCourses = isMaster || authUser?.permissions?.includes(PERMISSIONS.MANAGE_COURSES);
+  const canManageCourses = isMaster || hasPermission(PERMISSIONS.MANAGE_COURSES);
 
   const [page, setPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
@@ -39,16 +39,17 @@ const AllCourses = () => {
     ...(statusFilter !== "all" && { is_active: statusFilter === "active" })
   }), [debouncedSearch, statusFilter]);
   
-  const { data, isLoading, error, refetch, isRefetching } = useCourses(page, limit, filters);
+  const { data: coursesRes, isLoading, error, refetch, isRefetching } = useCourses(page, limit, filters);
   const deleteCourseMutation = useDeleteCourse();
   const toggleStatusMutation = useToggleCourseStatus();
   
-  const courses = data?.data || [];
-  const pagination = data?.pagination;
+  const courses = coursesRes?.data|| [];
+  const pagination = coursesRes?.pagination;
+
+  // console.log(coursesRes)
 
   useEffect(() => { setPage(1); }, [filters]);
 
-  // 🚀 DYNAMIC DELETE HANDLER WITH SWAL
   const handleDeleteClick = (id, courseName) => {
     confirmDelete({
       title: "Delete Course?",
@@ -62,7 +63,6 @@ const AllCourses = () => {
 
   if (error) return <DataErrorState error={error} onRetry={refetch} isRetrying={isRefetching} />;
 
-  // 🚀 Dynamically hide the "Actions" column header if the user doesn't have permission
   const columns = [
     { label: "Course Details" },
     { label: "Code" },
@@ -108,8 +108,7 @@ const AllCourses = () => {
         </span>
       </td>
 
-      {/* 🚀 Protect the action buttons rendering */}
-      {canManageCourses && (
+      <PermissionGuard requiredPermission={PERMISSIONS.MANAGE_COURSES}>
         <td className="px-5 py-4 text-right">
           <div className="flex items-center justify-end space-x-1.5">
             <ActionIconButton 
@@ -134,7 +133,7 @@ const AllCourses = () => {
             />
           </div>
         </td>
-      )}
+      </PermissionGuard>
     </tr>
   );
 
@@ -143,9 +142,9 @@ const AllCourses = () => {
       <PageHeader 
         title="Course Management"
         subtitle={`Total active courses: ${pagination?.total || 0}`}
-        // 🚀 Remove the Add Course button if they lack permissions
-        onAdd={canManageCourses ? () => navigate("/admin/add-course") : null}
+        onAdd={() => navigate("/admin/add-course")}
         addText="Add Course"
+        addPermission={PERMISSIONS.MANAGE_COURSES} 
       />
 
       <div className="mb-6">

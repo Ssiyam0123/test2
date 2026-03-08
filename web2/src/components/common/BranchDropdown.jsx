@@ -7,9 +7,8 @@ export default function BranchDropdown({
   value, 
   onChange, 
   showAllOption = true,
-  wrapperClassName = "flex justify-end mb-6" // ডিফল্ট স্টাইল, চাইলে বাইরে থেকে ওভাররাইড করা যাবে
+  wrapperClassName = "flex justify-end mb-6" 
 }) {
-  // যদি ইউজার সুপারঅ্যাডমিন না হয়, তাহলে এটা কিছুই রেন্ডার করবে না
   if (!isMaster) return null;
 
   return (

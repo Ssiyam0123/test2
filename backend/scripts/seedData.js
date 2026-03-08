@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import { faker } from "@faker-js/faker";
 import dotenv from "dotenv";
-import { addDays, subDays } from "date-fns";
+import { addDays, subMonths } from "date-fns";
 
 // Models
 import User from "../models/user.js";
@@ -9,241 +9,155 @@ import Course from "../models/course.js";
 import Batch from "../models/batch.js";
 import Student from "../models/student.js";
 import ClassContent from "../models/classContent.js";
-import Comment from "../models/comment.js";
 import Branch from "../models/branch.js"; 
 import Inventory from "../models/inventory.js";
-import Expense from "../models/expense.js";
 import Fee from "../models/fee.js";
 import Payment from "../models/payment.js";
-import StockTransaction from "../models/stockTransaction.js";
 import Role from "../models/role.js"; 
+import MasterSyllabus from "../models/masterSyllabus.js";
 
 dotenv.config();
 
-const CONFIG = {
-  BRANCHES: [
-    { name: "CIB Dhaka Main", code: "DHK" },
-    { name: "CIB Chittagong", code: "CTG" },
-    { name: "CIB Sylhet", code: "SYL" }
-  ],
-  NUM_INSTRUCTORS_PER_BRANCH: 2,
-  NUM_COURSES: 5,
-  BATCH_STUDENT_COUNTS: [12, 15, 10], 
-  CLASSES_PER_BATCH: 6,
-  INVENTORY_ITEMS: [
-    { name: "Chicken", category: "Meat", unit: "kg" },
-    { name: "Flour", category: "Dry Goods", unit: "kg" },
-    { name: "Milk", category: "Dairy", unit: "L" },
-    { name: "Butter", category: "Dairy", unit: "g" },
-    { name: "Chef Knife", category: "Equipment", unit: "pcs" }
-  ]
-};
-
-const MONGO_URI = process.env.MONGO_URI || "mongodb://localhost:27017/cibdhk";
-
 const seedDatabase = async () => {
   try {
-    console.log("🚀 Connecting to MongoDB...");
-    await mongoose.connect(MONGO_URI);
+    console.log("🚀 Syncing with MongoDB Compass Structure...");
+    await mongoose.connect(process.env.MONGO_URI || "mongodb://localhost:27017/cibdhk_test");
 
-    // 🚀 FETCH THE INSTRUCTOR ROLE ID FIRST
-    const instructorRole = await Role.findOne({ name: "instructor" });
-    if (!instructorRole) {
-      throw new Error("Instructor role not found! Please run node scripts/migrateRoles.js first.");
+    console.log("🔐 Synchronizing Roles & Permissions Matrix...");
+    
+    const superadminPerms = [
+      "view_dashboard", "manage_users", "view_roles", "manage_roles",
+      "view_branches", "manage_branches", "view_courses", "manage_courses",
+      "view_batches", "manage_batches", "view_students", "manage_students",
+      "view_finance", "manage_finance", "view_inventory", "manage_inventory",
+      "view_requisitions", "manage_requisitions", "view_attendance", "manage_attendance",
+      "view_reports", "view_settings", "manage_settings"
+    ];
+
+    const rolesToEnsure = [
+      { name: "superadmin", description: "Full System Access", permissions: superadminPerms, is_system_role: true },
+      { name: "admin", description: "Branch Management Access", permissions: ["view_dashboard", "view_students", "manage_students"], is_system_role: true },
+      { name: "registrar", description: "Handles student admissions and basic records.", permissions: ["view_students", "manage_students"], is_system_role: true },
+      { name: "instructor", description: "Class & Student Management", permissions: ["view_dashboard", "view_courses", "manage_attendance"], is_system_role: true },
+      { name: "staff", description: "General campus staff.", permissions: ["view_dashboard"], is_system_role: true }
+    ];
+
+    for (const r of rolesToEnsure) {
+      await Role.findOneAndUpdate({ name: r.name }, r, { upsert: true, new: true });
     }
 
-    console.log("🧹 Cleaning existing data (Keeping Superadmins & Roles)...");
-    // Notice we DO NOT delete the Roles collection here
+    const superRole = await Role.findOne({ name: "superadmin" });
+    const instRole = await Role.findOne({ name: "instructor" });
+
+    // 🧹 STEP 2: DEEP CLEAN (Except Roles)
+    console.log("🧹 Clearing collections for fresh analytics...");
     await Promise.all([
-      Branch.deleteMany({}),
-      User.deleteMany({ role: { $ne: await Role.findOne({ name: "superadmin" }).then(r => r?._id) } }), // Keep superadmins safe
-      Course.deleteMany({}),
-      Batch.deleteMany({}),
-      Student.deleteMany({}),
-      ClassContent.deleteMany({}),
-      Comment.deleteMany({}),
-      Inventory.deleteMany({}),
-      StockTransaction.deleteMany({}),
-      Expense.deleteMany({}),
-      Fee.deleteMany({}),
-      Payment.deleteMany({})
+      Branch.deleteMany({}), User.deleteMany({}), Course.deleteMany({}),
+      Batch.deleteMany({}), Student.deleteMany({}), ClassContent.deleteMany({}),
+      Inventory.deleteMany({}), Fee.deleteMany({}), Payment.deleteMany({}),
+      MasterSyllabus.deleteMany({})
     ]);
 
-    // 1. Create Branches
-    console.log("🏢 Creating Branches...");
-    const createdBranches = await Promise.all(
-      CONFIG.BRANCHES.map(b => Branch.create({
-        branch_name: b.name,
-        branch_code: b.code,
-        address: faker.location.streetAddress(),
-        contact_email: `contact@${b.code.toLowerCase()}.cib.com`,
-        contact_phone: faker.phone.number(),
-        is_active: true
-      }))
-    );
+    // 🏢 STEP 3: INFRASTRUCTURE
+    console.log("🏢 Building Campuses...");
+    const branches = await Branch.insertMany([
+      { branch_name: "Dhaka HQ", branch_code: "DHK", address: "Dhanmondi", is_active: true },
+      { branch_name: "Chittagong", branch_code: "CTG", address: "Agrabad", is_active: true }
+    ]);
 
-    // 2. Create Global Courses with Base Fees
-    console.log("📚 Creating Courses with Fee Structures...");
-    const courses = [];
-    const baseFees = [25000, 35000, 45000, 50000, 60000];
-    for (let i = 0; i < CONFIG.NUM_COURSES; i++) {
-      courses.push(await Course.create({
-        course_name: `${faker.commerce.productName()} Culinary Arts`,
-        course_code: `CRS-${faker.string.alphanumeric(3).toUpperCase()}`,
-        duration: { value: 3, unit: "months" },
-        base_fee: baseFees[i] || 30000,
-        description: faker.lorem.sentence(),
-        is_active: true
-      }));
+    // 👑 STEP 4: CREATE SIYAM ADMIN
+    console.log("👑 Onboarding Master Superadmin...");
+    await User.create({
+      username: "suiii",
+      email: "admin12@gmail.com",
+      full_name: "Siyam Admin",
+      password: "password123", 
+      role: superRole._id,
+      branch: branches[0]._id, 
+      employee_id: "ADM-001",
+      status: "Active"
+    });
+
+    // 📚 STEP 5: SYLLABUS & COURSES
+    const courses = await Course.insertMany([
+        { course_name: "Culinary Arts", course_code: "CAD", base_fee: 70000, duration: { value: 6, unit: "months" } }
+    ]);
+
+    const masterTopics = [];
+    for(let i=1; i<=5; i++) {
+        masterTopics.push({ topic: `Topic ${i}: Culinary Skills`, category: "General", order_index: i });
     }
+    await MasterSyllabus.insertMany(masterTopics);
 
-    // 3. Create Instructors
-    console.log("👨‍🍳 Creating Branch-specific Instructors...");
-    const allInstructors = [];
-    for (const branch of createdBranches) {
-      for (let i = 0; i < CONFIG.NUM_INSTRUCTORS_PER_BRANCH; i++) {
-        allInstructors.push(await User.create({
-          username: faker.internet.username().toLowerCase(), 
-          email: faker.internet.email().toLowerCase(),
-          password: "password123", 
-          role: instructorRole._id, // 🚀 FIXED: Now passing the ObjectId!
-          full_name: faker.person.fullName(),
-          employee_id: `EMP-${branch.branch_code}-${faker.string.numeric(4)}`,
-          designation: "Chef Instructor",
-          branch: branch._id,
-          status: "Active"
-        }));
-      }
-    }
-
-    // 4. Seed Inventory & Log Purchase Expenses
-    console.log("📦 Stocking Kitchens & Logging Expenses...");
-    for (const branch of createdBranches) {
-      // ✅ NEW WAY
-const branchInstructor = allInstructors.find(ins => String(ins.branch) === String(branch._id));
-      
-      for (const item of CONFIG.INVENTORY_ITEMS) {
-        const qty = faker.number.int({ min: 20, max: 100 });
-        const cost = qty * faker.number.int({ min: 100, max: 400 });
-        
-        const invItem = await Inventory.create({
-          branch: branch._id,
-          item_name: item.name.toLowerCase(),
-          category: item.category,
-          unit: item.unit,
-          quantity_in_stock: qty,
-          reorder_threshold: 5
-        });
-
-        await StockTransaction.create({
-          inventory_item: invItem._id,
-          branch: branch._id,
-          transaction_type: "PURCHASE",
-          quantity: qty,
-          total_cost: cost,
-          performed_by: branchInstructor._id
-        });
-
-        await Expense.create({
-          title: `Initial Pantry Stock: ${item.name}`,
-          amount: cost,
-          branch: branch._id,
-          recorded_by: branchInstructor._id,
-          date_incurred: subDays(new Date(), 5)
-        });
-      }
-    }
-
-    // 5. Create Batches, Students & Financial Ledgers
-    console.log("🎓 Processing Admissions & Installments...");
-    for (let i = 0; i < createdBranches.length; i++) {
-      const branch = createdBranches[i];
-      const course = courses[i % courses.length];
-// ✅ NEW WAY
-const instructor = allInstructors.find(ins => String(ins.branch) === String(branch._id));
-      const batch = await Batch.create({
-        batch_name: `B-${branch.branch_code}-${faker.string.numeric(3)}`,
-        course: course._id,
-        instructors: [instructor._id],
+    // 📊 STEP 6: OPERATIONAL DATA (Analytics)
+    console.log("📊 Injecting 6 months of financial history...");
+    for (const branch of branches) {
+      const chef = await User.create({
+        username: `chef_${branch.branch_code.toLowerCase()}`,
+        email: `chef.${branch.branch_code.toLowerCase()}@cib.com`,
+        password: "password123",
+        role: instRole._id,
         branch: branch._id,
-        start_date: new Date(),
-        schedule_days: ["Saturday", "Monday", "Wednesday"],
-        time_slot: { start_time: "10:00 AM", end_time: "01:00 PM" },
+        full_name: `Chef ${faker.person.firstName()}`,
+        employee_id: `EMP-${branch.branch_code}`,
         status: "Active"
       });
 
-      const studentIds = [];
-      const count = CONFIG.BATCH_STUDENT_COUNTS[i] || 10;
+      const batch = await Batch.create({
+        batch_name: `${branch.branch_code}-B1`,
+        course: courses[0]._id,
+        instructors: [chef._id],
+        branch: branch._id,
+        start_date: subMonths(new Date(), 4),
+        schedule_days: ["Monday", "Wednesday"],
+        time_slot: { start_time: "10:00 AM", end_time: "01:00 PM" }, // ✅ REQUIRED
+        status: "Active"
+      });
 
-      for (let s = 0; s < count; s++) {
+      for (let s = 0; s < 5; s++) {
         const student = await Student.create({
           student_name: faker.person.fullName(),
-          fathers_name: faker.person.fullName({ gender: "male" }),
-          student_id: `STU-${branch.branch_code}-${faker.string.numeric(5)}`,
-          course: course._id,
+          fathers_name: faker.person.fullName({ gender: 'male' }), // ✅ REQUIRED
+          student_id: `STU-${branch.branch_code}-${faker.string.numeric(4)}`,
+          course: courses[0]._id,
           batch: batch._id,
           branch: branch._id,
-          gender: faker.helpers.arrayElement(["male", "female"]),
-          issue_date: subDays(new Date(), 2),
+          gender: "male", // ✅ REQUIRED
+          issue_date: subMonths(new Date(), 4), // ✅ REQUIRED
           status: "active"
         });
-        studentIds.push(student._id);
-
-        // CREATE FEE LEDGER
-        const discount = faker.helpers.arrayElement([0, 0, 5000, 10000]);
-        const netPayable = course.base_fee - discount;
-        const scenario = faker.helpers.arrayElement(["paid", "partial", "unpaid"]);
-        let paidAmount = 0;
 
         const fee = await Fee.create({
-          student: student._id,
-          branch: branch._id,
-          course: course._id,
-          total_amount: course.base_fee,
-          discount: discount,
-          net_payable: netPayable,
-          paid_amount: 0,
-          status: "Unpaid"
+          student: student._id, branch: branch._id, course: courses[0]._id,
+          total_amount: 70000, net_payable: 65000, paid_amount: 0, status: "Partial"
         });
 
-        // SIMULATE PAYMENTS
-        if (scenario === "paid") {
+        // 📈 Fake Payments across 4 months for Revenue Chart
+        for (let m = 0; m < 4; m++) {
+          const amount = 5000 + (m * 2000);
           await Payment.create({
             fee_record: fee._id,
             student: student._id,
             branch: branch._id,
-            amount: netPayable,
-            payment_type: "Admission Fee",
-            payment_method: "Bank Transfer",
-            collected_by: instructor._id
+            amount: amount,
+            payment_type: "Installment", // ✅ REQUIRED
+            payment_method: "Cash", // ✅ REQUIRED
+            collected_by: chef._id,
+            receipt_number: `RCPT-${faker.string.alphanumeric(8).toUpperCase()}`, // ✅ UNIQUE
+            createdAt: subMonths(new Date(), m)
           });
-          paidAmount = netPayable;
-        } else if (scenario === "partial") {
-          await Payment.create({
-            fee_record: fee._id,
-            student: student._id,
-            branch: branch._id,
-            amount: 15000,
-            payment_type: "Admission Fee",
-            payment_method: "Cash",
-            collected_by: instructor._id
-          });
-          paidAmount = 15000;
+          fee.paid_amount += amount;
         }
-
-        // Update fee record with paid totals
-        fee.paid_amount = paidAmount;
-        fee.status = paidAmount >= netPayable ? "Paid" : paidAmount > 0 ? "Partial" : "Unpaid";
         await fee.save();
       }
-
-      await Batch.findByIdAndUpdate(batch._id, { students: studentIds });
     }
 
-    console.log("==========================================");
-    console.log("✅ SYSTEM SEEDED SUCCESSFULLY");
-    console.log("==========================================");
+    console.log("\n------------------------------------------");
+    console.log("✅ COMPASS SYNCED & DATABASE SEEDED!");
+    console.log("🚀 Admin: admin12@gmail.com / password123");
+    console.log("------------------------------------------");
     process.exit(0);
+
   } catch (error) {
     console.error("❌ Seed Failed:", error);
     process.exit(1);

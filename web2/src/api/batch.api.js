@@ -1,11 +1,6 @@
 import { API } from "./axios";
 
-// ==========================================
-// BATCH ENDPOINTS (/api/batches)
-// ==========================================
-
 export const fetchBatches = async (filters = {}) => {
-  // Merge default status with any incoming filters (like branch)
   const params = new URLSearchParams({ status: "all", ...filters });
   const { data } = await API.get(`/batches?${params}`);
   return data.data;
@@ -21,8 +16,8 @@ export const createBatch = async (batchData) => {
   return data.data;
 };
 
-export const updateBatch = async (id, updateData) => {
-  const { data } = await API.put(`/batches/${id}`, updateData);
+export const updateBatch = async ({ id, formData }) => {
+  const { data } = await API.put(`/batches/${id}`, formData);
   return data.data;
 };
 

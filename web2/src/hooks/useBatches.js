@@ -2,14 +2,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import * as BatchAPI from "../api/batch.api";
 
-// ==============================
-// FETCH QUERIES (GET)
-// ==============================
-
 export const useBatches = (filters = {}) => {
   return useQuery({
     queryKey: ["batches", filters],
-    queryFn: () => BatchAPI.fetchBatches(filters), // <-- FIXED THIS LINE
+    queryFn: () => BatchAPI.fetchBatches(filters),
   });
 };
 
@@ -20,10 +16,6 @@ export const useBatchById = (id) => {
     enabled: !!id,
   });
 };
-
-// ==============================
-// MUTATION QUERIES (POST/PUT/DELETE)
-// ==============================
 
 export const useCreateBatch = () => {
   const queryClient = useQueryClient();
@@ -40,7 +32,7 @@ export const useCreateBatch = () => {
 export const useUpdateBatch = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...updateData }) => BatchAPI.updateBatch(id, updateData),
+    mutationFn: BatchAPI.updateBatch,
     onSuccess: (_, variables) => {
       toast.success("Batch updated successfully!");
       queryClient.invalidateQueries({ queryKey: ["batches"] });
@@ -58,6 +50,6 @@ export const useDeleteBatch = () => {
       toast.success("Batch and curriculum deleted permanently");
       queryClient.invalidateQueries({ queryKey: ["batches"] });
     },
-    onError: (error) => toast.error("Failed to delete batch"),
+    onError: () => toast.error("Failed to delete batch"),
   });
 };

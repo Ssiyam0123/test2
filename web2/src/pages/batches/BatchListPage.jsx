@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Plus,
@@ -17,32 +17,30 @@ import Swal from "sweetalert2";
 import DataTable from "../../components/common/DataTable.jsx";
 import useAuth from "../../store/useAuth";
 import BranchDropdown from "../../components/common/BranchDropdown";
-import { useMemo } from "react";
+import PermissionGuard from "../../components/common/PermissionGuard.jsx";
+import { PERMISSIONS } from "../../config/permissionConfig.js";
 
 export default function BatchListPage() {
   const navigate = useNavigate();
-  const { authUser, hasPermission, isMaster } = useAuth();
-  // console.log(authUser)
-
-  const isSuper = isMaster ? isMaster() : authUser?.role.name === "superadmin";
-  const canManageBatches = hasPermission("manage_batches");
+  const { authUser, hasPermission, isMaster: checkMaster } = useAuth();
+  const isSuper = checkMaster();
 
   const [selectedBranch, setSelectedBranch] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
 
-  const { data: branchesRes } = useBranches({}, { enabled: !!isSuper });
+  const { data: branches = [] } = useBranches({}, { enabled: !!isSuper });
 
   const queryParams = useMemo(() => {
-    if (isSuper) {
-      return selectedBranch ? { branch: selectedBranch } : {};
-    }
+    if (isSuper)
+      return selectedBranch && selectedBranch !== "all"
+        ? { branch: selectedBranch }
+        : {};
     return { branch: authUser?.branch?._id || authUser?.branch };
   }, [isSuper, selectedBranch, authUser]);
 
-  const { data: batchesResponse, isLoading } = useBatches(queryParams);
-
+  const { data: batchesRes, isLoading } = useBatches(queryParams);
   const { mutate: deleteBatch } = useDeleteBatch();
-  const batches = batchesResponse?.data || [];
+  const batches = batchesRes?.data || [];
 
   const filteredBatches = batches.filter(
     (b) =>
@@ -53,181 +51,141 @@ export default function BatchListPage() {
   const handleDelete = (id) => {
     Swal.fire({
       title: "Delete Batch?",
-      text: "All schedule data and class records will be lost.",
+      text: "All schedule and class data will be lost permanently.",
       icon: "warning",
       showCancelButton: true,
-      confirmButtonColor: "#1e293b",
-      cancelButtonColor: "#ef4444",
       confirmButtonText: "Yes, delete it",
-      customClass: {
-        popup: "rounded-[2rem]",
-        confirmButton: "rounded-xl px-6 py-3",
-        cancelButton: "rounded-xl px-6 py-3",
-      },
-    }).then((result) => {
-      if (result.isConfirmed) {
-        deleteBatch(id);
-      }
+      confirmButtonColor: "#ef4444",
+    }).then((res) => {
+      if (res.isConfirmed) deleteBatch(id);
     });
   };
 
   const columns = [
-    { label: "Batch Details", className: "w-[40%]" },
-    { label: "Schedule & Days", className: "hidden md:table-cell w-[30%]" },
+    { label: "Batch Details", className: "w-[40%] pl-6" },
+    { label: "Schedule", className: "hidden md:table-cell w-[30%]" },
     { label: "Status", className: "w-[15%]" },
-    { label: "Actions", align: "right", className: "w-[15%]" },
+    { label: "Actions", align: "right", className: "w-[15%] pr-6" },
   ];
 
   const renderBatchRow = (batch) => (
     <tr
       key={batch._id}
-      className="group transition-colors duration-300 border-b border-slate-50 last:border-none hover:bg-slate-50/50"
+      className="hover:bg-slate-50/50 transition-colors border-b border-slate-50 last:border-none"
     >
-      <td className="px-6 py-4 align-middle">
+      <td className="px-6 py-4">
         <div className="flex items-center gap-4">
-          <div className="hidden sm:flex h-11 w-11 rounded-2xl bg-teal-50 text-teal-600 items-center justify-center group-hover:bg-teal-500 group-hover:text-white transition-all shadow-sm">
+          <div className="h-10 w-10 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center">
             <LayoutGrid size={18} />
           </div>
-          <div className="flex flex-col min-w-0">
-            <span className="font-bold text-[14px] text-slate-800 truncate">
+          <div>
+            <p className="font-bold text-slate-800 text-sm">
               {batch.batch_name}
-            </span>
-            <span className="text-[11px] text-teal-600 font-black uppercase tracking-tight truncate mt-0.5">
-              {batch.course?.course_name || "No Course Assigned"}
-            </span>
+            </p>
+            <p className="text-[10px] font-black text-teal-600 uppercase">
+              {batch.course?.course_name}
+            </p>
           </div>
         </div>
       </td>
-      <td className="hidden md:table-cell px-6 py-4 align-middle">
-        <div className="flex flex-col gap-1.5">
-          <div className="flex items-center gap-1.5 text-[12px] font-bold text-slate-700">
-            <Clock size={13} className="text-teal-500" />
-            <span>
-              {batch.time_slot?.start_time} - {batch.time_slot?.end_time}
-            </span>
-          </div>
-          <div className="flex flex-wrap gap-1">
-            {batch.schedule_days?.map((day) => (
+      <td className="hidden md:table-cell px-6 py-4">
+        <div className="flex flex-col gap-1 text-[11px] font-bold text-slate-600">
+          <span className="flex items-center gap-1">
+            <Clock size={12} /> {batch.time_slot?.start_time} -{" "}
+            {batch.time_slot?.end_time}
+          </span>
+          <div className="flex gap-1">
+            {batch.schedule_days?.map((d) => (
               <span
-                key={day}
-                className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 text-[9px] font-black text-slate-500 rounded uppercase"
+                key={d}
+                className="bg-slate-100 px-1 rounded uppercase text-[9px]"
               >
-                {day.substring(0, 3)}
+                {d.slice(0, 3)}
               </span>
             ))}
           </div>
         </div>
       </td>
-      <td className="px-6 py-4 align-middle">
+      <td className="px-6 py-4">
         <span
-          className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter ${
-            batch.status === "Active"
-              ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
-              : batch.status === "Upcoming"
-                ? "bg-amber-50 text-amber-600 border border-amber-100"
-                : "bg-slate-100 text-slate-500 border border-slate-200"
-          }`}
+          className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase ${batch.status === "Active" ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"}`}
         >
           {batch.status}
         </span>
       </td>
-      <td className="px-6 py-4 text-right align-middle">
-        <div className="flex items-center justify-end gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
+      <td className="px-6 py-4 text-right">
+        <div className="flex justify-end gap-1">
           <button
             onClick={() => navigate(`/admin/batches/${batch._id}`)}
-            className="p-2 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-xl transition-all"
-            title="View Workspace"
+            className="p-2 text-slate-400 hover:text-teal-600"
           >
             <BookOpen size={16} />
           </button>
-          {canManageBatches && (
-            <>
-              <button
-                onClick={() => navigate(`/admin/edit-batch/${batch._id}`)}
-                className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
-                title="Edit Batch"
-              >
-                <Edit3 size={16} />
-              </button>
-              <button
-                onClick={() => handleDelete(batch._id)}
-                className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
-                title="Delete Batch"
-              >
-                <Trash2 size={16} />
-              </button>
-            </>
-          )}
+          <PermissionGuard requiredPermission={PERMISSIONS.MANAGE_BATCHES}>
+            <button
+              onClick={() => navigate(`/admin/edit-batch/${batch._id}`)}
+              className="p-2 text-slate-400 hover:text-blue-600"
+            >
+              <Edit3 size={16} />
+            </button>
+            <button
+              onClick={() => handleDelete(batch._id)}
+              className="p-2 text-slate-400 hover:text-rose-600"
+            >
+              <Trash2 size={16} />
+            </button>
+          </PermissionGuard>
         </div>
       </td>
     </tr>
   );
 
-  if (isLoading && batches.length === 0) return <Loader />;
-
   return (
-    <div className="p-4 md:p-8 lg:p-10 bg-[#e8f0f2] min-h-screen font-sans">
+    <div className="p-4 md:p-8 lg:p-10 bg-[#e8f0f2] min-h-screen">
       <div className="max-w-7xl mx-auto space-y-8">
-        {/* Header Section */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">
-              Batch Inventory
-            </h1>
-            <p className="text-slate-500 text-sm font-medium mt-1">
-              {selectedBranch
-                ? "Branch-specific results"
-                : "Showing results from all campuses"}
-            </p>
-          </div>
-
-          <div className="flex flex-col sm:flex-row items-center gap-3">
+        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight">
+            Batch Inventory
+          </h1>
+          <div className="flex flex-wrap items-center gap-3">
             {isSuper && (
               <BranchDropdown
                 isMaster={isSuper}
-                branches={branchesRes?.data || []}
+                branches={branches}
                 value={selectedBranch}
                 onChange={setSelectedBranch}
-                showAllOption={true} 
-                wrapperClassName="w-full sm:w-64 mb-0"
+                showAllOption={true}
+                wrapperClassName="w-full sm:w-56 mb-0 mr-10"
               />
             )}
-
-            <div className="relative w-full sm:w-64">
+            <div className="relative">
               <Search
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
                 size={18}
               />
               <input
                 type="text"
-                placeholder="Search batches..."
+                placeholder="Search..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-white border border-transparent focus:border-teal-500 rounded-2xl outline-none shadow-sm transition-all text-sm font-medium"
+                className="pl-10 pr-4 py-2 bg-white rounded-xl text-sm border-none outline-none shadow-sm"
               />
             </div>
-
-            {canManageBatches && (
+            <PermissionGuard requiredPermission={PERMISSIONS.MANAGE_BATCHES}>
               <button
                 onClick={() => navigate("/admin/add-batch")}
-                className="bg-[#1e293b] hover:bg-slate-800 text-white px-5 py-2.5 rounded-2xl font-bold flex items-center gap-2 shadow-lg transition-all active:scale-95 shrink-0"
+                className="bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 shadow-lg"
               >
-                <Plus size={20} />{" "}
-                <span className="hidden sm:inline">New Batch</span>
+                <Plus size={18} /> New Batch
               </button>
-            )}
+            </PermissionGuard>
           </div>
         </div>
-
         <DataTable
           columns={columns}
           data={filteredBatches}
           renderRow={renderBatchRow}
           isLoading={isLoading}
-          searchTerm={searchTerm}
-          emptyStateIcon={Layers}
-          emptyStateTitle="No batches found"
-          emptyStateSubtitle="Try switching branches or adjusting your search term."
         />
       </div>
     </div>

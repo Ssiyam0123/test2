@@ -1,21 +1,26 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import { API } from "../api/axios";
-import { fetchStudentFinanceAPI } from "../api/finance.api";
 
 export const useHolidays = () => {
   return useQuery({
     queryKey: ["holidays"],
-    queryFn: () => API.get("/holidays"),
+    queryFn: async () => {
+      const { data } = await API.get("/holidays");
+      return data.data; // 🚀 FIXED: Returns raw Array!
+    },
   });
 };
 
 export const useAddHoliday = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data) => API.post("/holidays", data),
-    onSuccess: (res) => {
-      toast.success(res.message || "Holiday added!");
+    mutationFn: async (holidayData) => {
+      const { data } = await API.post("/holidays", holidayData);
+      return data.data; // 🚀 FIXED
+    },
+    onSuccess: () => {
+      toast.success("Holiday added!");
       queryClient.invalidateQueries({ queryKey: ["holidays"] });
     },
     onError: (err) => toast.error(err.response?.data?.message || "Failed to add holiday"),
@@ -25,21 +30,14 @@ export const useAddHoliday = () => {
 export const useDeleteHoliday = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id) => API.delete(`/holidays/${id}`),
-    onSuccess: (res) => {
-      toast.success(res.message || "Holiday removed!");
+    mutationFn: async (id) => {
+      const { data } = await API.delete(`/holidays/${id}`);
+      return data.data; // 🚀 FIXED
+    },
+    onSuccess: () => {
+      toast.success("Holiday removed!");
       queryClient.invalidateQueries({ queryKey: ["holidays"] });
     },
-    onError: (err) => toast.error("Failed to delete holiday"),
-  });
-};
-
-
-
-export const useStudentFinance = (studentId) => {
-  return useQuery({
-    queryKey: ["student-finance", studentId],
-    queryFn: () => fetchStudentFinanceAPI(studentId),
-    enabled: !!studentId,
+    onError: () => toast.error("Failed to delete holiday"),
   });
 };

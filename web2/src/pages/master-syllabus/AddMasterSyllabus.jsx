@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Plus, Trash2, Save } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react"; // Save icon removed since it's not used directly
 import EntityForm from "../../components/common/EntityForm";
 import { 
   useAddMasterSyllabus, 
@@ -17,8 +17,8 @@ export default function AddMasterSyllabus({ mode = "add" }) {
   const navigate = useNavigate();
   const { id } = useParams();
 
-  const { data: allTopicsRes, isLoading: loadingAll } = useMasterTopics();
-  
+  // 🚀 CLEAN DATA FETCHING: Directly receive arrays & objects
+  const { data: allTopics = [], isLoading: loadingAll } = useMasterTopics();
   const { data: editData, isLoading: loadingEdit } = useMasterSyllabusDetails(id, { 
     enabled: mode === "edit" && !!id 
   });
@@ -28,10 +28,11 @@ export default function AddMasterSyllabus({ mode = "add" }) {
 
   const [topics, setTopics] = useState([]);
 
+  // 🚀 Initialize for ADD mode
   useEffect(() => {
-    if (mode === "add" && allTopicsRes?.data) {
-      const currentMax = allTopicsRes.data.length > 0 
-        ? Math.max(...allTopicsRes.data.map(t => t.order_index || 0)) 
+    if (mode === "add" && allTopics) {
+      const currentMax = allTopics.length > 0 
+        ? Math.max(...allTopics.map(t => t.order_index || 0)) 
         : 0;
 
       setTopics([
@@ -40,17 +41,19 @@ export default function AddMasterSyllabus({ mode = "add" }) {
         { topic: "", category: "General", class_type: "Lecture", order_index: currentMax + 3, description: "" },
       ]);
     }
-  }, [allTopicsRes, mode]);
+  }, [allTopics, mode]);
 
+  // 🚀 Initialize for EDIT mode
   useEffect(() => {
-    if (mode === "edit" && editData?.data) {
-      setTopics([{ ...editData.data }]);
+    // editData is now the raw object directly from the API
+    if (mode === "edit" && editData) {
+      setTopics([{ ...editData }]);
     }
   }, [editData, mode]);
 
   const handleRowChange = (index, field, value) => {
     const updated = [...topics];
-    // 🚀 Ensure order_index stays a number
+    // Ensure order_index stays a number
     updated[index][field] = field === "order_index" ? Number(value) : value;
     setTopics(updated);
   };
@@ -85,7 +88,6 @@ export default function AddMasterSyllabus({ mode = "add" }) {
               <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
                 
                 <div className="md:col-span-3 flex gap-3">
-                   {/* 🚀 FIXED: order_index is now an editable input field instead of a static div */}
                    <div className="shrink-0 w-12">
                       <label className="text-[9px] font-black text-gray-400 uppercase mb-1 block ml-1 text-center">S.No</label>
                       <input
@@ -137,7 +139,7 @@ export default function AddMasterSyllabus({ mode = "add" }) {
                   </select>
                 </div>
 
-                {mode === "add" && (
+                {mode === "add" && topics.length > 1 && (
                   <div className="md:col-span-1 pt-5 text-right">
                     <button type="button" onClick={() => removeRow(idx)} className="p-2 text-gray-300 hover:text-rose-500"><Trash2 size={18} /></button>
                   </div>
@@ -170,11 +172,13 @@ export default function AddMasterSyllabus({ mode = "add" }) {
     }
   ];
 
+  // 🚀 EntityForm passes (formDataInstance, rawData), we ignore them and use our local state `topics`
   const handleFormSubmit = () => {
     const finalData = topics.filter(t => t.topic.trim() !== "");
     if (finalData.length === 0) return toast.error("Please add a topic name.");
 
     if (mode === "edit") {
+      // payload is wrapped properly as per your hook
       editMutation.mutate({ id, payload: finalData[0] }, {
         onSuccess: () => navigate("/admin/manage-syllabus")
       });
@@ -185,11 +189,19 @@ export default function AddMasterSyllabus({ mode = "add" }) {
     }
   };
 
-  if (loadingAll || loadingEdit) return <div className="h-screen flex items-center justify-center"><Loader /></div>;
+  // Prevent rendering if essential data is still loading
+  if (loadingAll || loadingEdit) {
+    return (
+      <div className="h-screen flex items-center justify-center">
+        <Loader />
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 bg-[#f8fafc] min-h-screen">
       <EntityForm
+        key={mode === "edit" ? id : "new"} // Ensure fresh re-render on mode change
         title={mode === "edit" ? "Edit Syllabus Topic" : "Add to Library"}
         subtitle={mode === "edit" ? "Modify existing lesson details." : "Topics will automatically continue from your last entry."}
         config={formConfig}

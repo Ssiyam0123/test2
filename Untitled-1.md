@@ -1,6 +1,6 @@
 # File Tree: cibdhk
 
-**Generated:** 3/3/2026, 4:15:55 PM
+**Generated:** 3/9/2026, 5:11:16 AM
 **Root Path:** `d:\pg\web_app\cibdhk`
 
 ```
@@ -53,6 +53,7 @@
 │   │   ├── 📄 employeeid.controller.js
 │   │   ├── 📄 expenses.controller.js
 │   │   ├── 📄 finance.controller.js
+│   │   ├── 📄 holiday.controller.js
 │   │   ├── 📄 inventory.controller.js
 │   │   ├── 📄 mastersyllabus.controller.js
 │   │   ├── 📄 requisition.controller.js
@@ -66,8 +67,7 @@
 │   │   └── 📄 utils.js
 │   ├── 📁 middlewares
 │   │   ├── 📄 auth.js
-│   │   ├── 📄 auth.middleware.js
-│   │   ├── 📄 branchGuard.js
+│   │   ├── 📄 errorHandler.js
 │   │   ├── 📄 multer.js
 │   │   └── 📄 validate.js
 │   ├── 📁 models
@@ -78,6 +78,7 @@
 │   │   ├── 📄 course.js
 │   │   ├── 📄 expense.js
 │   │   ├── 📄 fee.js
+│   │   ├── 📄 holiday.js
 │   │   ├── 📄 inventory.js
 │   │   ├── 📄 masterSyllabus.js
 │   │   ├── 📄 payment.js
@@ -89,18 +90,27 @@
 │   ├── 📁 public
 │   │   └── 📁 uploads
 │   │       ├── 📁 employees
-│   │       │   ├── 🖼️ photo-1772148639914-664821160.jpg
-│   │       │   ├── 🖼️ photo-1772405190303-915997948.jpg
-│   │       │   ├── 🖼️ photo-1772405526584-142994819.jpg
-│   │       │   ├── 🖼️ photo-1772408260055-672257356.jpg
-│   │       │   ├── 🖼️ photo-1772426052386-674584324.jpg
-│   │       │   ├── 🖼️ photo-1772426081655-601304688.jpg
-│   │       │   └── 🖼️ photo-1772468750432-198160459.jpg
+│   │       │   ├── 🖼️ photo-1772580280967-442161591.jpg
+│   │       │   ├── 🖼️ photo-1772662497236-38443082.jpg
+│   │       │   ├── 🖼️ photo-1772832836522-52092215.jpg
+│   │       │   ├── 🖼️ photo-1772833252306-780831275.jpg
+│   │       │   ├── 🖼️ photo-1772915217129-92802860.jpg
+│   │       │   ├── 🖼️ photo-1772916407202-97802618.jpg
+│   │       │   └── 🖼️ photo-1772967245586-529815772.jpg
 │   │       └── 📁 students
 │   │           ├── 🖼️ photo-1772146957737-445641866.jpg
 │   │           ├── 🖼️ photo-1772148624033-664161422.jpg
 │   │           ├── 🖼️ photo-1772425883909-394655231.jpg
-│   │           └── 🖼️ photo-1772484625895-30130077.jpg
+│   │           ├── 🖼️ photo-1772484625895-30130077.jpg
+│   │           ├── 🖼️ photo-1772580123824-193392330.jpg
+│   │           ├── 🖼️ photo-1772582192490-885213657.jpg
+│   │           ├── 🖼️ photo-1772733401378-789927995.jpg
+│   │           ├── 🖼️ photo-1772893773262-356001433.jpg
+│   │           ├── 🖼️ photo-1772915203712-607606418.jpg
+│   │           ├── 🖼️ photo-1772916650012-326716913.jpg
+│   │           ├── 🖼️ photo-1772967064720-456165029.jpg
+│   │           ├── 🖼️ photo-1772967750799-345730266.jpg
+│   │           └── 🖼️ photo-1772968256847-15729053.jpg
 │   ├── 📁 routes
 │   │   ├── 📄 authRoutes.js
 │   │   ├── 📄 batchRoutes.js
@@ -111,6 +121,24 @@
 │   │   ├── 📄 dashboard.routes.js
 │   │   ├── 📄 expenseRoute.js
 │   │   ├── 📄 finance.routes.js
+│   │   ├── 📄 holiday.routes.js
+│   │   ├── 📄 inventory.route.js
+│   │   ├── 📄 masterSyllabus.routes.js
+│   │   ├── 📄 requisition.route.js
+│   │   ├── 📄 role.routes.js
+│   │   ├── 📄 studentRoutes.js
+│   │   └── 📄 userRoutes.js
+│   ├── 📁 routes copy
+│   │   ├── 📄 authRoutes.js
+│   │   ├── 📄 batchRoutes.js
+│   │   ├── 📄 branchRoutes.js
+│   │   ├── 📄 certificate.routes.js
+│   │   ├── 📄 class.route.js
+│   │   ├── 📄 courseRoute.js
+│   │   ├── 📄 dashboard.routes.js
+│   │   ├── 📄 expenseRoute.js
+│   │   ├── 📄 finance.routes.js
+│   │   ├── 📄 holiday.routes.js
 │   │   ├── 📄 inventory.route.js
 │   │   ├── 📄 masterSyllabus.routes.js
 │   │   ├── 📄 requisition.route.js
@@ -121,48 +149,41 @@
 │   │   ├── 📄 createAdmin.js
 │   │   ├── 📄 migrateRoles.js
 │   │   └── 📄 seedData.js
+│   ├── 📁 services
+│   │   ├── 📄 auth.service.js
+│   │   ├── 📄 batch.service.js
+│   │   ├── 📄 branch.service.js
+│   │   ├── 📄 class.service.js
+│   │   ├── 📄 comment.service.js
+│   │   ├── 📄 course.service.js
+│   │   ├── 📄 finance.service.js
+│   │   ├── 📄 inventory.service.js
+│   │   ├── 📄 masterSyllabus.service.js
+│   │   ├── 📄 receipt.service.js
+│   │   ├── 📄 requisition.service.js
+│   │   ├── 📄 role.service.js
+│   │   ├── 📄 student.service.js
+│   │   └── 📄 user.service.js
 │   ├── 📁 utils
+│   │   ├── 📄 ApiResponse.js
+│   │   ├── 📄 AppError.js
+│   │   ├── 📄 catchAsync.js
 │   │   └── 📄 defaultSyllabus.js
 │   ├── 📁 validators
 │   │   ├── 📄 batch.validator.js
 │   │   ├── 📄 branch.validator.js
+│   │   ├── 📄 class.validator.js
+│   │   ├── 📄 comment.validator.js
 │   │   ├── 📄 common.js
 │   │   ├── 📄 course.validator.js
 │   │   ├── 📄 finance.validator.js
+│   │   ├── 📄 holiday.validator.js
 │   │   ├── 📄 inventory.validator.js
+│   │   ├── 📄 masterSyllabus.validator.js
+│   │   ├── 📄 requisition.validator.js
 │   │   ├── 📄 role.validator.js
 │   │   ├── 📄 student.validator.js
 │   │   ├── 📄 syllabus.validator.js
-│   │   └── 📄 user.validator.js
-│   ├── 📁 vld
-│   │   ├── 📁 controllers copy
-│   │   │   ├── 📄 auth.controller.js
-│   │   │   ├── 📄 batch.controller.js
-│   │   │   ├── 📄 branch.controller.js
-│   │   │   ├── 📄 certificate.controller.js
-│   │   │   ├── 📄 comment.controller.js
-│   │   │   ├── 📄 course.controller.js
-│   │   │   ├── 📄 dashboard.controller.js
-│   │   │   ├── 📄 employeeid.controller.js
-│   │   │   ├── 📄 expenses.controller.js
-│   │   │   ├── 📄 inventory.controller.js
-│   │   │   ├── 📄 student.controller.js
-│   │   │   └── 📄 user.controller.js
-│   │   ├── 📁 rt
-│   │   │   ├── 📄 authRoutes.js
-│   │   │   ├── 📄 batchRoutes.js
-│   │   │   ├── 📄 branchRoutes.js
-│   │   │   ├── 📄 certificate.routes.js
-│   │   │   ├── 📄 courseRoute.js
-│   │   │   ├── 📄 dashboard.routes.js
-│   │   │   ├── 📄 expenseRoute.js
-│   │   │   ├── 📄 inventory.route.js
-│   │   │   ├── 📄 studentRoutes.js
-│   │   │   └── 📄 userRoutes.js
-│   │   ├── 📄 batch.validator.js
-│   │   ├── 📄 branch.validator.js
-│   │   ├── 📄 course.validator.js
-│   │   ├── 📄 student.validator.js
 │   │   └── 📄 user.validator.js
 │   ├── ⚙️ .env.sample
 │   ├── ⚙️ .gitignore
@@ -171,7 +192,8 @@
 │   ├── 📦 controllers.zip
 │   ├── 📄 index.js
 │   ├── ⚙️ package-lock.json
-│   └── ⚙️ package.json
+│   ├── ⚙️ package.json
+│   └── 📦 routes.zip
 ├── 📁 web2
 │   ├── 📁 .vercel
 │   │   ├── 📄 README.txt
@@ -187,6 +209,7 @@
 │   │   │   ├── 📄 class.api.js
 │   │   │   ├── 📄 courses.api.js
 │   │   │   ├── 📄 dashboard.api.js
+│   │   │   ├── 📄 finance.api.js
 │   │   │   ├── 📄 inventory.api.js
 │   │   │   ├── 📄 masterSyllabus.api.js
 │   │   │   ├── 📄 payment.api.js
@@ -209,15 +232,16 @@
 │   │   │   │   ├── 📄 AddClassModal.jsx
 │   │   │   │   ├── 📄 AddSyllabusModal.jsx
 │   │   │   │   ├── 📄 AttendancePanel.jsx
-│   │   │   │   ├── 📄 BatchFormContainer.jsx
+│   │   │   │   ├── 📄 BatchCard.jsx
+│   │   │   │   ├── 📄 BatchCurriculumList.jsx
 │   │   │   │   ├── 📄 BatchHeader.jsx
-│   │   │   │   ├── 📄 BatchList.jsx
 │   │   │   │   ├── 📄 BatchWorkspace.jsx
 │   │   │   │   ├── 📄 ClassAttendance.jsx
 │   │   │   │   ├── 📄 ClassCalendar.jsx
+│   │   │   │   ├── 📄 ClassDetailsPanel.jsx
 │   │   │   │   ├── 📄 ClassRequisitionModal.jsx
-│   │   │   │   ├── 📄 ClassSidebar.jsx
 │   │   │   │   ├── 📄 CurriculumBuilderModal.jsx
+│   │   │   │   ├── 📄 DayAgendaPanel.jsx
 │   │   │   │   ├── 📄 MarkClassCompleteModal.jsx
 │   │   │   │   ├── 📄 QuickScheduleModal.jsx
 │   │   │   │   └── 📄 ViewSyllabusModal.jsx
@@ -233,6 +257,8 @@
 │   │   │   │   ├── 📄 EntityForm.jsx
 │   │   │   │   ├── 📄 PageHeader.jsx
 │   │   │   │   ├── 📄 Pagination.jsx
+│   │   │   │   ├── 📄 PermissionGuard.jsx
+│   │   │   │   ├── 📄 ProtectedRoute.jsx
 │   │   │   │   ├── 📄 SearchBar.jsx
 │   │   │   │   └── 📄 TableSkeleton.jsx
 │   │   │   ├── 📁 costs
@@ -251,15 +277,21 @@
 │   │   │   ├── 📁 fields
 │   │   │   │   ├── 📄 InputGroup.jsx
 │   │   │   │   └── 📄 SelectGroup.jsx
+│   │   │   ├── 📁 finance
+│   │   │   │   └── 📄 PaymentReceipt.jsx
 │   │   │   ├── 📁 inventory
-│   │   │   │   └── 📄 AddStockModal.jsx
+│   │   │   │   ├── 📄 AddStockModal.jsx
+│   │   │   │   ├── 📄 HisabNikashView.jsx
+│   │   │   │   ├── 📄 PantryView.jsx
+│   │   │   │   └── 📄 RequisitionsView.jsx
 │   │   │   ├── 📁 modal
 │   │   │   │   ├── 📄 CollectPaymentModal.jsx
 │   │   │   │   ├── 📄 CommentModal.jsx
 │   │   │   │   ├── 📄 EditSyllabusModal.jsx
 │   │   │   │   ├── 📄 EmployeeQRCodeModal.jsx
 │   │   │   │   ├── 📄 QRCodeModal.jsx
-│   │   │   │   └── 📄 RoleModal.jsx
+│   │   │   │   ├── 📄 RoleModal.jsx
+│   │   │   │   └── 📄 SendSmsModal.jsx
 │   │   │   ├── 📁 table
 │   │   │   │   ├── 📄 EmployeesTable.jsx
 │   │   │   │   └── 📄 StudentsTable.jsx
@@ -272,6 +304,8 @@
 │   │   │   ├── 📄 ProfileLayout.jsx
 │   │   │   ├── 📄 PublicLayout.jsx
 │   │   │   └── 📄 SearchBar.jsx
+│   │   ├── 📁 config
+│   │   │   └── 📄 permissionConfig.js
 │   │   ├── 📁 css
 │   │   │   ├── 🎨 Footer.css
 │   │   │   └── 🎨 Header.css
@@ -283,6 +317,7 @@
 │   │   │   ├── 📄 useDashboard.js
 │   │   │   ├── 📄 useExpenses.js
 │   │   │   ├── 📄 useFinance.js
+│   │   │   ├── 📄 useHolidays.js
 │   │   │   ├── 📄 useInventory.js
 │   │   │   ├── 📄 useMasterSyllabus.js
 │   │   │   ├── 📄 useRequisitions.js
@@ -294,6 +329,7 @@
 │   │   │   ├── 📁 batches
 │   │   │   │   ├── 📄 AddBatch.jsx
 │   │   │   │   ├── 📄 AttendanceBook.jsx
+│   │   │   │   ├── 📄 AttendanceBookPage.jsx
 │   │   │   │   ├── 📄 BatchListPage.jsx
 │   │   │   │   ├── 📄 ManageBatches.jsx
 │   │   │   │   └── 📄 ManageBatchesTabs.jsx
@@ -312,14 +348,18 @@
 │   │   │   │   ├── 📄 AllEmployees.jsx
 │   │   │   │   └── 📄 UpdateEmployee.jsx
 │   │   │   ├── 📁 finance
-│   │   │   │   └── 📄 ManageFees.jsx
+│   │   │   │   ├── 📄 ManageFees.jsx
+│   │   │   │   └── 📄 StudentFinance.jsx
 │   │   │   ├── 📁 inventory
 │   │   │   │   ├── 📄 AddInventory.jsx
 │   │   │   │   ├── 📄 HisabNikash.jsx
+│   │   │   │   ├── 📄 InventoryHistory.jsx
 │   │   │   │   └── 📄 ManageInventory.jsx
 │   │   │   ├── 📁 master-syllabus
 │   │   │   │   ├── 📄 AddMasterSyllabus.jsx
 │   │   │   │   └── 📄 ManageMasterSyllabus.jsx
+│   │   │   ├── 📁 setting
+│   │   │   │   └── 📄 ManageHolidays.jsx
 │   │   │   ├── 📁 student-public
 │   │   │   │   ├── 📄 SearchStudent.jsx
 │   │   │   │   └── 📄 StudentDetails.jsx
@@ -336,7 +376,9 @@
 │   │   ├── 📁 store
 │   │   │   └── 📄 useAuth.js
 │   │   ├── 📁 utils
-│   │   │   └── 📄 permissions.js
+│   │   │   └── 📄 swalUtils.js
+│   │   ├── 📁 validators
+│   │   │   └── 📄 zodSchemas.js
 │   │   ├── 🎨 App.css
 │   │   ├── 📄 App.jsx
 │   │   ├── 🎨 index.css
@@ -350,8 +392,7 @@
 │   ├── ⚙️ package.json
 │   ├── ⚙️ vercel.json
 │   └── 📄 vite.config.js
-├── ⚙️ package-lock.json
-└── ⚙️ package.json
+└── 📝 Untitled-1.md
 ```
 
 ---

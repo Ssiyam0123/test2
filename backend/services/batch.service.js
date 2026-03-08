@@ -7,48 +7,52 @@ import { addDays } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz"; // 🚀 For Exact Bangladeshi Timezone
 import AppError from "../utils/AppError.js";
 
-// Transaction Helper
+// 🛠️ HELPER: Safe Transaction Execution
 const executeTransaction = async (callback) => {
   const session = await mongoose.startSession();
+  const isReplicaSet = mongoose.connection.getClient().topology.description.type.includes("ReplicaSet");
+
   try {
-    session.startTransaction();
-    const result = await callback(session);
-    await session.commitTransaction();
+    if (isReplicaSet) session.startTransaction();
+    const result = await callback(session, isReplicaSet);
+    if (isReplicaSet) await session.commitTransaction();
     return result;
   } catch (error) {
-    await session.abortTransaction();
+    if (isReplicaSet && session.inTransaction()) await session.abortTransaction();
     throw error;
   } finally {
     session.endSession();
   }
 };
 
+// 🟢 Batch CRUD Operations
 export const createBatch = async (data, isMaster, userBranch) => {
   if (!isMaster) data.branch = userBranch;
   return await Batch.create(data);
 };
 
-// 🚀 FIXED: Added Pagination for Production Scalability
 export const fetchAllBatches = async (query, branchFilter, isMaster) => {
   let filter = { ...branchFilter };
+  
   if (isMaster && query.branch && query.branch !== "all") filter.branch = query.branch;
   if (query.status && query.status !== "all") filter.status = query.status;
 
   // Pagination Logic
   const page = parseInt(query.page) || 1;
-  const limit = parseInt(query.limit) || 20; // Default 20 items per page
+  const limit = parseInt(query.limit) || 20;
   const skip = (page - 1) * limit;
 
-  const totalBatches = await Batch.countDocuments(filter);
-
-  const batches = await Batch.find(filter)
-    .populate("course", "course_name")
-    .populate("branch", "branch_name branch_code")
-    .populate("students", "student_name student_id photo_url")
-    .sort({ createdAt: -1 })
-    .skip(skip)
-    .limit(limit)
-    .lean();
+  const [totalBatches, batches] = await Promise.all([
+    Batch.countDocuments(filter),
+    Batch.find(filter)
+      .populate("course", "course_name")
+      .populate("branch", "branch_name branch_code")
+      .populate("students", "student_name student_id photo_url")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean()
+  ]);
 
   return {
     data: batches,
@@ -81,27 +85,31 @@ export const modifyBatch = async (id, data, branchFilter) => {
   return updatedBatch;
 };
 
-// 🚀 FIXED: Wrapped in Transaction to avoid Data Inconsistency
 export const removeBatch = async (id, branchFilter) => {
-  await executeTransaction(async (session) => {
-    const batch = await Batch.findOne({ _id: id, ...branchFilter }).session(session).lean();
+  await executeTransaction(async (session, isReplicaSet) => {
+    const opts = isReplicaSet ? { session } : {};
+    
+    const batch = await Batch.findOne({ _id: id, ...branchFilter }, null, opts).lean();
     if (!batch) throw new AppError("Batch not found or unauthorized.", 404);
 
-    await ClassContent.deleteMany({ batch: id }).session(session);
-    await Batch.findByIdAndDelete(id).session(session);
+    await ClassContent.deleteMany({ batch: id }, opts);
+    await Batch.findByIdAndDelete(id, opts);
   });
 };
 
+// 🟢 Class Content & Syllabus Operations
 export const fetchBatchClasses = async (batchId, branchFilter) => {
   const batchExists = await Batch.exists({ _id: batchId, ...branchFilter });
   if (!batchExists) throw new AppError("Batch not found or unauthorized.", 404);
 
-  return await ClassContent.find({ batch: batchId }).sort({ class_number: 1 });
+  return await ClassContent.find({ batch: batchId }).sort({ class_number: 1 }).lean();
 };
 
 export const insertClassesToSyllabus = async (batchId, classesData, branchFilter) => {
-  return await executeTransaction(async (session) => {
-    const batch = await Batch.findOne({ _id: batchId, ...branchFilter }).session(session);
+  return await executeTransaction(async (session, isReplicaSet) => {
+    const opts = isReplicaSet ? { session } : {};
+
+    const batch = await Batch.findOne({ _id: batchId, ...branchFilter }, null, opts);
     if (!batch) throw new AppError("Batch not found or unauthorized.", 404);
 
     const classArray = Array.isArray(classesData) ? classesData : [classesData];
@@ -117,12 +125,12 @@ export const insertClassesToSyllabus = async (batchId, classesData, branchFilter
       is_completed: false
     }));
 
-    const newClasses = await ClassContent.insertMany(formattedClasses, { session });
+    const newClasses = await ClassContent.insertMany(formattedClasses, opts);
     const newIds = newClasses.map((c) => c._id);
 
     await Batch.findByIdAndUpdate(batchId, {
       $push: { class_contents: { $each: newIds } }
-    }, { session });
+    }, opts);
 
     return newClasses;
   });
@@ -137,19 +145,21 @@ export const modifyClassContent = async (classId, updateData, branchFilter) => {
     { _id: classId, ...branchFilter },
     updateData,
     { new: true }
-  );
+  ).lean();
   
   if (!updated) throw new AppError("Class not found or unauthorized.", 404);
   return updated;
 };
 
 export const removeClassContent = async (classId, branchFilter) => {
-  await executeTransaction(async (session) => {
-    const classToDelete = await ClassContent.findOne({ _id: classId, ...branchFilter }).session(session);
+  await executeTransaction(async (session, isReplicaSet) => {
+    const opts = isReplicaSet ? { session } : {};
+
+    const classToDelete = await ClassContent.findOne({ _id: classId, ...branchFilter }, null, opts);
     if (!classToDelete) throw new AppError("Class not found or unauthorized.", 404);
 
-    await Batch.findByIdAndUpdate(classToDelete.batch, { $pull: { class_contents: classId } }, { session });
-    await ClassContent.findByIdAndDelete(classId).session(session);
+    await Batch.findByIdAndUpdate(classToDelete.batch, { $pull: { class_contents: classId } }, opts);
+    await ClassContent.findByIdAndDelete(classId, opts);
   });
 };
 
@@ -158,17 +168,19 @@ export const assignClassDate = async (classId, dateScheduled, branchFilter) => {
     { _id: classId, ...branchFilter },
     { date_scheduled: dateScheduled },
     { new: true }
-  );
+  ).lean();
 
   if (!updatedClass) throw new AppError("Class not found or unauthorized.", 404);
   return updatedClass;
 };
 
+// 🟢 Attendance & Expense Integration
 export const recordClassAttendance = async (classId, data, branchFilter, userId) => {
-  return await executeTransaction(async (session) => {
+  return await executeTransaction(async (session, isReplicaSet) => {
+    const opts = isReplicaSet ? { session } : {};
     const { attendanceRecords, instructorId, is_completed, financials } = data;
 
-    const classRecord = await ClassContent.findOne({ _id: classId, ...branchFilter }).populate("batch").session(session);
+    const classRecord = await ClassContent.findOne({ _id: classId, ...branchFilter }, null, opts).populate("batch");
     if (!classRecord) throw new AppError("Class not found or unauthorized.", 404);
 
     const updatedClass = await ClassContent.findByIdAndUpdate(
@@ -179,7 +191,7 @@ export const recordClassAttendance = async (classId, data, branchFilter, userId)
         is_completed: is_completed ?? true,
         ...(financials && { financials }),
       },
-      { new: true, session }
+      { new: true, ...opts }
     ).populate("attendance.student", "student_name student_id");
 
     if (financials?.actual_cost > 0) {
@@ -192,7 +204,7 @@ export const recordClassAttendance = async (classId, data, branchFilter, userId)
           branch: classRecord.batch.branch,
           recorded_by: userId,
         },
-        { upsert: true, session }
+        { upsert: true, ...opts }
       );
     }
 
@@ -200,30 +212,30 @@ export const recordClassAttendance = async (classId, data, branchFilter, userId)
   });
 };
 
-// 🚀 FIXED: Auto Scheduler with Infinite Loop Guard, TZ & Dynamic Holidays
+// 🚀 Smart Auto-Scheduler (With Holiday Guard)
 export const generateAutoSchedule = async (batchId, branchFilter) => {
-  return await executeTransaction(async (session) => {
-    const batch = await Batch.findOne({ _id: batchId, ...branchFilter }).session(session);
+  return await executeTransaction(async (session, isReplicaSet) => {
+    const opts = isReplicaSet ? { session } : {};
+
+    const batch = await Batch.findOne({ _id: batchId, ...branchFilter }, null, opts);
 
     if (!batch || !batch.start_date || !batch.schedule_days?.length) {
       throw new AppError("Batch missing configuration (Start Date/Schedule Days)", 400);
     }
 
-    const classes = await ClassContent.find({ batch: batchId }).sort({ class_number: 1 }).session(session);
+    const classes = await ClassContent.find({ batch: batchId }, null, opts).sort({ class_number: 1 });
     if (classes.length === 0) throw new AppError("Syllabus is empty.", 400);
 
-    // 🚀 Dynamic Holiday Fetching (with graceful fallback if model doesn't exist yet)
+    // Dynamic Holiday Fetching
     let holidayList = [];
     try {
-       const dbHolidays = await Holiday.find({ is_active: true }).lean().session(session);
-       // Assuming your holiday model has a 'date_string' field like "yyyy-MM-dd" or "MM-dd"
+       const dbHolidays = await Holiday.find({ is_active: true }, null, opts).lean();
        holidayList = dbHolidays.map(h => h.date_string); 
     } catch(e) {
        holidayList = ["02-21", "03-17", "03-26", "04-14", "05-01", "08-15", "12-16", "12-25"];
     }
 
     const isHoliday = (dateToCheck) => {
-      // 🚀 Explicit Timezone calculation for DB dates
       const monthDay = formatInTimeZone(dateToCheck, "Asia/Dhaka", "MM-dd");
       const fullDate = formatInTimeZone(dateToCheck, "Asia/Dhaka", "yyyy-MM-dd");
       return holidayList.includes(monthDay) || holidayList.includes(fullDate);
@@ -233,7 +245,7 @@ export const generateAutoSchedule = async (batchId, branchFilter) => {
 
     let currentCheckDate = new Date(batch.start_date);
     const updates = [];
-    const MAX_SEARCH_DAYS = 365; 
+    const MAX_SEARCH_DAYS = 365; // Safe-guard against infinite loops
 
     for (const cls of classes) {
       let dateFound = false;
@@ -262,7 +274,9 @@ export const generateAutoSchedule = async (batchId, branchFilter) => {
     }
 
     if (updates.length > 0) {
-      await ClassContent.bulkWrite(updates, { session });
+      await ClassContent.bulkWrite(updates, opts);
     }
+    
+    return { success: true, message: `${updates.length} classes scheduled.` };
   });
 };

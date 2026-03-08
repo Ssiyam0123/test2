@@ -16,12 +16,7 @@ const userSchema = new mongoose.Schema(
       ],
     },
     password: { type: String, required: true, minlength: 6, select: false },
-
-    role: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Role",
-      required: true,
-    },
+    role: { type: mongoose.Schema.Types.ObjectId, ref: "Role", required: true },
     employee_id: { type: String, unique: true, sparse: true, trim: true },
     full_name: {
       type: String,
@@ -39,12 +34,10 @@ const userSchema = new mongoose.Schema(
       enum: ["Active", "On Leave", "Resigned"],
       default: "Active",
     },
-
     branch: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Branch",
-      required: true, 
-      index: true,
+      required: true,
     },
     social_links: {
       facebook: { type: String, default: "" },
@@ -54,8 +47,11 @@ const userSchema = new mongoose.Schema(
       custom: { type: String, default: "" },
     },
   },
-  { timestamps: true, minimize: false },
+  { timestamps: true },
 );
+
+userSchema.index({ branch: 1, role: 1, status: 1 });
+userSchema.index({ username: 1 });
 
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
@@ -72,5 +68,4 @@ userSchema.methods.comparePassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
-const User = mongoose.models.User || mongoose.model("User", userSchema);
-export default User;
+export default mongoose.models.User || mongoose.model("User", userSchema);

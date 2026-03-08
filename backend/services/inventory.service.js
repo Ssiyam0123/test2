@@ -4,7 +4,7 @@ import StockTransaction from "../models/stockTransaction.js";
 import Expense from "../models/expense.js";
 import AppError from "../utils/AppError.js";
 
-// Helper for conditional transactions (local vs replica set)
+// HELPER: Safe Transaction Execution
 const executeTransaction = async (callback) => {
   const session = await mongoose.startSession();
   const isReplicaSet = mongoose.connection.getClient().topology.description.type.includes('ReplicaSet');
@@ -22,21 +22,28 @@ const executeTransaction = async (callback) => {
   }
 };
 
+// Fetch Inventory
 export const fetchBranchInventory = async (branchId) => {
   return await Inventory.find({ branch: branchId }).sort({ item_name: 1 }).lean();
 };
 
+// 🚀 FIXED: Fetch Transactions with Perfect Population for Chain of Custody
 export const fetchBranchTransactions = async (branchId) => {
   return await StockTransaction.find({ branch: branchId })
+    // ১. আইটেমের নাম আর ইউনিট
     .populate("inventory_item", "item_name unit")
+    
+    // ২. কে ট্রানজেকশন করেছে (লগার বা অ্যাপ্রুভার)
     .populate({
       path: "performed_by",
-      select: "full_name role",
+      select: "full_name username role",
       populate: { path: "role", select: "name" } 
     })
+    
+    // 🚀 ৩. চেইন অফ কাস্টডি (Stock OUT এর জন্য)
     .populate({
-      path: "reference_class",
-      select: "class_number topic batch instructor",
+      path: "reference_class", 
+      select: "class_number topic batch instructor", // তোর Class মডেলে এই ফিল্ডগুলো থাকতে হবে
       populate: [
         { path: "batch", select: "batch_name" },
         { path: "instructor", select: "full_name" } 
@@ -46,6 +53,7 @@ export const fetchBranchTransactions = async (branchId) => {
     .lean();
 };
 
+// Process Stock Purchase (Stock IN)
 export const processStockPurchase = async (branchId, purchaseData, userId) => {
   const { items, total_cost, supplier, notes } = purchaseData;
 
@@ -78,7 +86,7 @@ export const processStockPurchase = async (branchId, purchaseData, userId) => {
       return {
         inventory_item: invItem._id,
         branch: branchId,
-        transaction_type: "PURCHASE",
+        transaction_type: "PURCHASE", // 🚀 FRONTEND WILL CATCH THIS AS 'Stock IN'
         quantity: original.quantity,
         total_cost: original.total_price || 0,
         supplier,

@@ -2,25 +2,13 @@ import mongoose from "mongoose";
 
 const studentSchema = new mongoose.Schema(
   {
-    student_name: {
-      type: String,
-      required: true,
-      trim: true,
-      // match: [/^[a-zA-Z\s\-']+$/, "Invalid name format"],
-    },
+    student_name: { type: String, required: true, trim: true },
     fathers_name: { type: String, required: true, trim: true },
-    student_id: {
-      type: String,
-      required: true,
-      unique: true,
-      index: true,
-      trim: true,
-    },
+    student_id: { type: String, required: true, unique: true, trim: true },
     registration_number: {
       type: String,
       unique: true,
       sparse: true,
-      index: true,
       trim: true,
     },
     course: {
@@ -58,20 +46,19 @@ const studentSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Branch",
       required: true,
-      index: true, // Crucial for performance as DB grows
     },
   },
   {
     timestamps: true,
-    toJSON: { virtuals: true }, // 🚀 এই দুইটা লাইন মাস্ট অ্যাড করবি
+    toJSON: { virtuals: true },
     toObject: { virtuals: true },
   },
 );
 
-// Performance Indexes
-studentSchema.index({ batch: 1, status: 1 });
+studentSchema.index({ branch: 1, batch: 1, status: 1 });
+studentSchema.index({ student_id: 1 });
+studentSchema.index({ student_name: "text" });
 
-// Paginated Virtual for Comments
 studentSchema.virtual("comments", {
   ref: "Comment",
   localField: "_id",
@@ -79,9 +66,5 @@ studentSchema.virtual("comments", {
   options: { limit: 20, sort: { createdAt: -1 } },
 });
 
-studentSchema.set("toObject", { virtuals: true });
-studentSchema.set("toJSON", { virtuals: true });
-
-const Student =
-  mongoose.models.Student || mongoose.model("Student", studentSchema);
-export default Student;
+export default mongoose.models.Student ||
+  mongoose.model("Student", studentSchema);

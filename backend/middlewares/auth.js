@@ -10,9 +10,7 @@ const checkIsMaster = (role) => {
   return safeName === "superadmin" || safeName === "admin" || (Array.isArray(role.permissions) && role.permissions.includes("all_access"));
 };
 
-// ==========================================
-// 1. VERIFY TOKEN (Authentication)
-// ==========================================
+
 export const verifyToken = catchAsync(async (req, res, next) => {
   let token = req.cookies?.jwt;
 
@@ -34,23 +32,20 @@ export const verifyToken = catchAsync(async (req, res, next) => {
   next();
 });
 
-// ==========================================
-// 2. PERMISSION GUARD (Action Based Auth)
-// ==========================================
+
 export const requirePermission = (requiredPermission) => {
   return (req, res, next) => {
     if (req.isMaster) return next();
 
     const permissions = req.user.role?.permissions || [];
+    // console.log(permissions)
     if (permissions.includes(requiredPermission)) return next();
 
     return next(new AppError(`Access denied. Missing permission: ${requiredPermission}`, 403));
   };
 };
 
-// ==========================================
-// 3. BRANCH ISOLATION FILTER
-// ==========================================
+
 export const injectBranchFilter = (req, res, next) => {
   req.branchFilter = { branch: req.user.branch };
 

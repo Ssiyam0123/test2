@@ -4,12 +4,13 @@ import { Plus, PackageSearch, ClipboardList, History, Calculator } from "lucide-
 import useAuth from "../../store/useAuth";
 import { useBranches } from "../../hooks/useBranches"; 
 
-// 🚀 Import Separate Components
 import PantryView from "../../components/inventory/PantryView";
 import HisabNikashView from "../../components/inventory/HisabNikashView";
 import RequisitionsView from "../../components/inventory/RequisitionsView";
 import InventoryHistory from "../inventory/InventoryHistory";
 import BranchDropdown from "../../components/common/BranchDropdown"; 
+import PermissionGuard from "../../components/common/PermissionGuard"; 
+import { PERMISSIONS } from "../../config/permissionConfig";
 
 export default function ManageInventory() {
   const { branchId, branchName } = useOutletContext() || {};
@@ -19,31 +20,33 @@ export default function ManageInventory() {
   const isSuper = isMaster ? isMaster() : authUser?.role === "superadmin";
 
   const [activeTab, setActiveTab] = useState("pantry");
-  const [superAdminBranch, setSuperAdminBranch] = useState(""); // 🚀 Default empty
+  const [superAdminBranch, setSuperAdminBranch] = useState(""); 
+  
+  // CLEAN DATA FETCHING: Directly receive the branches array
+  const { data: branches = [] } = useBranches({}, { enabled: !!isSuper });
 
-  const { data: branchesRes } = useBranches({}, { enabled: !!isSuper });
-
-  // 🚀 Auto-select the first branch for Super Admin when data loads
+  // Auto-select the first branch for Super Admin when data loads cleanly
   useEffect(() => {
-    if (isSuper && branchesRes?.data?.length > 0 && !superAdminBranch) {
-      setSuperAdminBranch(branchesRes.data[0]._id);
+    if (isSuper && branches.length > 0 && !superAdminBranch) {
+      setSuperAdminBranch(branches[0]._id);
     }
-  }, [isSuper, branchesRes, superAdminBranch]);
+  }, [isSuper, branches, superAdminBranch]);
 
-  // 🚀 Calculate effective branch ID
+  // Calculate effective branch ID
   const effectiveBranchId = isSuper ? superAdminBranch : branchId;
 
   const displayBranchName = useMemo(() => {
     if (!isSuper) return branchName;
     if (!superAdminBranch) return "Loading...";
-    const selected = branchesRes?.data?.find(b => b._id === superAdminBranch);
+    // Directly search the clean array
+    const selected = branches.find(b => b._id === superAdminBranch);
     return selected ? selected.branch_name : "Loading...";
-  }, [isSuper, superAdminBranch, branchName, branchesRes]);
+  }, [isSuper, superAdminBranch, branchName, branches]);
 
   const tabs = [
     { id: "pantry", label: "Fast Count", icon: PackageSearch },
     { id: "hisab", label: "Valuation", icon: Calculator },
-    { id: "requisitions", label: "Requisitions", icon: ClipboardList, permission: "view_requisitions" },
+    { id: "requisitions", label: "Requisitions", icon: ClipboardList, permission: PERMISSIONS.VIEW_REQUISITIONS },
     { id: "history", label: "History", icon: History },
   ].filter(t => !t.permission || hasPermission(t.permission));
 
@@ -58,20 +61,26 @@ export default function ManageInventory() {
         </div>
         
         <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
-          {/* 🚀 BRANCH DROPDOWN (No 'All Campuses' option) */}
-          {isSuper && (
-            <BranchDropdown 
-              isMaster={isSuper} 
-              branches={branchesRes?.data || []} 
-              value={superAdminBranch} 
-              onChange={setSuperAdminBranch} 
-              showAllOption={false} // 🚀 HIDDEN THE ALL OPTION HERE
-              wrapperClassName="w-full sm:w-auto" 
-            />
-          )}
+          {/* Protect Branch Dropdown with PermissionGuard */}
+          <PermissionGuard requiredPermission={PERMISSIONS.VIEW_BRANCHES}>
+            {isSuper && (
+              <BranchDropdown 
+                isMaster={isSuper} 
+                branches={branches} // Pass clean array
+                value={superAdminBranch} 
+                onChange={setSuperAdminBranch} 
+                showAllOption={false} 
+                wrapperClassName="w-full sm:w-auto" 
+              />
+            )}
+          </PermissionGuard>
 
-          {hasPermission("manage_inventory") && (
-            <button onClick={() => navigate("/admin/add-inventory")} className="w-full sm:w-auto h-[42px] px-6 bg-teal-600 text-white text-xs font-black uppercase rounded-xl hover:bg-teal-700 transition-all flex items-center justify-center gap-2">
+          {/* Ensure only authorized users can add inventory */}
+          {hasPermission(PERMISSIONS.MANAGE_INVENTORY) && (
+            <button 
+              onClick={() => navigate("/admin/add-inventory")} 
+              className="w-full sm:w-auto h-[42px] px-6 bg-teal-600 text-white text-xs font-black uppercase rounded-xl hover:bg-teal-700 transition-all flex items-center justify-center gap-2"
+            >
               <Plus size={18} /> Log Purchase
             </button>
           )}
@@ -91,7 +100,7 @@ export default function ManageInventory() {
         ))}
       </div>
 
-      {/* 🚀 Render components only if we have an effective branch ID */}
+      {/* Render active views based on effective branch */}
       {effectiveBranchId && (
         <>
           {activeTab === "pantry" && <PantryView branchId={effectiveBranchId} />}

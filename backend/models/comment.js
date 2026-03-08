@@ -9,7 +9,6 @@ const commentSchema = new mongoose.Schema(
       index: true,
     },
     
-    // The instructor (User) who wrote the comment
     instructor: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",

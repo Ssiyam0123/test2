@@ -1,14 +1,26 @@
 import React, { useState } from "react";
-import { useAddComment, useStudentComments } from "../../hooks/useStudents";
+import {
+  useAddComment,
+  useStudentComments,
+  useDeleteComment,
+} from "../../hooks/useStudents";
 import { apiURL } from "../../../Constant";
-import { MessageSquare, RefreshCw, Send, UserIcon, X } from "lucide-react";
-
+import {
+  MessageSquare,
+  RefreshCw,
+  Send,
+  UserIcon,
+  X,
+  Trash2,
+} from "lucide-react";
+import Swal from "sweetalert2";
 const CommentModal = ({ student, onClose }) => {
   const [commentText, setCommentText] = useState("");
-  const { data: commentsResponse, isLoading } = useStudentComments(student._id);
-  const addCommentMutation = useAddComment();
 
-  const comments = commentsResponse?.data || [];
+  const { data: comments = [], isLoading } = useStudentComments(student._id);
+
+  const addCommentMutation = useAddComment();
+  const deleteCommentMutation = useDeleteComment();
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -18,6 +30,22 @@ const CommentModal = ({ student, onClose }) => {
       { studentId: student._id, text: commentText },
       { onSuccess: () => setCommentText("") },
     );
+  };
+
+  const handleDelete = (commentId) => {
+    Swal.fire({
+      title: "Delete Observation?",
+      text: "Are you sure you want to delete this comment? This cannot be undone.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#ef4444",
+      cancelButtonColor: "#94a3b8",
+      confirmButtonText: "Yes, delete it",
+    }).then((result) => {
+      if (result.isConfirmed) {
+        deleteCommentMutation.mutate(commentId);
+      }
+    });
   };
 
   return (
@@ -52,27 +80,39 @@ const CommentModal = ({ student, onClose }) => {
             </div>
           ) : comments.length > 0 ? (
             comments.map((comment) => (
-              <div key={comment._id} className="flex gap-3">
-                <div className="h-8 w-8 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 border border-indigo-100 shrink-0">
+              <div key={comment._id} className="flex gap-3 relative group">
+                <div className="h-8 w-8 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 border border-indigo-100 shrink-0 overflow-hidden">
                   {comment.instructor?.photo_url ? (
                     <img
                       src={`${apiURL.image_url}${comment.instructor.photo_url}`}
-                      className="h-full w-full rounded-full object-cover"
+                      className="h-full w-full object-cover"
+                      alt="Instructor"
                     />
                   ) : (
                     <UserIcon size={14} />
                   )}
                 </div>
-                <div className="flex-1 bg-white p-3 rounded-2xl rounded-tl-none border border-slate-200 shadow-sm">
+                <div className="flex-1 bg-white p-3 rounded-2xl rounded-tl-none border border-slate-200 shadow-sm relative">
                   <div className="flex justify-between items-start mb-1">
                     <p className="text-xs font-bold text-gray-900">
                       {comment.instructor?.full_name || "Instructor"}
                     </p>
-                    <span className="text-[10px] text-gray-400">
-                      {new Date(comment.createdAt).toLocaleDateString()}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-gray-400">
+                        {new Date(comment.createdAt).toLocaleDateString()}
+                      </span>
+
+                      <button
+                        onClick={() => handleDelete(comment._id)}
+                        disabled={deleteCommentMutation.isPending}
+                        className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1 rounded transition-colors opacity-0 group-hover:opacity-100"
+                        title="Delete Comment"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
                   </div>
-                  <p className="text-sm text-gray-700 leading-relaxed">
+                  <p className="text-sm text-gray-700 leading-relaxed pr-6">
                     {comment.text}
                   </p>
                 </div>
@@ -116,4 +156,5 @@ const CommentModal = ({ student, onClose }) => {
     </div>
   );
 };
+
 export default CommentModal;

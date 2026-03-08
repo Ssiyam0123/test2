@@ -10,14 +10,15 @@ const holidaySchema = new mongoose.Schema(
     date_string: {
       type: String,
       required: true,
-      unique: true, 
+      unique: true,
     },
     is_active: {
       type: Boolean,
       default: true,
-    }
+    },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
-export default mongoose.models.Holiday || mongoose.model("Holiday", holidaySchema);
+export default mongoose.models.Holiday ||
+  mongoose.model("Holiday", holidaySchema);

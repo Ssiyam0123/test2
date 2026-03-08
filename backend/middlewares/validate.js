@@ -1,28 +1,35 @@
-import { ZodError } from "zod";
-
 export const validate = (schema) => (req, res, next) => {
   try {
-    // Zod parses and strips unknown fields
-    const validatedData = schema.parse(req.body);
-    req.body = validatedData;
+    // 🚀 রিকোয়েস্ট বডি ভ্যালিডেট করা হচ্ছে
+    req.body = schema.parse(req.body);
     next();
   } catch (error) {
-    console.warn(`[Validation Error] Path: ${req.originalUrl}`);
-    
-    // Safely format Zod errors without crashing
-    let errorMessage = "Invalid input data";
-    
-    if (error instanceof ZodError) {
-      errorMessage = error.errors.map((err) => `${err.path.join('.')}: ${err.message}`).join(" | ");
-      console.warn("Details:", errorMessage); // For your backend debugging
+    // 🚀 টার্মিনালে বিশাল করে এরর প্রিন্ট করবে যাতে চোখে পড়ে!
+    console.log("\n========================================");
+    console.log("🚨 VALIDATION FAILED 🚨");
+    console.log(`Route: ${req.method} ${req.originalUrl}`);
+    console.log("📦 Received Data (req.body):", JSON.stringify(req.body, null, 2));
+
+    let errorDetails = error.message;
+
+    // instanceof এর বদলে duck-typing ইউজ করা হলো যাতে ক্র্যাশ না করে
+    if (error.name === "ZodError" || error.errors) {
+      errorDetails = error.errors.map(err => {
+        const field = err.path.length > 0 ? err.path.join(".") : "ROOT_OBJECT";
+        return { field, issue: err.message };
+      });
+      console.log("\n❌ Zod Rejection Reasons:");
+      console.table(errorDetails);
     } else {
-      errorMessage = error.message;
+      console.log("\n❌ Raw Error:", error);
     }
-    
-    return res.status(400).json({ 
-        success: false, 
-        message: "Validation Failed",
-        errors: errorMessage 
+    console.log("========================================\n");
+
+    // 🚀 ফ্রন্টএন্ডে সুন্দর করে 400 Bad Request পাঠাবে
+    return res.status(400).json({
+      success: false,
+      message: "Data Validation Failed!",
+      errors: errorDetails,
     });
   }
 };

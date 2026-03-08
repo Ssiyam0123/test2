@@ -9,7 +9,7 @@ export const createBatch = catchAsync(async (req, res) => {
 
 export const getAllBatches = catchAsync(async (req, res) => {
   const batches = await BatchService.fetchAllBatches(req.query, req.branchFilter, req.isMaster);
-  res.status(200).json(new ApiResponse(200, batches, "Batches fetched"));
+  res.status(200).json(new ApiResponse(200, batches, "Batches fetched successfully"));
 });
 
 export const getBatchById = catchAsync(async (req, res) => {
@@ -19,10 +19,10 @@ export const getBatchById = catchAsync(async (req, res) => {
 
 export const updateBatch = catchAsync(async (req, res) => {
   const batch = await BatchService.modifyBatch(req.params.id, req.body, req.branchFilter);
-  res.status(200).json(new ApiResponse(200, batch, "Batch updated"));
+  res.status(200).json(new ApiResponse(200, batch, "Batch updated successfully"));
 });
 
 export const deleteBatch = catchAsync(async (req, res) => {
   await BatchService.removeBatch(req.params.id, req.branchFilter);
-  res.status(200).json(new ApiResponse(200, null, "Batch and syllabus deleted"));
+  res.status(200).json(new ApiResponse(200, null, "Batch and syllabus deleted permanently"));
 });

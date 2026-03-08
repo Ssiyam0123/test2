@@ -3,13 +3,10 @@ import catchAsync from "../utils/catchAsync.js";
 import AppError from "../utils/AppError.js";
 import ApiResponse from "../utils/ApiResponse.js";
 
-// ==========================================
-// 🐳 [Controller: getExpenses]
-// ==========================================
+//  getExpenses
 export const getExpenses = catchAsync(async (req, res, next) => {
   const { batchId, classId } = req.query;
   
-  // 🚀 Automatically handles isMaster vs Branch Admin via req.branchFilter
   let filter = { ...req.branchFilter };
 
   if (classId) filter.class_content = classId;

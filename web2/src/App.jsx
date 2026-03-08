@@ -10,8 +10,9 @@ import {
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 
-// STORE & LAYOUTS
+// STORE, LAYOUTS & CONFIG
 import useAuth from "./store/useAuth";
+import { PERMISSIONS } from "./config/permissionConfig";
 import LogoLoader from "./components/LogoLoader.jsx";
 import AdminLayout from "./components/AdminLayout";
 import PublicLayout from "./components/PublicLayout";
@@ -39,22 +40,17 @@ import ManageBatchesTabs from "./pages/batches/ManageBatchesTabs.jsx";
 import ManageBatches from "./pages/batches/ManageBatches.jsx";
 import BatchListPage from "./pages/batches/BatchListPage.jsx";
 import AddBatch from "./pages/batches/AddBatch.jsx";
-// import BatchFormContainer from "./components/batches/BatchFormContainer.jsx";
 import ManageBranches from "./pages/branches/ManageBranches.jsx";
 import BranchDetails from "./pages/branches/BranchDetails.jsx";
 import AllBranches from "./pages/branches/AllBranches.jsx";
 import ManageBranchForm from "./pages/branches/ManageBranchForm.jsx";
 import ManageInventory from "./pages/inventory/ManageInventory.jsx";
 import AddInventory from "./pages/inventory/AddInventory.jsx";
-
-// SYLLABUS DOMAIN
 import ManageMasterSyllabus from "./pages/master-syllabus/ManageMasterSyllabus.jsx";
 import AddMasterSyllabus from "./pages/master-syllabus/AddMasterSyllabus.jsx";
-
 import StudentFinance from "./pages/finance/StudentFinance";
-
-// 🚀 SETTINGS / HOLIDAYS
 import ManageHolidays from "./pages/setting/ManageHolidays.jsx";
+import AttendanceBookPage from "./pages/batches/AttendanceBookPage.jsx";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -72,7 +68,6 @@ const ProtectedRoute = ({ children }) => {
   return authUser ? children : <Navigate to="/login" replace />;
 };
 
-// RoleGuard ekhon shudhu hasPermission use korbe
 const RoleGuard = ({ requiredPermission }) => {
   const { hasPermission } = useAuth();
   const context = useOutletContext();
@@ -88,17 +83,10 @@ const RoleGuard = ({ requiredPermission }) => {
 const AdminIndex = () => {
   const { hasPermission, isMaster } = useAuth();
 
-  if (isMaster()) {
-    return <Dashboard />;
-  }
-
-  if (hasPermission("view_dashboard")) {
-    return <BranchDashboard />;
-  }
-
-  if (hasPermission("view_students")) {
+  if (isMaster()) return <Dashboard />;
+  if (hasPermission(PERMISSIONS.VIEW_DASHBOARD)) return <BranchDashboard />;
+  if (hasPermission(PERMISSIONS.VIEW_STUDENTS))
     return <Navigate to="/admin/all-students" replace />;
-  }
 
   return (
     <div className="p-8 text-center font-bold text-slate-500 mt-20">
@@ -107,9 +95,6 @@ const AdminIndex = () => {
   );
 };
 
-// ==========================================
-// MAIN ROUTER
-// ==========================================
 function App() {
   const { checkAuth, isCheckingAuth, authUser } = useAuth();
 
@@ -146,44 +131,42 @@ function App() {
           >
             <Route index element={<AdminIndex />} />
 
-            <Route element={<RoleGuard requiredPermission="view_students" />}>
+            <Route element={<RoleGuard requiredPermission={PERMISSIONS.VIEW_STUDENTS} />}>
               <Route path="all-students" element={<AllStudents />} />
             </Route>
-            <Route element={<RoleGuard requiredPermission="add_student" />}>
+            <Route element={<RoleGuard requiredPermission={PERMISSIONS.ADD_STUDENT} />}>
               <Route path="add-student" element={<AddStudent />} />
             </Route>
-            <Route element={<RoleGuard requiredPermission="edit_student" />}>
+            <Route element={<RoleGuard requiredPermission={PERMISSIONS.EDIT_STUDENT} />}>
               <Route path="update-student/:id" element={<UpdateStudent />} />
             </Route>
 
-            <Route element={<RoleGuard requiredPermission="view_employees" />}>
+            <Route element={<RoleGuard requiredPermission={PERMISSIONS.VIEW_EMPLOYEES} />}>
               <Route path="all-employees" element={<AllEmployees />} />
               <Route path="employee/:id" element={<EmployeeDetails />} />
             </Route>
-            <Route element={<RoleGuard requiredPermission="add_employee" />}>
+            <Route element={<RoleGuard requiredPermission={PERMISSIONS.ADD_EMPLOYEE} />}>
               <Route
                 path="add-employee"
                 element={<AddEmployeeForm mode="add" />}
               />
             </Route>
-            <Route element={<RoleGuard requiredPermission="edit_employee" />}>
+            <Route element={<RoleGuard requiredPermission={PERMISSIONS.EDIT_EMPLOYEE} />}>
               <Route
                 path="update-employee/:id"
                 element={<UpdateEmployee mode="edit" />}
               />
             </Route>
 
-            <Route element={<RoleGuard requiredPermission="view_courses" />}>
+            <Route element={<RoleGuard requiredPermission={PERMISSIONS.VIEW_COURSES} />}>
               <Route path="all-courses" element={<AllCourses />} />
             </Route>
-            <Route element={<RoleGuard requiredPermission="manage_courses" />}>
+            <Route element={<RoleGuard requiredPermission={PERMISSIONS.MANAGE_COURSES} />}>
               <Route path="add-course" element={<AddCourse />} />
               <Route
                 path="update-course/:id"
                 element={<AddCourse mode="edit" />}
               />
-
-              {/* SYLLABUS ROUTES */}
               <Route
                 path="manage-syllabus"
                 element={<ManageMasterSyllabus />}
@@ -198,15 +181,16 @@ function App() {
               />
             </Route>
 
-            <Route element={<RoleGuard requiredPermission="view_classes" />}>
+            <Route element={<RoleGuard requiredPermission={PERMISSIONS.VIEW_CLASSES} />}>
               <Route path="all-batches" element={<BatchListPage />} />
+              <Route path="attendance-book" element={<AttendanceBookPage />} />
             </Route>
-            <Route element={<RoleGuard requiredPermission="manage_classes" />}>
+
+            <Route element={<RoleGuard requiredPermission={PERMISSIONS.MANAGE_CLASSES} />}>
               <Route path="manage-batches" element={<ManageBatchesTabs />} />
               <Route path="batches/:id" element={<ManageBatches />} />
               <Route path="add-batch" element={<AddBatch />} />
               <Route path="edit-batch/:id" element={<AddBatch />} />
-              {/* 🚀 HOLIDAY ROUTE */}
               <Route path="manage-holidays" element={<ManageHolidays />} />
             </Route>
 
@@ -215,11 +199,12 @@ function App() {
               element={<StudentFinance />}
             />
 
-            <Route element={<RoleGuard requiredPermission="view_branches" />}>
+            <Route element={<RoleGuard requiredPermission={PERMISSIONS.VIEW_BRANCHES} />}>
               <Route path="branches" element={<AllBranches />} />
               <Route path="branches/:id" element={<BranchDetails />} />
             </Route>
-            <Route element={<RoleGuard requiredPermission="manage_branches" />}>
+
+            <Route element={<RoleGuard requiredPermission={PERMISSIONS.MANAGE_BRANCHES} />}>
               <Route path="manage-branches" element={<ManageBranches />} />
               <Route path="manage-branches/:id" element={<BranchDetails />} />
               <Route
@@ -231,22 +216,19 @@ function App() {
                 element={<ManageBranchForm mode="edit" />}
               />
             </Route>
-
-            <Route element={<RoleGuard requiredPermission="view_inventory" />}>
+            <Route element={<RoleGuard requiredPermission={PERMISSIONS.VIEW_INVENTORY} />}>
               <Route path="inventory" element={<ManageInventory />} />
             </Route>
             <Route
-              element={<RoleGuard requiredPermission="manage_inventory" />}
+              element={<RoleGuard requiredPermission={PERMISSIONS.MANAGE_INVENTORY} />}
             >
               <Route path="add-inventory" element={<AddInventory />} />
             </Route>
-
-            <Route element={<RoleGuard requiredPermission="manage_roles" />}>
+            <Route element={<RoleGuard requiredPermission={PERMISSIONS.MANAGE_ROLES} />}>
               <Route path="manage-admins" element={<ManageAdmins />} />
               <Route path="manage-roles" element={<ManageRoles />} />
             </Route>
           </Route>
-
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Router>

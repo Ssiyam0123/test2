@@ -23,16 +23,28 @@ export const deleteClassContent = catchAsync(async (req, res) => {
 });
 
 export const scheduleClass = catchAsync(async (req, res) => {
-  const updatedClass = await ClassService.assignClassDate(req.params.classContentId, req.body.date_scheduled, req.branchFilter);
+  // 🚀 FIXED: req.params.classId হবে, classContentId না!
+  const updatedClass = await ClassService.assignClassDate(req.params.classId, req.body.date_scheduled, req.branchFilter);
   res.status(200).json(new ApiResponse(200, updatedClass, "Class scheduled"));
 });
 
-export const updateClassAttendance = catchAsync(async (req, res) => {
-  const updatedClass = await ClassService.recordClassAttendance(req.params.classId, req.body, req.branchFilter, req.user._id);
-  res.status(200).json(new ApiResponse(200, updatedClass, "Attendance and costs updated"));
+export const autoScheduleSyllabus = catchAsync(async (req, res) => {
+  const result = await ClassService.generateAutoSchedule(req.params.batchId, req.branchFilter);
+  res.status(200).json(new ApiResponse(200, result, "Calendar generated successfully"));
 });
 
-export const autoScheduleSyllabus = catchAsync(async (req, res) => {
-  await ClassService.generateAutoSchedule(req.params.batchId, req.branchFilter);
-  res.status(200).json(new ApiResponse(200, null, "Calendar generated successfully"));
+// 🚀 FIXED: The missing Controller function that connects to your Service
+export const updateClassAttendance = catchAsync(async (req, res) => {
+  const classId = req.params.classId; 
+  const branchFilter = req.branchFilter || {};
+  const userId = req.user ? req.user._id : null; 
+
+  const updatedClass = await ClassService.recordClassAttendance(
+    classId, 
+    req.body, 
+    branchFilter, 
+    userId
+  );
+
+  res.status(200).json(new ApiResponse(200, updatedClass, "Attendance recorded successfully!"));
 });

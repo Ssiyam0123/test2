@@ -2,7 +2,6 @@ import * as StudentService from "../services/student.service.js";
 import catchAsync from "../utils/catchAsync.js";
 import ApiResponse from "../utils/ApiResponse.js";
 import AppError from "../utils/AppError.js";
-import mongoose from "mongoose";
 
 export const addStudent = catchAsync(async (req, res) => {
   const student = await StudentService.createStudent(
@@ -27,47 +26,13 @@ export const updateStudent = catchAsync(async (req, res) => {
 });
 
 export const getAllStudents = catchAsync(async (req, res) => {
-  const page = Math.max(1, parseInt(req.query.page) || 1);
-  const limit = Math.min(100, parseInt(req.query.limit) || 30);
-  
-  const { search, status, branch, batch, course, is_active, is_verified, date_from, date_to } = req.query;
-
-  let match = {};
-
-  const effectiveBranch = req.branchFilter?.branch || branch;
-  if (effectiveBranch && effectiveBranch !== "all") {
-    match.branch = new mongoose.Types.ObjectId(effectiveBranch);
-  }
-
-  if (batch && batch !== "all") match.batch = new mongoose.Types.ObjectId(batch);
-  if (course && course !== "all") match.course = new mongoose.Types.ObjectId(course);
-
-  if (status && status !== "all") match.status = status;
-  if (is_active && is_active !== "all") match.is_active = is_active === "true";
-  if (is_verified && is_verified !== "all") match.is_verified = is_verified === "true";
-
-  if (date_from || date_to) {
-    match.createdAt = {}; 
-    if (date_from) match.createdAt.$gte = new Date(date_from);
-    if (date_to) match.createdAt.$lte = new Date(date_to);
-  }
-
-  if (search) {
-    match.$or = [
-      { student_name: { $regex: search, $options: "i" } },
-      { student_id: { $regex: search, $options: "i" } },
-      { phone: { $regex: search, $options: "i" } }
-    ];
-  }
-
-  const { students, pagination } = await StudentService.fetchAllStudents(match, page, limit);
-
+  const { students, pagination } = await StudentService.fetchAllStudents(req.query, req.branchFilter);
   res.status(200).json(new ApiResponse(200, students, "Students fetched successfully", pagination));
 });
 
 export const deleteStudent = catchAsync(async (req, res) => {
   await StudentService.removeStudent(req.params.id, req.branchFilter);
-  res.status(200).json(new ApiResponse(200, null, "Student and all associated records deleted permanently."));
+  res.status(200).json(new ApiResponse(200, null, "Student and associated records deleted permanently"));
 });
 
 export const removeStudentImage = catchAsync(async (req, res) => {
@@ -95,7 +60,7 @@ export const getAdminStudentById = catchAsync(async (req, res) => {
 
 export const publicSearchStudent = catchAsync(async (req, res, next) => {
   const { query } = req.query;
-  if (!query || query.trim() === "") return next(new AppError("Search query is required", 400));
+  if (!query?.trim()) return next(new AppError("Search query is required", 400));
 
   const student = await StudentService.fetchPublicStudentSearch(query);
   res.status(200).json(new ApiResponse(200, student, "Student found"));

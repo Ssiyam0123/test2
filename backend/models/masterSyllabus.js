@@ -6,7 +6,7 @@ const masterSyllabusSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
-      unique: true, 
+      unique: true,
     },
     order_index: {
       type: Number,
@@ -14,21 +14,30 @@ const masterSyllabusSchema = new mongoose.Schema(
     },
     class_type: {
       type: String,
-      enum: ["Lecture", "Lab", "Assessment", "Exam", "Review", "Orientation", "Other"],
+      enum: [
+        "Lecture",
+        "Lab",
+        "Assessment",
+        "Exam",
+        "Review",
+        "Orientation",
+        "Other",
+      ],
       default: "Lecture",
     },
     description: {
       type: String,
       trim: true,
     },
-    category: { 
+    category: {
       type: String,
       default: "General",
-    }
+    },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 masterSyllabusSchema.index({ order_index: 1 });
 
-export default mongoose.models.MasterSyllabus || mongoose.model("MasterSyllabus", masterSyllabusSchema);
+export default mongoose.models.MasterSyllabus ||
+  mongoose.model("MasterSyllabus", masterSyllabusSchema);

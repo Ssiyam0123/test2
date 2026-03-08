@@ -9,10 +9,9 @@ export const fetchCourses = async (page = 1, limit = 30, filters = {}) => {
 export const fetchActiveCourses = async (filters = {}) => {
   const params = new URLSearchParams(filters);
   const { data } = await API.get(`/courses/active?${params}`);
-  return data;
+  return data.data;
 };
 
-// 🚀 FIXED: Unwrapping ApiResponse data
 export const fetchCourseById = async (id) => {
   const { data } = await API.get(`/courses/${id}`);
   return data.data; 
@@ -20,20 +19,20 @@ export const fetchCourseById = async (id) => {
 
 export const createCourse = async (courseData) => {
   const { data } = await API.post('/courses/create', courseData);
-  return data;
+  return data.data;
 };
 
-export const updateCourse = async ({ id, ...courseData }) => {
-  const { data } = await API.put(`/courses/update/${id}`, courseData);
-  return data;
-};
-
-export const deleteCourse = async (id) => {
-  const { data } = await API.delete(`/courses/delete/${id}`);
-  return data;
+export const updateCourse = async ({ id, formData }) => {
+  const { data } = await API.put(`/courses/update/${id}`, formData);
+  return data.data;
 };
 
 export const toggleCourseStatus = async (id) => {
   const { data } = await API.patch(`/courses/toggle-status/${id}`);
-  return data;
+  return data.data;
+};
+
+export const deleteCourse = async (id) => {
+  const { data } = await API.delete(`/courses/delete/${id}`);
+  return data.data;
 };

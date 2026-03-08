@@ -7,18 +7,12 @@ import { batchCreateSchema, batchUpdateSchema } from "../validators/batch.valida
 const router = express.Router();
 
 router.use(verifyToken);
+router.use(injectBranchFilter);
 
-// ==========================================
-// READ ROUTES
-// ==========================================
-router.get("/", requirePermission("view_classes"), injectBranchFilter, batchCtrl.getAllBatches);
-router.get("/:id", requirePermission("view_classes"), injectBranchFilter, batchCtrl.getBatchById); // 🚀 Branch Filter injected
-
-// ==========================================
-// WRITE ROUTES
-// ==========================================
+router.get("/", requirePermission("view_classes"), batchCtrl.getAllBatches);
+router.get("/:id", requirePermission("view_classes"), batchCtrl.getBatchById);
 router.post("/", requirePermission("manage_classes"), validate(batchCreateSchema), batchCtrl.createBatch);
-router.put("/:id", requirePermission("manage_classes"), injectBranchFilter, validate(batchUpdateSchema), batchCtrl.updateBatch);
-router.delete("/:id", requirePermission("manage_classes"), injectBranchFilter, batchCtrl.deleteBatch);
+router.put("/:id", requirePermission("manage_classes"), validate(batchUpdateSchema), batchCtrl.updateBatch);
+router.delete("/:id", requirePermission("manage_classes"), batchCtrl.deleteBatch);
 
 export default router;

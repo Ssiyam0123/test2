@@ -9,7 +9,7 @@ import DataTable from "../common/DataTable.jsx";
 import ActionIconButton from "../common/ActionIconButton.jsx";
 import Avatar from "../common/Avatar.jsx";
 import CanAccess from "../common/CanAccess.jsx"; 
-import { PERMISSIONS } from "../../utils/permissions.js";
+import { PERMISSIONS } from "../../config/permissionConfig.js";
 import { confirmDelete } from "../../utils/swalUtils"; // 🚀 Import Swal Utility
 
 const EmployeesTable = ({
@@ -107,7 +107,6 @@ const EmployeesTable = ({
         <td className="px-6 py-4 align-middle">
           <div className="flex items-center gap-4">
             
-            {/* 🚀 FIXED AVATAR: Check if the field is photo_url or just photo */}
             <Avatar
               src={employee.photo_url || employee.photo} 
               alt={employee.username}

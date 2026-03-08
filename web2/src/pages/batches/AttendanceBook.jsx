@@ -3,12 +3,10 @@ import { Check, X, Minus, UserCircle } from "lucide-react";
 import { format } from "date-fns";
 
 export default function AttendanceBook({ batch, classes }) {
-  // 1. Sort classes by class_number to ensure the columns are in order
   const sortedClasses = useMemo(() => {
     return [...(classes || [])].sort((a, b) => a.class_number - b.class_number);
   }, [classes]);
 
-  // 2. Build the Matrix Data
   const attendanceMatrix = useMemo(() => {
     if (!batch?.students) return [];
 
@@ -16,126 +14,117 @@ export default function AttendanceBook({ batch, classes }) {
       let presentCount = 0;
       let totalMarked = 0;
 
-      const studentRecord = {
-        student,
-        attendance: sortedClasses.map((cls) => {
-          // Find if this student was marked in this specific class
-          const record = cls.attendance?.find(
-            (a) => a.student === student._id || a.student?._id === student._id
-          );
+      const attendance = sortedClasses.map((cls) => {
+        const record = cls.attendance?.find(
+          (a) => (a.student?._id || a.student) === (student._id || student),
+        );
 
-          if (record) {
-            totalMarked++;
-            if (record.status === "present") presentCount++;
+        let normalizedStatus = "unmarked";
+
+        if (record && record.status) {
+          totalMarked++;
+          normalizedStatus = record.status.toLowerCase();
+          if (normalizedStatus === "present") {
+            presentCount++;
           }
+        }
 
-          return {
-            classId: cls._id,
-            status: record ? record.status : "unmarked",
-            isCompleted: cls.is_completed,
-          };
-        }),
+        return { status: normalizedStatus };
+      });
+
+      return {
+        student,
+        attendance,
+        percentage:
+          totalMarked === 0
+            ? 0
+            : Math.round((presentCount / totalMarked) * 100),
       };
-
-      // Calculate percentage
-      studentRecord.percentage = totalMarked === 0 
-        ? 0 
-        : Math.round((presentCount / totalMarked) * 100);
-
-      return studentRecord;
     });
   }, [batch?.students, sortedClasses]);
 
-  if (!batch?.students?.length) {
-    return <div className="p-8 text-center text-slate-500 font-medium">No students enrolled in this batch yet.</div>;
-  }
+  if (!batch?.students?.length)
+    return (
+      <div className="p-20 text-center font-bold text-slate-400">
+        No students enrolled yet.
+      </div>
+    );
 
   return (
     <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden">
-      <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-        <div>
-          <h3 className="text-xl font-black text-slate-800">Master Attendance Book</h3>
-          <p className="text-sm font-medium text-slate-500">Cross-reference view of all scheduled classes.</p>
-        </div>
-      </div>
-
-      {/* HORIZONTAL SCROLL CONTAINER */}
-      <div className="overflow-x-auto custom-scrollbar relative">
+      <div className="overflow-x-auto custom-scrollbar">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr>
-              {/* STICKY LEFT COLUMN: Student Name */}
-              <th className="sticky left-0 z-20 bg-slate-50 p-4 border-b border-r border-slate-200 min-w-[250px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
-                <span className="text-xs font-black text-slate-500 uppercase tracking-widest">Student</span>
+            <tr className="bg-slate-50">
+              <th className="sticky left-0 z-20 bg-slate-50 p-5 border-b border-r border-slate-200 min-w-[240px]">
+                Student
               </th>
-              
-              {/* PERCENTAGE COLUMN */}
-              <th className="bg-slate-50 p-4 border-b border-slate-200 text-center min-w-[100px]">
-                <span className="text-xs font-black text-slate-500 uppercase tracking-widest">Score</span>
+              <th className="p-5 border-b border-slate-200 text-center min-w-[100px]">
+                Avg Score
               </th>
-
-              {/* DYNAMIC CLASS COLUMNS */}
               {sortedClasses.map((cls) => (
-                <th key={cls._id} className="bg-slate-50 p-4 border-b border-slate-200 text-center min-w-[120px]">
-                  <div className="flex flex-col items-center">
-                    <span className="text-[11px] font-black text-slate-800 uppercase tracking-wider mb-1">
-                      Class {cls.class_number}
-                    </span>
-                    <span className="text-[10px] font-bold text-slate-400">
-                      {cls.date_scheduled ? format(new Date(cls.date_scheduled), "MMM dd") : "TBA"}
-                    </span>
-                  </div>
+                <th
+                  key={cls._id}
+                  className="p-5 border-b border-slate-200 text-center min-w-[110px]"
+                >
+                  <span className="block text-[10px] font-black uppercase text-slate-400">
+                    Class {cls.class_number}
+                  </span>
+                  <span className="text-[11px] font-bold text-slate-600">
+                    {cls.date_scheduled
+                      ? format(new Date(cls.date_scheduled), "MMM dd")
+                      : "TBA"}
+                  </span>
                 </th>
               ))}
             </tr>
           </thead>
-
           <tbody>
-            {attendanceMatrix.map((row, index) => (
-              <tr key={row.student._id} className="hover:bg-slate-50/50 transition-colors group">
-                
-                {/* STICKY LEFT COLUMN: Student Name */}
-                <td className="sticky left-0 z-10 bg-white group-hover:bg-slate-50 p-4 border-b border-r border-slate-100 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.02)] transition-colors">
+            {attendanceMatrix.map((row) => (
+              <tr
+                key={row.student._id}
+                className="hover:bg-slate-50/50 transition-colors group"
+              >
+                <td className="sticky left-0 z-10 bg-white group-hover:bg-slate-50 p-4 border-b border-r border-slate-100 shadow-sm transition-colors">
                   <div className="flex items-center gap-3">
-                    {row.student.photo_url ? (
-                      <img src={row.student.photo_url} alt="profile" className="w-8 h-8 rounded-full object-cover" />
-                    ) : (
-                      <UserCircle className="w-8 h-8 text-slate-300" />
-                    )}
-                    <div>
-                      <p className="text-sm font-bold text-slate-800">{row.student.student_name}</p>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{row.student.student_id}</p>
+                    <UserCircle className="w-8 h-8 text-slate-300 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-slate-800 truncate">
+                        {row.student.student_name}
+                      </p>
+                      <p className="text-[10px] font-black text-slate-400 uppercase">
+                        {row.student.student_id}
+                      </p>
                     </div>
                   </div>
                 </td>
-
-                {/* PERCENTAGE CELL */}
                 <td className="p-4 border-b border-slate-100 text-center">
-                  <span className={`inline-flex items-center justify-center px-2.5 py-1 rounded-lg text-xs font-black ${
-                    row.percentage >= 80 ? 'bg-emerald-100 text-emerald-700' :
-                    row.percentage >= 50 ? 'bg-amber-100 text-amber-700' :
-                    'bg-rose-100 text-rose-700'
-                  }`}>
+                  <span
+                    className={`px-2.5 py-1 rounded-lg text-xs font-black ${row.percentage >= 80 ? "bg-emerald-50 text-emerald-600" : row.percentage >= 50 ? "bg-amber-50 text-amber-600" : "bg-rose-50 text-rose-600"}`}
+                  >
                     {row.percentage}%
                   </span>
                 </td>
-
-                {/* DYNAMIC ATTENDANCE CELLS */}
                 {row.attendance.map((record, i) => (
-                  <td key={`${row.student._id}-${record.classId}`} className="p-4 border-b border-slate-100 text-center">
+                  <td
+                    key={i}
+                    className="p-4 border-b border-slate-100 text-center"
+                  >
                     <div className="flex justify-center">
                       {record.status === "present" ? (
-                        <div className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center border border-emerald-100 shadow-sm">
-                          <Check size={16} strokeWidth={3} />
-                        </div>
+                        <Check
+                          className="text-emerald-500"
+                          size={18}
+                          strokeWidth={4}
+                        />
                       ) : record.status === "absent" ? (
-                        <div className="w-8 h-8 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center border border-rose-100 shadow-sm">
-                          <X size={16} strokeWidth={3} />
-                        </div>
+                        <X
+                          className="text-rose-500"
+                          size={18}
+                          strokeWidth={4}
+                        />
                       ) : (
-                        <div className="w-8 h-8 rounded-full bg-slate-50 text-slate-300 flex items-center justify-center border border-slate-100">
-                          <Minus size={16} />
-                        </div>
+                        <Minus className="text-slate-200" size={16} />
                       )}
                     </div>
                   </td>

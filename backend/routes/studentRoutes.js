@@ -1,41 +1,34 @@
 import express from "express";
-import { 
-  addStudent, getAllStudents, deleteStudent, getAdminStudentById, 
-  updateStudent, toggleStudentStatus, removeStudentImage,
-  searchStudent, publicSearchStudent, getPublicStudentById
-} from "../controllers/student.controller.js";
-import { addComment, getStudentComments } from "../controllers/comment.controller.js";
+import * as studentCtrl from "../controllers/student.controller.js";
+import { addComment, deleteComment, getStudentComments } from "../controllers/comment.controller.js";
 import { upload } from "../middlewares/multer.js";
 import { validate } from "../middlewares/validate.js";
 import { studentCreateSchema, studentUpdateSchema } from "../validators/student.validator.js";
-import { commentCreateSchema } from "../validators/comment.validator.js"; // 🚀 Zod Validator for comments
+import { commentCreateSchema } from "../validators/comment.validator.js"; 
 import { verifyToken, requirePermission, injectBranchFilter } from "../middlewares/auth.js";
 
 const router = express.Router();
 
-// PUBLIC ROUTES
-router.get("/public/search", publicSearchStudent);
-router.get("/public/:id", getPublicStudentById);
+// Public Routes (No Token Required)
+router.get("/public/search", studentCtrl.publicSearchStudent);
+router.get("/public/:id", studentCtrl.getPublicStudentById);
 
-// PROTECTED ROUTES
+// Protected Routes
 router.use(verifyToken);
 
-// READ OPERATIONS
-router.get("/all", requirePermission("view_students"), injectBranchFilter, getAllStudents);
-router.get("/search", requirePermission("view_students"), injectBranchFilter, searchStudent);
-router.get("/admin/:id", requirePermission("view_students"), getAdminStudentById);
+router.get("/all", requirePermission("view_students"), injectBranchFilter, studentCtrl.getAllStudents);
+router.get("/search", requirePermission("view_students"), injectBranchFilter, studentCtrl.searchStudent);
+router.get("/admin/:id", requirePermission("view_students"), injectBranchFilter, studentCtrl.getAdminStudentById);
 
-// WRITE OPERATIONS
-router.post("/create", requirePermission("add_student"), upload.single("photo"), validate(studentCreateSchema), addStudent);
-router.put("/update/:id", requirePermission("edit_student"), upload.single("photo"), validate(studentUpdateSchema), updateStudent);
+router.post("/create", requirePermission("add_student"), upload.single("photo"), validate(studentCreateSchema), studentCtrl.addStudent);
+router.put("/update/:id", requirePermission("edit_student"), upload.single("photo"), validate(studentUpdateSchema), studentCtrl.updateStudent);
+router.patch("/toggle-status/:id", requirePermission("edit_student"), studentCtrl.toggleStudentStatus);
+router.delete("/remove-image/:id", requirePermission("edit_student"), studentCtrl.removeStudentImage);
+router.delete("/delete/:id", requirePermission("delete_student"), studentCtrl.deleteStudent);
 
-// STATUS & MEDIA
-router.patch("/toggle-status/:id", requirePermission("edit_student"), toggleStudentStatus);
-router.delete("/remove-image/:id", requirePermission("edit_student"), removeStudentImage);
-router.delete("/delete/:id", requirePermission("delete_student"), deleteStudent);
-
-// COMMENTS
+// Comments
 router.post("/:studentId/comments", requirePermission("add_comment"), validate(commentCreateSchema), addComment);
 router.get("/:studentId/comments", requirePermission("view_students"), getStudentComments);
+router.delete("/comments/:commentId", requirePermission("add_comment"), deleteComment);
 
 export default router;

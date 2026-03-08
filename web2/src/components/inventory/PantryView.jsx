@@ -4,8 +4,8 @@ import { useInventory } from "../../hooks/useInventory";
 import Loader from "../../components/Loader";
 
 export default function PantryView({ branchId }) { 
-  const { data: res, isLoading } = useInventory(branchId);
-  const inventory = res?.data || [];
+  // CLEAN DATA FETCHING: Directly receive the array, defaulting to []
+  const { data: inventory = [], isLoading } = useInventory(branchId);
 
   if (isLoading) return <div className="py-20 flex justify-center"><Loader /></div>;
 

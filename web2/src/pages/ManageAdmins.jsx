@@ -1,173 +1,250 @@
 import React, { useState } from "react";
-import { Trash2, Plus, X, ShieldCheck, UserCog } from "lucide-react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { API } from "../api/axios";
-import Loader from "../components/Loader.jsx";
+import {
+  Trash2,
+  Plus,
+  X,
+  ShieldCheck,
+  UserCog,
+  Mail,
+  Phone,
+  Fingerprint,
+} from "lucide-react";
+import {
+  useUsers,
+  useAddUser,
+  useDeleteUser,
+  useUpdateUser,
+} from "../hooks/useUser";
+import Loader from "../components/Loader";
+import PageHeader from "../components/common/PageHeader";
+import DataTable from "../components/common/DataTable";
+import { confirmDelete } from "../utils/swalUtils";
 import toast from "react-hot-toast";
 
 const ManageAdmins = () => {
-  const queryClient = useQueryClient();
-  const [open, setOpen] = useState(false);
-
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [form, setForm] = useState({
     username: "",
     email: "",
-    password: "123456", 
+    password: "123456",
     full_name: "",
     employee_id: "",
     phone: "",
-    role: "admin" 
+    role: "admin",
   });
 
-  // 1. Fetch ONLY admins using the role query parameter
-  const { data: admins = [], isLoading } = useQuery({
-    queryKey: ["admins"],
-    queryFn: async () => {
-      // Pointing to the new unified users route with the role filter
-      const res = await API.get("/users/all?role=admin&limit=100");
-      // The backend returns { data: [...], pagination: {...} }, so we return res.data.data
-      return res.data.data || [];
-    },
+  const { data: adminsRes, isLoading } = useUsers({
+    role: "admin",
+    limit: 100,
   });
+  const admins = adminsRes?.data || [];
 
-  // 2. Updated Toggle Mutation
-  const toggleRole = useMutation({
-    mutationFn: (id) => API.patch(`/users/toggle-role/${id}`),
-    onSuccess: (res) => {
-      queryClient.invalidateQueries(["admins"]);
-      toast.success(res.data.message);
-    },
-  });
-
-  // 3. Updated Delete Mutation 
-  const deleteUser = useMutation({
-    mutationFn: (id) => API.delete(`/users/delete/${id}`),
-    onSuccess: () => {
-      queryClient.invalidateQueries(["admins"]);
-      toast.success("Account removed");
-    },
-    onError: (err) => toast.error(err.response?.data?.message || "Failed to delete")
-  });
-
-  const addAdmin = useMutation({
-    mutationFn: async (data) => {
-      // Because the /users/create route uses multer, we must send it as FormData
-      const formData = new FormData();
-      Object.keys(data).forEach((key) => formData.append(key, data[key]));
-      return await API.post("/users/create", formData);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries(["admins"]);
-      setOpen(false);
-      setForm({ username: "", email: "", password: "123456", full_name: "", employee_id: "", phone: "", role: "admin" });
-      toast.success("New Admin Registered");
-    },
-    onError: (err) => toast.error(err.response?.data?.message || "Registration failed")
-  });
+  const createMutation = useAddUser();
+  const deleteMutation = useDeleteUser();
+  const updateMutation = useUpdateUser();
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    addAdmin.mutate(form);
+
+    const formData = new FormData();
+    Object.keys(form).forEach((key) => formData.append(key, form[key]));
+
+    createMutation.mutate(formData, {
+      onSuccess: () => {
+        setIsModalOpen(false);
+        setForm({
+          username: "",
+          email: "",
+          password: "123456",
+          full_name: "",
+          employee_id: "",
+          phone: "",
+          role: "admin",
+        });
+        toast.success("Administrator access granted.");
+      },
+    });
   };
 
-  if (isLoading) return <Loader/>;
+  const handleDelete = (user) => {
+    confirmDelete({
+      title: "Revoke Access?",
+      text: `Are you sure you want to remove admin privileges for ${user.full_name || user.username}?`,
+      onConfirm: () => deleteMutation.mutate(user._id),
+    });
+  };
+
+  const handleToggleStatus = (id) => {
+    updateMutation.mutate({ id, data: { action: "toggle-role" } });
+  };
+
+  // ==========================================
+  // TABLE CONFIG
+  // ==========================================
+  const columns = [
+    { label: "Administrator Identity", align: "left" },
+    { label: "Contact Info", align: "left" },
+    { label: "Access Level", align: "center" },
+    { label: "Management", align: "right" },
+  ];
+
+  const renderRow = (user) => (
+    <tr key={user._id} className="hover:bg-slate-50/50 transition-colors group">
+      <td className="px-6 py-5">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 border border-indigo-100 shadow-sm">
+            <ShieldCheck size={20} />
+          </div>
+          <div>
+            <p className="font-black text-slate-800 uppercase tracking-tight text-sm">
+              {user.full_name || user.username}
+            </p>
+            <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+              <Fingerprint size={10} /> {user.employee_id || "No ID"} • @
+              {user.username}
+            </div>
+          </div>
+        </div>
+      </td>
+      <td className="px-6 py-5">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-xs font-bold text-slate-600">
+            <Mail size={12} className="text-slate-400" /> {user.email}
+          </div>
+          <div className="flex items-center gap-2 text-[11px] font-medium text-slate-400">
+            <Phone size={12} className="text-slate-400" /> {user.phone || "N/A"}
+          </div>
+        </div>
+      </td>
+      <td className="px-6 py-5 text-center">
+        <button
+          onClick={() => handleToggleStatus(user._id)}
+          className="px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[0.1em] bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-600 hover:text-white transition-all shadow-sm shadow-emerald-100"
+        >
+          Enabled
+        </button>
+      </td>
+      <td className="px-6 py-5 text-right">
+        <button
+          onClick={() => handleDelete(user)}
+          disabled={deleteMutation.isPending}
+          className="p-2.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all border border-transparent hover:border-rose-100"
+        >
+          <Trash2 size={18} />
+        </button>
+      </td>
+    </tr>
+  );
+
+  if (isLoading) return <Loader />;
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">System Permissions</h1>
-          <p className="text-sm text-gray-500">Manage administrative access for staff members</p>
-        </div>
-        <button
-          onClick={() => setOpen(true)}
-          className="flex items-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all"
-        >
-          <Plus size={18} /> Add Admin
-        </button>
-      </div>
+    <div className="p-8 max-w-7xl mx-auto min-h-screen">
+      <PageHeader
+        title="System Administrators"
+        subtitle="Manage root-level permissions and staff administrative identities."
+        onAdd={() => setIsModalOpen(true)}
+        addText="New Admin"
+      />
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <table className="w-full text-left">
-          <thead className="bg-gray-50/50 border-b border-gray-100">
-            <tr>
-              <th className="p-4 text-xs font-bold text-gray-400 uppercase tracking-widest">Identity</th>
-              <th className="p-4 text-xs font-bold text-gray-400 uppercase tracking-widest">Email</th>
-              <th className="p-4 text-xs font-bold text-gray-400 uppercase tracking-widest text-center">Admin Access</th>
-              <th className="p-4 text-xs font-bold text-gray-400 uppercase tracking-widest text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {admins?.map((user) => (
-              <tr key={user._id} className="hover:bg-gray-50/50 transition-colors">
-                <td className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="h-9 w-9 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600">
-                      <ShieldCheck size={20} />
-                    </div>
-                    <div>
-                      <p className="font-bold text-gray-900">{user.full_name || user.username}</p>
-                      <p className="text-xs text-gray-400">@{user.username}</p>
-                    </div>
-                  </div>
-                </td>
-                <td className="p-4 text-sm text-gray-600">{user.email}</td>
-                <td className="p-4 text-center">
-                  <button 
-                    onClick={() => toggleRole.mutate(user._id)}
-                    className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold transition-all bg-green-100 text-green-700 border border-green-200"
-                  >
-                    ENABLED
-                  </button>
-                </td>
-                <td className="p-4 text-right">
-                  <button
-                    onClick={() => { if(window.confirm("Delete this admin account?")) deleteUser.mutate(user._id)}}
-                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                  >
-                    <Trash2 size={18} />
-                  </button>
-                </td>
-              </tr>
-            ))}
-            
-            {admins.length === 0 && (
-               <tr>
-                 <td colSpan="4" className="p-8 text-center text-gray-500">No admins found.</td>
-               </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+        columns={columns}
+        data={admins}
+        renderRow={renderRow}
+        isLoading={isLoading}
+        emptyStateTitle="No Administrators Defined"
+      />
 
-      {/* MODAL */}
-      {open && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-8 relative animate-in zoom-in-95 duration-200">
-            <button onClick={() => setOpen(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><X /></button>
-            <h2 className="text-xl font-bold mb-1">New Administrator</h2>
-            <p className="text-sm text-gray-500 mb-6">Create a new staff identity with admin privileges.</p>
+      {isModalOpen && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-[2.5rem] w-full max-w-md p-8 shadow-2xl border border-white/20 relative overflow-hidden">
+            <button
+              onClick={() => setIsModalOpen(false)}
+              className="absolute top-6 right-6 p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="mb-8">
+              <h2 className="text-2xl font-black text-slate-800 tracking-tight">
+                Access Provisioning
+              </h2>
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">
+                Register new administrative staff
+              </p>
+            </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              <input placeholder="Full Name" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} required className="w-full border border-gray-200 px-4 py-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" />
-              <div className="grid grid-cols-2 gap-4">
-                 <input placeholder="Username" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} required className="w-full border border-gray-200 px-4 py-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" />
-                 <input placeholder="Employee ID" value={form.employee_id} onChange={(e) => setForm({ ...form, employee_id: e.target.value })} required className="w-full border border-gray-200 px-4 py-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" />
+              <div className="space-y-4">
+                <input
+                  placeholder="Legal Full Name"
+                  value={form.full_name}
+                  onChange={(e) =>
+                    setForm({ ...form, full_name: e.target.value })
+                  }
+                  required
+                  className="w-full bg-slate-50 border-2 border-slate-100 px-5 py-4 rounded-2xl font-bold focus:bg-white outline-none focus:border-indigo-500 transition-all"
+                />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <input
+                    placeholder="Username"
+                    value={form.username}
+                    onChange={(e) =>
+                      setForm({ ...form, username: e.target.value })
+                    }
+                    required
+                    className="w-full bg-slate-50 border-2 border-slate-100 px-5 py-4 rounded-2xl font-bold focus:bg-white outline-none focus:border-indigo-500 transition-all"
+                  />
+                  <input
+                    placeholder="Staff ID"
+                    value={form.employee_id}
+                    onChange={(e) =>
+                      setForm({ ...form, employee_id: e.target.value })
+                    }
+                    required
+                    className="w-full bg-slate-50 border-2 border-slate-100 px-5 py-4 rounded-2xl font-bold focus:bg-white outline-none focus:border-indigo-500 transition-all"
+                  />
+                </div>
+
+                <input
+                  type="email"
+                  placeholder="Official Email Address"
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  required
+                  className="w-full bg-slate-50 border-2 border-slate-100 px-5 py-4 rounded-2xl font-bold focus:bg-white outline-none focus:border-indigo-500 transition-all"
+                />
+                <input
+                  placeholder="Primary Phone"
+                  value={form.phone}
+                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                  required
+                  className="w-full bg-slate-50 border-2 border-slate-100 px-5 py-4 rounded-2xl font-bold focus:bg-white outline-none focus:border-indigo-500 transition-all"
+                />
               </div>
-              <input type="email" placeholder="Email Address" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required className="w-full border border-gray-200 px-4 py-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" />
-              <input placeholder="Phone Number" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} required className="w-full border border-gray-200 px-4 py-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" />
-              
-              <div className="p-3 bg-amber-50 rounded-xl border border-amber-100 flex items-center gap-3">
-                 <UserCog className="text-amber-600" size={20} />
-                 <p className="text-[11px] text-amber-700 leading-tight">Admin accounts are created with the default password <span className="font-bold">123456</span></p>
+
+              <div className="p-4 bg-amber-50 rounded-[1.5rem] border border-amber-100 flex items-start gap-4">
+                <div className="p-2 bg-white rounded-lg text-amber-600 shadow-sm">
+                  <UserCog size={18} />
+                </div>
+                <p className="text-[11px] text-amber-700 font-bold leading-relaxed">
+                  SECURITY NOTICE: This identity will be generated with the
+                  default system password:{" "}
+                  <span className="underline decoration-amber-300 px-1">
+                    123456
+                  </span>
+                </p>
               </div>
 
               <button
                 type="submit"
-                disabled={addAdmin.isPending}
-                className="w-full bg-indigo-600 text-white py-3.5 rounded-xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all disabled:opacity-50"
+                disabled={createMutation.isPending}
+                className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black uppercase tracking-widest hover:bg-indigo-600 shadow-xl shadow-slate-200 transition-all disabled:opacity-50 mt-4 active:scale-95"
               >
-                {addAdmin.isPending ? "Registering..." : "Complete Registration"}
+                {createMutation.isPending
+                  ? "Syncing Server..."
+                  : "Activate Account"}
               </button>
             </form>
           </div>

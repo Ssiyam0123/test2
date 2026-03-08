@@ -1,21 +1,30 @@
-import React from "react";
+import React, { useState } from "react";
 import { 
-  ArrowRightLeft, History, ArrowDownToLine, ArrowUpFromLine 
+  ArrowRightLeft, History, ArrowDownToLine, ArrowUpFromLine, Wallet 
 } from "lucide-react";
 import { useBranchTransactions } from "../../hooks/useInventory";
 import Loader from "../../components/Loader";
 import { format } from "date-fns";
 
 export default function InventoryHistory({ branchId }) {
-  const { data: txnRes, isLoading } = useBranchTransactions(branchId);
-  const transactions = txnRes?.data || [];
+  // CLEAN DATA FETCHING
+  const { data: transactions = [], isLoading } = useBranchTransactions(branchId);
+  
+  // TABS STATE
+  const [activeTab, setActiveTab] = useState("in"); // "in" or "out"
 
   if (isLoading) return <div className="py-20 flex justify-center h-full items-center"><Loader /></div>;
+
+  // FILTER DATA BASED ON TABS
+  const inTransactions = transactions.filter(t => t.transaction_type === "PURCHASE");
+  const outTransactions = transactions.filter(t => t.transaction_type !== "PURCHASE"); // Assuming others are ISSUES/REQUISITIONS
+  
+  const currentData = activeTab === "in" ? inTransactions : outTransactions;
 
   return (
     <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden animate-in fade-in duration-500 flex flex-col h-full">
       
-      {/* 🟢 HEADER SECTION */}
+      {/* HEADER SECTION */}
       <div className="p-6 md:p-8 border-b border-slate-100 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
         <div>
           <div className="flex items-center gap-3 mb-1">
@@ -31,16 +40,40 @@ export default function InventoryHistory({ branchId }) {
         
         <div className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl flex items-center gap-2">
           <History size={14} className="text-slate-400" />
-          <span className="text-xs font-black text-slate-700">{transactions.length} Records</span>
+          <span className="text-xs font-black text-slate-700">{currentData.length} Records</span>
         </div>
       </div>
 
-      {/* 🟢 TABLE AREA */}
+      {/* TAB BUTTONS */}
+      <div className="px-6 md:px-8 pt-6 pb-2">
+        <div className="flex gap-2 p-1.5 bg-slate-100 rounded-2xl w-fit border border-slate-200">
+          <button 
+            onClick={() => setActiveTab("in")}
+            className={`flex items-center gap-2 py-2.5 px-6 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${
+              activeTab === "in" ? "bg-white text-emerald-600 shadow-sm border border-slate-200/50" : "text-slate-400 hover:text-slate-600"
+            }`}
+          >
+            <ArrowDownToLine size={16} /> Stock IN (Purchases)
+          </button>
+          <button 
+            onClick={() => setActiveTab("out")}
+            className={`flex items-center gap-2 py-2.5 px-6 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${
+              activeTab === "out" ? "bg-white text-amber-600 shadow-sm border border-slate-200/50" : "text-slate-400 hover:text-slate-600"
+            }`}
+          >
+            <ArrowUpFromLine size={16} /> Stock OUT (Issues)
+          </button>
+        </div>
+      </div>
+
+      {/* TABLE AREA */}
       <div className="flex-1 overflow-x-auto overflow-y-auto custom-scrollbar bg-slate-50/30">
-        {transactions.length === 0 ? (
+        {currentData.length === 0 ? (
           <div className="flex flex-col items-center justify-center text-slate-400 h-full py-20">
             <History size={64} className="mb-4 opacity-10" />
-            <p className="text-sm font-black uppercase tracking-widest text-slate-500">No Movements Recorded</p>
+            <p className="text-sm font-black uppercase tracking-widest text-slate-500">
+              No {activeTab === "in" ? "Purchases" : "Issues"} Recorded
+            </p>
           </div>
         ) : (
           <table className="w-full text-left border-collapse whitespace-nowrap min-w-[1000px]">
@@ -49,12 +82,18 @@ export default function InventoryHistory({ branchId }) {
                 <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-widest pl-8">Date & TXN ID</th>
                 <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Item & Action</th>
                 <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Qty Impact</th>
+                
+                {/* CONDITIONAL COLUMN FOR MONEY */}
+                {activeTab === "in" && (
+                  <th className="p-5 text-[10px] font-black text-emerald-600 uppercase tracking-widest text-right">Total Cost</th>
+                )}
+                
                 <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Chain of Custody (Details)</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {transactions.map((txn) => {
-                const isPurchase = txn.transaction_type === "PURCHASE";
+              {currentData.map((txn) => {
+                const isPurchase = activeTab === "in";
                 
                 return (
                   <tr key={txn._id} className="hover:bg-white transition-colors group bg-transparent">
@@ -100,7 +139,20 @@ export default function InventoryHistory({ branchId }) {
                       </div>
                     </td>
 
-                    {/* 4. 🚀 TRUE CHAIN OF CUSTODY */}
+                    {/* 4. TOTAL COST (Only for IN) */}
+                    {isPurchase && (
+                      <td className="p-5 text-right">
+                        <div className="flex flex-col items-end">
+                          <span className="text-sm font-black text-emerald-700 flex items-center gap-1">
+                            <Wallet size={14} className="opacity-50" />
+                            ৳{txn.total_cost?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"}
+                          </span>
+                          <span className="text-[9px] font-bold text-slate-400 mt-1 uppercase">Total Paid</span>
+                        </div>
+                      </td>
+                    )}
+
+                    {/* 5. CHAIN OF CUSTODY */}
                     <td className="p-5">
                       <div className="flex flex-col gap-3">
                         {isPurchase ? (
@@ -122,7 +174,7 @@ export default function InventoryHistory({ branchId }) {
                           </>
                         ) : (
                           <>
-                            {/* 🚀 Stock OUT (Requisition) View */}
+                            {/* Stock OUT (Requisition) View */}
                             <div className="flex items-start gap-3">
                               <span className="px-2 py-0.5 bg-blue-50 text-blue-600 border border-blue-100 text-[8px] font-black uppercase tracking-widest rounded w-20 text-center shrink-0 mt-0.5">Req. From</span>
                               <div className="flex flex-col">

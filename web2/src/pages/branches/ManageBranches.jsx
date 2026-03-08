@@ -1,7 +1,6 @@
-// src/pages/branches/ManageBranches.jsx
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Building2, Search, MapPin, Users, BookOpen, ChevronRight } from "lucide-react";
+import { Building2, Search, MapPin, ChevronRight } from "lucide-react";
 import { useBranches } from "../../hooks/useBranches";
 import LogoLoader from "../../components/LogoLoader";
 
@@ -10,7 +9,7 @@ export default function ManageBranches() {
   const [searchTerm, setSearchTerm] = useState("");
   const { data: branchesResponse, isLoading, isError } = useBranches();
 
-  const branches = branchesResponse?.data || [];
+  const branches = branchesResponse || [];
 
   const filteredBranches = branches.filter((b) => 
     b.branch_name.toLowerCase().includes(searchTerm.toLowerCase()) ||

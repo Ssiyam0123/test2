@@ -1,14 +1,15 @@
 import * as FinanceService from "../services/finance.service.js";
 import catchAsync from "../utils/catchAsync.js";
 import ApiResponse from "../utils/ApiResponse.js";
+import AppError from "../utils/AppError.js";
 import { generateReceiptPDF } from "../services/receipt.service.js";
 import { format } from "date-fns";
-import Payment from "../models/payment.js"; // 🚀 এটা ইম্পোর্ট কর
+import Payment from "../models/payment.js"; 
+// import axios from "axios"; 
 
 export const downloadPaymentReceipt = catchAsync(async (req, res) => {
-  // 🚀 FIXED: Directly using Payment model instead of FinanceService.Payment
   const txn = await Payment.findOne({ _id: req.params.id, ...req.branchFilter })
-    .populate("student", "student_name student_id")
+    .populate("student", "student_name student_id contact_number")
     .populate({ path: "fee_record", populate: { path: "course", select: "course_name" } })
     .populate("collected_by", "full_name")
     .lean();
@@ -39,10 +40,6 @@ export const downloadPaymentReceipt = catchAsync(async (req, res) => {
   res.send(pdfBuffer);
 });
 
-
-
-// 🐳 [Controller: collectPayment]
-// ==========================================
 export const collectPayment = catchAsync(async (req, res) => {
   const result = await FinanceService.processPayment(
     req.body, 
@@ -53,9 +50,6 @@ export const collectPayment = catchAsync(async (req, res) => {
   res.status(201).json(new ApiResponse(201, result, "Payment collected successfully"));
 });
 
-// ==========================================
-// 🐳 [Controller: getStudentFinance]
-// ==========================================
 export const getStudentFinance = catchAsync(async (req, res) => {
   const financeData = await FinanceService.fetchStudentFinance(
     req.params.studentId, 
@@ -65,9 +59,6 @@ export const getStudentFinance = catchAsync(async (req, res) => {
   res.status(200).json(new ApiResponse(200, financeData, "Student finance data fetched"));
 });
 
-// ==========================================
-// 🐳 [Controller: getCampusFees]
-// ==========================================
 export const getCampusFees = catchAsync(async (req, res) => {
   const fees = await FinanceService.fetchCampusFees(
     req.query, 
@@ -77,9 +68,6 @@ export const getCampusFees = catchAsync(async (req, res) => {
   res.status(200).json(new ApiResponse(200, fees, "Campus fees fetched successfully"));
 });
 
-// ==========================================
-// 🐳 [Controller: updateFeeDiscount]
-// ==========================================
 export const updateFeeDiscount = catchAsync(async (req, res) => {
   const { isUnchanged, fee } = await FinanceService.modifyFeeDiscount(
     req.params.feeId, 
@@ -95,4 +83,45 @@ export const updateFeeDiscount = catchAsync(async (req, res) => {
   res.status(200).json(new ApiResponse(200, fee, message));
 });
 
+// ==========================================
+// 📱 SMS Reminder Feature
+// ==========================================
+export const sendSMSReminder = catchAsync(async (req, res, next) => {
+  // 🚀 Fixed: Added customMessage destructuring so modal edits work
+  const { studentId, dueAmount, contactNumber, studentName, customMessage } = req.body;
 
+  if (!contactNumber) {
+    return next(new AppError("Student contact number is missing.", 400));
+  }
+
+  // BD Number Formatting (+8801...)
+  let phone = contactNumber.replace(/\s+/g, '');
+  if (phone.startsWith("01") && phone.length === 11) {
+    phone = "88" + phone;
+  }
+
+  // 🚀 Fixed: Use customMessage if provided, else fallback to default
+  const message = customMessage || `Dear ${studentName}, this is a reminder from the institute. Your pending fee is BDT ${dueAmount}. Please clear your dues soon. Ignore if already paid.`;
+
+  try {
+    const smsApiUrl = process.env.SMS_API_URL;
+    const apiKey = process.env.SMS_API_KEY;
+    const senderId = process.env.SMS_SENDER_ID;
+
+    const payload = {
+      api_key: apiKey,
+      senderid: senderId,
+      number: phone,
+      message: message
+    };
+
+    // 🔴 Uncomment below when your API is ready:
+    // await axios.post(smsApiUrl, payload);
+    console.log("Mock SMS Sent:", payload);
+
+    res.status(200).json(new ApiResponse(200, null, "SMS reminder sent successfully"));
+  } catch (error) {
+    console.error("SMS Gateway Error:", error);
+    return next(new AppError("Failed to send SMS.", 500));
+  }
+});

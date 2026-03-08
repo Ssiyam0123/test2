@@ -5,7 +5,7 @@ import {
   useDeleteUser,
   useUpdateUserStatus,
   useUpdateUserRole,
-} from "../../hooks/useUser.js";
+} from "../../hooks/useUser.js"; // Ensure this matches your hook filename
 import useAuth from "../../store/useAuth.js";
 import toast from "react-hot-toast";
 
@@ -15,9 +15,11 @@ import TableSkeleton from "../../components/common/TableSkeleton.jsx";
 import DataErrorState from "../../components/common/DataErrorState.jsx";
 import EmployeeFilters from "../../components/Search_filter/EmployeeFilters.jsx";
 import EmployeesTable from "../../components/table/EmployeesTable.jsx";
-import BranchDropdown from "../../components/common/BranchDropdown.jsx"; // 🚀 Import Dropdown
+import BranchDropdown from "../../components/common/BranchDropdown.jsx";
 import { useBranches } from "../../hooks/useBranches.js";
 import { useRoles } from "../../hooks/useRoles.js";
+import PermissionGuard from "../../components/common/PermissionGuard.jsx";
+import { PERMISSIONS } from "../../config/permissionConfig.js";
 
 const INITIAL_FILTERS = {
   branch: "all",
@@ -32,18 +34,17 @@ const AllEmployees = () => {
   const navigate = useNavigate();
   const { authUser } = useAuth();
   const currentUserId = authUser?.id || authUser?._id;
-  const { data: rolesRes } = useRoles(); 
 
   const isMaster =
     authUser?.permissions?.includes("all_access") ||
     authUser?.role === "superadmin" ||
     authUser?.role?.name === "superadmin";
-  const canAddEmployee = isMaster || authUser?.permissions?.includes("add_employee");
 
   const context = useOutletContext() || {};
   const { branchId } = context;
 
-  const { data: branchesRes } = useBranches();
+  const { data: roles = [] } = useRoles();
+  const { data: branches = [] } = useBranches();
 
   const [filters, setFilters] = useState(INITIAL_FILTERS);
   const [searchTerm, setSearchTerm] = useState("");
@@ -75,46 +76,59 @@ const AllEmployees = () => {
     return activeFilters;
   }, [filters, debouncedSearch, branchId, isMaster]);
 
-  const { data, isLoading, error, refetch, isRefetching } = useUsers(
-    page,
-    limit,
-    queryFilters,
-    { enabled: isMaster ? true : !!branchId }
-  );
+  const {
+    data: usersRes,
+    isLoading,
+    error,
+    refetch,
+    isRefetching,
+  } = useUsers(page, limit, queryFilters, {
+    enabled: isMaster ? true : !!branchId,
+  });
 
   const deleteUserMutation = useDeleteUser();
   const updateStatusMutation = useUpdateUserStatus();
   const updateRoleMutation = useUpdateUserRole();
 
-  const employees = data?.data || [];
-  const pagination = data?.pagination;
+  const employees = usersRes?.data || [];
+  const pagination = usersRes?.pagination;
 
-  // 🚀 Roles options passed to filters
-  const filterOptions = useMemo(() => ({
-    roles: rolesRes?.data || []
-  }), [rolesRes]);
+  const filterOptions = useMemo(
+    () => ({
+      roles: roles,
+    }),
+    [roles],
+  );
 
   useEffect(() => {
     setPage(1);
   }, [queryFilters]);
 
   const handleDelete = (id) => {
-    if (id === currentUserId) return toast.error("You cannot delete your own account.");
+    if (id === currentUserId)
+      return toast.error("You cannot delete your own account.");
     deleteUserMutation.mutate(id);
   };
 
   const handleToggleStatus = (id, currentStatus) => {
-    if (id === currentUserId) return toast.error("You cannot change your own status.");
+    if (id === currentUserId)
+      return toast.error("You cannot change your own status.");
     const newStatus = currentStatus === "Active" ? "On Leave" : "Active";
     updateStatusMutation.mutate({ id, status: newStatus });
   };
 
   const handleUpdateRole = (id, newRole) => {
-    if (id === currentUserId) return toast.error("You cannot change your own role.");
+    if (id === currentUserId)
+      return toast.error("You cannot change your own role.");
     updateRoleMutation.mutate({ id, role: newRole });
   };
 
-  if (!isMaster && !branchId) return <div className="p-6"><TableSkeleton rows={8} /></div>;
+  if (!isMaster && !branchId)
+    return (
+      <div className="p-6">
+        <TableSkeleton rows={8} />
+      </div>
+    );
 
   return (
     <div className="p-6 max-w-[1600px] mx-auto min-h-screen relative">
@@ -123,32 +137,40 @@ const AllEmployees = () => {
         subtitle="Manage and export staff records."
         showExport={true}
         disableExport={isLoading || employees.length === 0}
-        onAdd={canAddEmployee ? () => navigate("/admin/add-employee") : null}
+        onAdd={() => navigate("/admin/add-employee")}
         addText="Add Employee"
+        addPermission={PERMISSIONS.ADD_EMPLOYEE}
       />
 
-      {/* 🚀 Standalone Branch Dropdown */}
-      <BranchDropdown 
-        isMaster={isMaster}
-        branches={branchesRes?.data || []}
-        value={filters.branch}
-        onChange={(val) => setFilters(prev => ({ ...prev, branch: val }))}
-        wrapperClassName="flex justify-end mb-4"
-      />
+      <PermissionGuard requiredPermission={PERMISSIONS.VIEW_BRANCHES}>
+        {isMaster && (
+          <BranchDropdown
+            isMaster={isMaster}
+            branches={branches}
+            value={filters.branch}
+            onChange={(val) => setFilters((prev) => ({ ...prev, branch: val }))}
+            wrapperClassName="flex justify-end mb-4"
+          />
+        )}
+      </PermissionGuard>
 
       <div className="mb-6">
         <EmployeeFilters
           searchTerm={searchTerm}
           onSearchChange={setSearchTerm}
           onFilterChange={setFilters}
-          filterOptions={filterOptions} // Pass roles here
-          initialFilters={filters}
+          filterOptions={filterOptions}
+          initialFilters={INITIAL_FILTERS}
           isLoading={isLoading}
         />
       </div>
 
       {error ? (
-        <DataErrorState error={error} onRetry={refetch} isRetrying={isRefetching} />
+        <DataErrorState
+          error={error}
+          onRetry={refetch}
+          isRetrying={isRefetching}
+        />
       ) : (
         <>
           {isLoading ? (
@@ -156,11 +178,15 @@ const AllEmployees = () => {
           ) : (
             <EmployeesTable
               employees={employees}
-              roles={rolesRes?.data || []} 
+              roles={roles}
               currentUserId={currentUserId}
-              currentUserRole={typeof authUser?.role === "string" ? authUser.role : authUser?.role?.name}
+              currentUserRole={
+                typeof authUser?.role === "string"
+                  ? authUser.role
+                  : authUser?.role?.name
+              }
               pagination={pagination}
-              onDelete={handleDelete} 
+              onDelete={handleDelete}
               onToggleStatus={handleToggleStatus}
               onUpdateRole={handleUpdateRole}
               onGenerateQR={setSelectedEmployeeForQr}
@@ -168,7 +194,11 @@ const AllEmployees = () => {
               onEdit={(id) => navigate(`/admin/update-employee/${id}`)}
               deleteLoading={deleteUserMutation.isPending}
               toggleLoading={updateStatusMutation.isPending}
-              roleLoadingId={updateRoleMutation.isPending ? updateRoleMutation.variables?.id : null}
+              roleLoadingId={
+                updateRoleMutation.isPending
+                  ? updateRoleMutation.variables?.id
+                  : null
+              }
               page={page}
               onPageChange={setPage}
               searchTerm={debouncedSearch}

@@ -1,7 +1,7 @@
 import React from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Users, UserCheck, BookOpen, Layers, Building2, BarChart3, TrendingUp, MapPin } from "lucide-react";
-import { useBranch } from "../../hooks/useBranches"; // Reverting hook location to your existing branches hook
+import { ArrowLeft, Users, UserCheck, BookOpen, Layers, Building2, TrendingUp, MapPin } from "lucide-react";
+import { useBranch } from "../../hooks/useBranches"; 
 import { useBranchStats } from "../../hooks/useDashboard"; 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import LogoLoader from "../../components/LogoLoader";
