@@ -1,8 +1,5 @@
-// src/config/permissionConfig.js
-
 // ==========================================
-// 🚀 1. The Flat Dictionary (SINGLE SOURCE OF TRUTH)
-// Use this in your code logic, eg: <RoleGuard requiredPermission={PERMISSIONS.ADD_STUDENT} />
+// 1. The Flat Dictionary (SINGLE SOURCE OF TRUTH)
 // ==========================================
 export const PERMISSIONS = {
   // Dashboard & Reports
@@ -32,7 +29,7 @@ export const PERMISSIONS = {
   ADD_EXPENSE: "add_expense",
   VIEW_EXPENSES: "view_expenses",
 
-  // Inventory
+  // Inventory & Requisitions
   VIEW_INVENTORY: "view_inventory",
   MANAGE_INVENTORY: "manage_inventory",
   VIEW_REQUISITIONS: "view_requisitions",
@@ -69,9 +66,7 @@ export const PERMISSIONS = {
 };
 
 // ==========================================
-// 🚀 2. The Grouped Array (FOR UI RENDERING ONLY)
-// Used exclusively for rendering the checkboxes in the Role Management Modal.
-// Notice how we use PERMISSIONS.XXX instead of hardcoding strings!
+// 2. The Grouped Array (FOR UI RENDERING ONLY)
 // ==========================================
 export const PERMISSION_MATRIX = [
   {
@@ -111,14 +106,14 @@ export const PERMISSION_MATRIX = [
     moduleName: "Batch & Classes",
     page: "Manage Batches",
     features: [
-      { label: "View Batches", value: PERMISSIONS.VIEW_BATCHES },
+      { label: "View Batches List", value: PERMISSIONS.VIEW_BATCHES },
       { label: "Create/Edit Batch", value: PERMISSIONS.MANAGE_BATCHES },
       { label: "Delete Batch", value: PERMISSIONS.DELETE_BATCH },
       { label: "View Class Workspace", value: PERMISSIONS.VIEW_CLASSES },
       { label: "Schedule/Edit Classes", value: PERMISSIONS.MANAGE_CLASSES },
       { label: "Access Curriculum Builder", value: PERMISSIONS.MANAGE_CURRICULUM },
       { label: "Use Auto Scheduler", value: PERMISSIONS.USE_AUTO_SCHEDULER },
-      { label: "View Attendance", value: PERMISSIONS.VIEW_ATTENDANCE },
+      { label: "View Attendance Book", value: PERMISSIONS.VIEW_ATTENDANCE },
       { label: "Take/Manage Attendance", value: PERMISSIONS.TAKE_ATTENDANCE },
       { label: "Mark Class Complete", value: PERMISSIONS.MARK_CLASS_COMPLETE },
       { label: "Request Requisition", value: PERMISSIONS.REQUEST_REQUISITION },

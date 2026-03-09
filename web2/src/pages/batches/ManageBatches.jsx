@@ -1,8 +1,8 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 
-import { useBatches } from "../../hooks/useBatches";
+import { useBatchById } from "../../hooks/useBatches"; // useBatches এর বদলে useBatchById
 import { useBatchClasses, useAutoSchedule, useDeleteClass } from "../../hooks/useClasses";
 import useAuth from "../../store/useAuth";
 
@@ -17,10 +17,8 @@ export default function ManageBatches() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [currentDate, setCurrentDate] = useState(new Date());
 
-  const { data: batchesRes } = useBatches();
-  const batches = Array.isArray(batchesRes?.data) ? batchesRes.data : Array.isArray(batchesRes) ? batchesRes : [];
-  
-  const selectedBatch = useMemo(() => batches.find(b => b._id === batchId), [batches, batchId]);
+  // সরাসরি ব্যাচ আইডি দিয়ে পপুলেটেড ডাটা ফেচ করা হচ্ছে
+  const { data: selectedBatch, isLoading: isBatchLoading } = useBatchById(batchId);
 
   const { data: classesRes, isLoading: isClassesLoading } = useBatchClasses(batchId);
   const allClasses = Array.isArray(classesRes?.data) ? classesRes.data : Array.isArray(classesRes) ? classesRes : [];
@@ -28,14 +26,21 @@ export default function ManageBatches() {
   const { mutate: autoSchedule, isPending: isAutoScheduling } = useAutoSchedule(batchId);
   const { mutate: deleteClass } = useDeleteClass(batchId);
 
-  // // DEBUG LOGS
-  // useEffect(() => {
-  //   console.log("[API DEBUG] Selected Batch:", selectedBatch);
-  //   console.log("[API DEBUG] All Classes:", allClasses);
-  // }, [selectedBatch, allClasses]);
+  if (isClassesLoading || isBatchLoading) {
+    return (
+      <div className="h-screen flex items-center justify-center">
+        <Loader />
+      </div>
+    );
+  }
 
-  if (isClassesLoading) return <div className="h-screen flex items-center justify-center"><Loader /></div>;
-  if (!selectedBatch) return <div className="p-20 text-center font-bold text-slate-400">Batch Not Found.</div>;
+  if (!selectedBatch) {
+    return (
+      <div className="p-20 text-center font-bold text-slate-400">
+        Batch Not Found or Access Denied.
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#f1f5f9] p-4 lg:p-8">
@@ -43,12 +48,19 @@ export default function ManageBatches() {
         
         {/* TOP BAR */}
         <div className="flex items-center gap-4 mb-6 shrink-0">
-          <button onClick={() => navigate('/admin/manage-batches')} className="p-3 bg-white rounded-2xl text-slate-400 hover:text-teal-600 shadow-sm transition-all">
+          <button 
+            onClick={() => navigate('/admin/manage-batches')} 
+            className="p-3 bg-white rounded-2xl text-slate-400 hover:text-teal-600 shadow-sm transition-all"
+          >
             <ArrowLeft size={20} />
           </button>
           <div>
-            <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter italic">{selectedBatch.batch_name}</h1>
-            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{selectedBatch.course?.course_name}</p>
+            <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter italic">
+              {selectedBatch.batch_name}
+            </h1>
+            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">
+              {selectedBatch.course?.course_name}
+            </p>
           </div>
         </div>
 

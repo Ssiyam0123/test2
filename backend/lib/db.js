@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import dns from "dns"; // 1. Import Node's native DNS module (no npm install needed)
 
-dns.setServers(['8.8.8.8', '1.1.1.1']);
+// dns.setServers(['8.8.8.8', '1.1.1.1']);
 
 export const connectDb = async()=>{
     try {
@@ -11,4 +11,4 @@ export const connectDb = async()=>{
         console.log("error from database",error);
         process.exit(1);
     }
-}
+}   

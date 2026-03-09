@@ -18,14 +18,9 @@ const userSchema = new mongoose.Schema(
     password: { type: String, required: true, minlength: 6, select: false },
     role: { type: mongoose.Schema.Types.ObjectId, ref: "Role", required: true },
     employee_id: { type: String, unique: true, sparse: true, trim: true },
-    full_name: {
-      type: String,
-      required: true,
-      trim: true,
-      match: [/^[a-zA-Z\s\-'.]+$/, "Invalid name format"],
-    },
+    full_name: { type: String, required: true, trim: true },
     photo_url: { type: String, default: "" },
-    phone: { type: String, match: [/^[0-9+\-\s()]*$/, "Invalid phone number"] },
+    phone: { type: String },
     designation: { type: String, trim: true },
     department: { type: String, trim: true },
     joining_date: { type: Date, default: Date.now },
@@ -50,8 +45,8 @@ const userSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
+// Compound index for optimized filtering
 userSchema.index({ branch: 1, role: 1, status: 1 });
-userSchema.index({ username: 1 });
 
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();

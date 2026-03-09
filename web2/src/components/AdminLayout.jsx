@@ -90,7 +90,7 @@ const AdminLayout = () => {
       label: "Batches & Attendance",
       items: [
         { name: "All Batches", href: "/admin/all-batches", icon: Layers, permission: PERMISSIONS.VIEW_BATCHES },
-        { name: "Manage Batches", href: "/admin/manage-batches", icon: CalendarDays, permission: PERMISSIONS.MANAGE_BATCHES },
+        { name: "Manage Batches", href: "/admin/manage-batches", icon: CalendarDays, permission: PERMISSIONS.VIEW_BATCHES },
         { name: "Attendance Book", href: "/admin/attendance-book", icon: ClipboardCheck, permission: PERMISSIONS.VIEW_CLASSES }, 
       ],
     },

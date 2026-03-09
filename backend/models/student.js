@@ -55,8 +55,9 @@ const studentSchema = new mongoose.Schema(
   },
 );
 
+// Compound index for dashboards/lists
 studentSchema.index({ branch: 1, batch: 1, status: 1 });
-studentSchema.index({ student_id: 1 });
+// Text index for search functionality
 studentSchema.index({ student_name: "text" });
 
 studentSchema.virtual("comments", {

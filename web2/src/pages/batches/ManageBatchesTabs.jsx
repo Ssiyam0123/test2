@@ -41,14 +41,26 @@ export default function ManageBatchesTabs() {
       <div className="max-w-[1600px] mx-auto space-y-6">
         <BatchHeader searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
         
-        {isMaster && <BranchDropdown isMaster={isMaster} branches={branches} value={localBranchId} onChange={setLocalBranchId} wrapperClassName="flex justify-end mb-4" />}
+        {isMaster && (
+          <BranchDropdown 
+            isMaster={isMaster} 
+            branches={branches} 
+            value={localBranchId} 
+            onChange={setLocalBranchId} 
+            wrapperClassName="flex justify-end mb-4" 
+          />
+        )}
 
         <BatchCard 
           batches={filteredBatches} 
           onSelectBatch={(batch) => navigate(`/admin/batches/${batch._id}`)} 
           onDeleteBatch={(e, id, name) => {
             e.stopPropagation();
-            showConfirmToast({ type: "delete", itemName: name, onConfirm: () => deleteBatchMutation.mutate(id) });
+            showConfirmToast({ 
+              type: "delete", 
+              itemName: name, 
+              onConfirm: () => deleteBatchMutation.mutate(id) 
+            });
           }}
           isDeleting={deleteBatchMutation.isPending}
         />

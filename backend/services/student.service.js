@@ -67,7 +67,7 @@ export const createStudent = async (studentData, file, isMaster, adminBranch) =>
   }
 };
 
-//  Modify Student
+// Modify Student Section update kor
 export const modifyStudent = async (studentId, updateData, file, branchFilter, isMaster, adminBranch) => {
   const uploadedFilePath = file ? `/uploads/students/${file.filename}` : null;
   let oldPhotoUrl = null; 
@@ -82,9 +82,8 @@ export const modifyStudent = async (studentId, updateData, file, branchFilter, i
       if (!isMaster) updateData.branch = adminBranch;
 
       const oldBatchId = targetStudent.batch?.toString();
-      const newBatchId = updateData.batch?.toString();
+      const newBatchId = updateData.batch ? updateData.batch.toString() : oldBatchId; // Ensure we have a batch ID
 
-      // Setup File Replacement
       if (uploadedFilePath) {
         oldPhotoUrl = targetStudent.photo_url;
         updateData.photo_url = uploadedFilePath;
@@ -93,21 +92,26 @@ export const modifyStudent = async (studentId, updateData, file, branchFilter, i
       Object.assign(targetStudent, updateData);
       await targetStudent.save(opts);
 
-      // Handle Batch Change
-      if (newBatchId && oldBatchId !== newBatchId) {
-        if (oldBatchId) await Batch.findByIdAndUpdate(oldBatchId, { $pull: { students: targetStudent._id } }, opts);
+      // --- BATCH SYNC LOGIC FIX ---
+      if (newBatchId) {
+        // 1. Jodi batch change hoy, tahole purono batch theke rimum korbo
+        if (oldBatchId && oldBatchId !== newBatchId) {
+          await Batch.findByIdAndUpdate(oldBatchId, { $pull: { students: targetStudent._id } }, opts);
+        }
+        
+        // 2. NEW ba CURRENT batch-e student-ke oboshshoi add korbo (Heal missing data)
+        // $addToSet thakay double add hobar voy nai
         await Batch.findByIdAndUpdate(newBatchId, { $addToSet: { students: targetStudent._id } }, opts);
       }
+      // ----------------------------
 
       return targetStudent;
     });
 
-    //  Safely delete OLD image only after DB transaction is fully successful
     if (oldPhotoUrl) deleteLocalFile(oldPhotoUrl);
     return student;
     
   } catch (error) {
-    // 🔴 Delete the NEW uploaded file if DB save fails
     if (uploadedFilePath) deleteLocalFile(uploadedFilePath);
     throw error;
   }

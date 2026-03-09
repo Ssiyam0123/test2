@@ -12,6 +12,7 @@ import {
   scheduleClassSchema,
   updateAttendanceSchema,
 } from "../validators/class.validator.js";
+import { PERMISSIONS } from "../constants/permissions.js";
 
 const router = express.Router();
 
@@ -20,44 +21,44 @@ router.use(injectBranchFilter);
 
 router.get(
   "/batch/:batchId",
-  requirePermission("view_classes"),
+  requirePermission(PERMISSIONS.VIEW_CLASSES),
   classCtrl.getBatchClasses,
 );
 
 router.post(
   "/batch/:batchId",
-  requirePermission("manage_classes"),
+  requirePermission(PERMISSIONS.MANAGE_CLASSES),
   validate(addClassSchema),
   classCtrl.addClassToSyllabus,
 );
 router.post(
   "/batch/:batchId/auto-schedule",
-  requirePermission("manage_classes"),
+  requirePermission(PERMISSIONS.MANAGE_CLASSES),
   classCtrl.autoScheduleSyllabus,
 );
 
 router.put(
   "/:classId/schedule",
-  requirePermission("manage_classes"),
+  requirePermission(PERMISSIONS.MANAGE_CLASSES),
   validate(scheduleClassSchema),
   classCtrl.scheduleClass,
 );
 router.put(
   "/:classId/attendance",
-  requirePermission("take_attendance"),
+  requirePermission(PERMISSIONS.TAKE_ATTENDANCE),
   validate(updateAttendanceSchema),
   classCtrl.updateClassAttendance,
 );
 router.put(
   "/:classId",
-  requirePermission("manage_classes"),
+  requirePermission(PERMISSIONS.MANAGE_CLASSES),
   validate(updateClassContentSchema),
   classCtrl.updateClassContent,
 );
 
 router.delete(
   "/:classId",
-  requirePermission("manage_classes"),
+  requirePermission(PERMISSIONS.MANAGE_CLASSES),
   classCtrl.deleteClassContent,
 );
 

@@ -29,9 +29,9 @@ const AddBatch = () => {
   const { mutate: updateBatch, isPending: isUpdating } = useUpdateBatch();
   const isPending = isCreating || isUpdating;
 
-  // 🚀 ১. ডাটা এক্সট্রাকশন (তোর রিকোয়ারমেন্ট অনুযায়ী)
+  // Data Extraction
   const { data: coursesRes, isLoading: coursesLoading } = useCourses();
-  const courses = coursesRes?.data || []; // শুধুমাত্র কোর্স .data দিয়ে এক্সট্রাক্ট হচ্ছে
+  const courses = coursesRes?.data || []; 
 
   const { data: branches = [], isLoading: branchesLoading } = useBranches();
   const { data: roles = [] } = useRoles();
@@ -47,7 +47,7 @@ const AddBatch = () => {
     }
   }, [isEditMode, batchData]);
 
-  // 🚀 ২. ক্লিন API প্যারামিটার (যাতে undefined না যায়)
+  // Clean API Parameters
   const userFilters = useMemo(() => {
     const filters = {};
     if (instructorRoleId) filters.role = instructorRoleId;
@@ -61,14 +61,13 @@ const AddBatch = () => {
     { enabled: !!instructorRoleId && !!selectedBranch } 
   );
   
-  // useUsers সাধারণত paginated ডাটা দেয়, তাই সেফটির জন্য চেক রাখা হলো
   const instructors = Array.isArray(instructorsRes?.data) ? instructorsRes.data : (Array.isArray(instructorsRes) ? instructorsRes : []);
 
   const initialData = useMemo(() => {
     if (!isEditMode) return { schedule_days: [], status: "Active" }; 
     if (!batchData) return null;
     
-    // 🛡️ সেফ ডেট পার্সিং (যাতে ইনভ্যালিড ডেটের কারণে পেজ ক্র্যাশ না করে)
+    // Safe Date Parsing
     let safeStartDate = "";
     if (batchData.start_date) {
       const d = new Date(batchData.start_date);
@@ -125,11 +124,10 @@ const AddBatch = () => {
       return Swal.fire("Error", "Please select a valid campus/branch.", "error");
     }
 
-    // 🚀 ৩. SECURITY FIX: পুরনো ব্রাঞ্চের ইন্সট্রাক্টর ফিল্টার আউট করা
+    // SECURITY FIX: Filter out instructors from previous branches
     const validInstructorIds = instructors.map(inst => inst._id);
     const safeInstructors = (jsonPayload.instructors || []).filter(id => validInstructorIds.includes(id));
 
-    // যদি ইউজার ব্রাঞ্চ চেঞ্জ করার পর নতুন ইন্সট্রাক্টর সিলেক্ট করতে ভুলে যায়
     if (safeInstructors.length === 0 && (jsonPayload.instructors || []).length > 0) {
       return Swal.fire("Instructor Mismatch", "The selected instructors do not belong to the chosen branch. Please re-assign instructors for this branch.", "error");
     }

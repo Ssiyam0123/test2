@@ -1,215 +1,174 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { Plus, Trash2 } from "lucide-react"; // Save icon removed since it's not used directly
-import EntityForm from "../../components/common/EntityForm";
-import { 
-  useAddMasterSyllabus, 
-  useUpdateMasterSyllabus, 
-  useMasterSyllabusDetails,
-  useMasterTopics 
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Edit3, Trash2, Search, BookOpen, Layers } from "lucide-react";
+import {
+  useMasterTopics,
+  useDeleteMasterSyllabus,
 } from "../../hooks/useMasterSyllabus";
-import toast from "react-hot-toast";
-import Loader from "../../components/Loader";
 
-const CATEGORIES = ["Foundations", "Continental", "Asian", "Bakery & Pastry", "Middle Eastern", "Beverage", "Assessment", "General"];
+import { confirmDelete } from "../../utils/swalUtils"; 
+import DataTable from "../../components/common/DataTable";
+import PageHeader from "../../components/common/PageHeader";
+import PermissionGuard from "../../components/common/PermissionGuard"; 
+import { PERMISSIONS } from "../../config/permissionConfig";
 
-export default function AddMasterSyllabus({ mode = "add" }) {
+const CATEGORIES = [
+  "Foundations",
+  "Continental",
+  "Asian",
+  "Bakery & Pastry",
+  "Middle Eastern",
+  "Beverage",
+  "Assessment",
+  "General",
+];
+
+export default function ManageMasterSyllabus() {
   const navigate = useNavigate();
-  const { id } = useParams();
+  
+  const [category, setCategory] = useState("");
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
 
-  // CLEAN DATA FETCHING: Directly receive arrays & objects
-  const { data: allTopics = [], isLoading: loadingAll } = useMasterTopics();
-  const { data: editData, isLoading: loadingEdit } = useMasterSyllabusDetails(id, { 
-    enabled: mode === "edit" && !!id 
-  });
+  const { data: topics = [], isLoading } = useMasterTopics({ category, search });
+  const deleteMutation = useDeleteMasterSyllabus();
 
-  const addMutation = useAddMasterSyllabus();
-  const editMutation = useUpdateMasterSyllabus();
+  const syllabusData = [...topics].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
 
-  const [topics, setTopics] = useState([]);
-
-  // Initialize for ADD mode
-  useEffect(() => {
-    if (mode === "add" && allTopics) {
-      const currentMax = allTopics.length > 0 
-        ? Math.max(...allTopics.map(t => t.order_index || 0)) 
-        : 0;
-
-      setTopics([
-        { topic: "", category: "General", class_type: "Lecture", order_index: currentMax + 1, description: "" },
-        { topic: "", category: "General", class_type: "Lecture", order_index: currentMax + 2, description: "" },
-        { topic: "", category: "General", class_type: "Lecture", order_index: currentMax + 3, description: "" },
-      ]);
-    }
-  }, [allTopics, mode]);
-
-  // Initialize for EDIT mode
-  useEffect(() => {
-    // editData is now the raw object directly from the API
-    if (mode === "edit" && editData) {
-      setTopics([{ ...editData }]);
-    }
-  }, [editData, mode]);
-
-  const handleRowChange = (index, field, value) => {
-    const updated = [...topics];
-    // Ensure order_index stays a number
-    updated[index][field] = field === "order_index" ? Number(value) : value;
-    setTopics(updated);
+  const handleDelete = (id, name) => {
+    confirmDelete({
+      title: "Remove Topic?",
+      text: `Are you sure you want to permanently delete "${name}"? This action cannot be undone.`,
+      confirmText: "Yes, delete topic",
+      onConfirm: () => deleteMutation.mutate(id),
+    });
   };
 
-  const handleAddMoreRows = () => {
-    const lastOrder = topics.length > 0 ? topics[topics.length - 1].order_index : 0;
-    const lastCategory = topics.length > 0 ? topics[topics.length - 1].category : "General";
-    
-    setTopics([...topics, { 
-      topic: "", 
-      category: lastCategory, 
-      class_type: "Lecture", 
-      order_index: lastOrder + 1, 
-      description: "" 
-    }]);
-  };
-
-  const removeRow = (index) => {
-    if (mode === "edit") return; 
-    setTopics(topics.filter((_, i) => i !== index));
-  };
-
-  const formConfig = [
-    {
-      name: "topics_builder",
-      type: "custom",
-      fullWidth: true,
-      render: () => (
-        <div className="space-y-4">
-          {topics.map((item, idx) => (
-            <div key={idx} className="p-5 bg-white border border-gray-100 rounded-[2rem] shadow-sm hover:border-teal-200 transition-all group relative">
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
-                
-                <div className="md:col-span-3 flex gap-3">
-                   <div className="shrink-0 w-12">
-                      <label className="text-[9px] font-black text-gray-400 uppercase mb-1 block ml-1 text-center">S.No</label>
-                      <input
-                        type="number"
-                        min="1"
-                        value={item.order_index}
-                        onChange={(e) => handleRowChange(idx, "order_index", e.target.value)}
-                        className="w-full h-10 bg-gray-900 text-white rounded-xl text-center text-xs font-black focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all"
-                      />
-                   </div>
-                   
-                   <div className="flex-1">
-                      <label className="text-[9px] font-black text-gray-400 uppercase mb-1 block ml-1">Category</label>
-                      <select
-                        value={item.category}
-                        onChange={(e) => handleRowChange(idx, "category", e.target.value)}
-                        className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold focus:bg-white outline-none"
-                      >
-                        {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                      </select>
-                   </div>
-                </div>
-
-                <div className="md:col-span-5">
-                   <label className="text-[9px] font-black text-gray-400 uppercase mb-1 block ml-1">Topic Name</label>
-                   <input
-                    type="text"
-                    required
-                    value={item.topic}
-                    onChange={(e) => handleRowChange(idx, "topic", e.target.value)}
-                    className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl text-sm font-bold focus:bg-white outline-none"
-                  />
-                </div>
-
-                <div className="md:col-span-3">
-                   <label className="text-[9px] font-black text-gray-400 uppercase mb-1 block ml-1">Type</label>
-                   <select
-                    value={item.class_type}
-                    onChange={(e) => handleRowChange(idx, "class_type", e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold focus:bg-white outline-none"
-                  >
-                    <option value="Lecture">Lecture</option>
-                    <option value="Lab">Lab</option>
-                    <option value="Exam">Exam</option>
-                    <option value="Orientation">Orientation</option>
-                    <option value="Assessment">Assessment</option>
-                    <option value="Review">Review</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
-
-                {mode === "add" && topics.length > 1 && (
-                  <div className="md:col-span-1 pt-5 text-right">
-                    <button type="button" onClick={() => removeRow(idx)} className="p-2 text-gray-300 hover:text-rose-500"><Trash2 size={18} /></button>
-                  </div>
-                )}
-
-                <div className="md:col-span-12">
-                   <input
-                    type="text"
-                    placeholder="Details (Optional)..."
-                    value={item.description}
-                    onChange={(e) => handleRowChange(idx, "description", e.target.value)}
-                    className="w-full px-4 py-2 bg-gray-50/50 border border-dashed border-gray-200 rounded-xl text-[11px] text-gray-500 focus:bg-white outline-none"
-                  />
-                </div>
-              </div>
-            </div>
-          ))}
-
-          {mode === "add" && (
-            <button
-              type="button"
-              onClick={handleAddMoreRows}
-              className="w-full py-4 border-2 border-dashed border-gray-200 rounded-[2rem] text-gray-400 font-bold text-sm hover:border-teal-400 transition-all flex items-center justify-center gap-2"
-            >
-              <Plus size={20} /> Add More Topics
-            </button>
-          )}
-        </div>
-      )
-    }
+  const columns = [
+    { label: "#", align: "center", className: "w-16" }, 
+    { label: "Syllabus Topic & Recipes", align: "left" },
+    { label: "Category", align: "left" },
+    { label: "Type", align: "left" },
+    { label: "Actions", align: "right" },
   ];
 
-  // EntityForm passes (formDataInstance, rawData), we ignore them and use our local state `topics`
-  const handleFormSubmit = () => {
-    const finalData = topics.filter(t => t.topic.trim() !== "");
-    if (finalData.length === 0) return toast.error("Please add a topic name.");
+  const renderRow = (item) => (
+    <tr key={item._id} className="hover:bg-slate-50/80 transition-colors group">
+      
+      <td className="px-6 py-5 text-center">
+        <span className="font-mono font-black text-teal-600 bg-teal-50 px-2.5 py-1 rounded-lg text-[11px] border border-teal-100">
+          {String(item.order_index || 0).padStart(2, "0")}
+        </span>
+      </td>
 
-    if (mode === "edit") {
-      // payload is wrapped properly as per your hook
-      editMutation.mutate({ id, payload: finalData[0] }, {
-        onSuccess: () => navigate("/admin/manage-syllabus")
-      });
-    } else {
-      addMutation.mutate(finalData, {
-        onSuccess: () => navigate("/admin/manage-syllabus")
-      });
-    }
-  };
+      <td className="px-6 py-5">
+        <div className="flex flex-col">
+          <span className="text-[15px] font-bold text-slate-800 group-hover:text-teal-600 transition-colors">
+            {item.topic}
+          </span>
+          {item.description && (
+            <span className="text-[11px] text-slate-400 font-medium mt-1 italic line-clamp-1">
+              {item.description}
+            </span>
+          )}
+        </div>
+      </td>
 
-  // Prevent rendering if essential data is still loading
-  if (loadingAll || loadingEdit) {
-    return (
-      <div className="h-screen flex items-center justify-center">
-        <Loader />
-      </div>
-    );
-  }
+      <td className="px-6 py-5">
+        <span className="text-[11px] font-black text-slate-500 uppercase tracking-tighter bg-slate-100 px-2 py-1 rounded-md">
+          {item.category || "General"}
+        </span>
+      </td>
+
+      <td className="px-6 py-5">
+        <span
+          className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border ${
+            item.class_type === "Lab"
+              ? "bg-amber-50 text-amber-600 border-amber-100"
+              : "bg-indigo-50 text-indigo-600 border-indigo-100"
+          }`}
+        >
+          {item.class_type || "Lecture"}
+        </span>
+      </td>
+
+      <td className="px-6 py-5 text-right">
+        <div className="flex justify-end gap-2">
+          <PermissionGuard 
+            requiredPermission={PERMISSIONS.MANAGE_SYLLABUS}
+            fallback={
+              <span className="text-[10px] text-slate-300 font-bold uppercase tracking-widest">
+                View Only
+              </span>
+            }
+          >
+            <button
+              onClick={() => navigate(`/admin/update-syllabus/${item._id}`)}
+              className="p-2 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-xl border border-transparent hover:border-teal-100 transition-all"
+              title="Edit Topic"
+            >
+              <Edit3 size={16} />
+            </button>
+            <button
+              onClick={() => handleDelete(item._id, item.topic)}
+              disabled={deleteMutation.isPending}
+              className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl border border-transparent hover:border-rose-100 transition-all disabled:opacity-50"
+              title="Delete Topic"
+            >
+              <Trash2 size={16} />
+            </button>
+          </PermissionGuard>
+        </div>
+      </td>
+    </tr>
+  );
 
   return (
-    <div className="p-6 bg-[#f8fafc] min-h-screen">
-      <EntityForm
-        key={mode === "edit" ? id : "new"} // Ensure fresh re-render on mode change
-        title={mode === "edit" ? "Edit Syllabus Topic" : "Add to Library"}
-        subtitle={mode === "edit" ? "Modify existing lesson details." : "Topics will automatically continue from your last entry."}
-        config={formConfig}
-        onSubmit={handleFormSubmit}
-        isLoading={addMutation.isPending || editMutation.isPending}
-        buttonText={mode === "edit" ? "Update Topic" : "Save to Library"}
-        buttonColor="bg-gray-900 hover:bg-black"
-        onCancel={() => navigate("/admin/manage-syllabus")}
+    <div className="p-8 max-w-7xl mx-auto min-h-screen">
+      <PageHeader
+        title="Master Syllabus Library"
+        subtitle="Global blueprint for all batch curricula."
+        onAdd={() => navigate("/admin/add-syllabus")}
+        addText="Add Topics"
+        addPermission={PERMISSIONS.MANAGE_SYLLABUS} 
+      />
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mb-8">
+        <div className="md:col-span-8 relative group">
+          <div className="absolute inset-y-0 left-0 pl-4 flex items-center text-slate-400">
+            <Search size={20} />
+          </div>
+          <input
+            type="text"
+            placeholder="Search topics..."
+            className="w-full pl-12 pr-4 py-4 bg-white border border-slate-200 rounded-[1.5rem] focus:border-teal-500 outline-none transition-all shadow-sm"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <div className="md:col-span-4">
+          <select
+            className="w-full px-6 py-4 bg-white border border-slate-200 rounded-[1.5rem] focus:border-teal-500 outline-none font-bold text-slate-700 shadow-sm cursor-pointer"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+          >
+            <option value="">All Categories</option>
+            {CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <DataTable
+        columns={columns}
+        data={syllabusData}
+        renderRow={renderRow}
+        isLoading={isLoading}
+        searchTerm={search}
+        page={page}
+        onPageChange={setPage}
+        pagination={{ total: syllabusData.length, totalPages: 1 }}
       />
     </div>
   );

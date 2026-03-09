@@ -65,38 +65,23 @@ export const courseFormSchema = z.object({
 export const getBatchFormSchema = (mode) => z.object({
   batch_name: z.string().min(1, "Batch Title is required"),
   course: z.string().min(1, "Associated Course is required"),
-  branch: z.string().min(1, "Campus / Location is required"),
-  
-  instructors: z.preprocess((val) => {
-    if (Array.isArray(val)) return val;
-    if (typeof val === "string" && val.trim() !== "") return [val];
-    return [];
-  }, z.array(z.string()).min(1, "Assign at least one instructor").optional()), 
-  
-  schedule_days: z.preprocess((val) => {
-    if (Array.isArray(val)) return val;
-    if (typeof val === "string" && val.trim() !== "") return [val];
-    return [];
-  }, z.array(z.enum(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"])).min(1, "Select at least one class day")),
-  
+  branch: z.string().min(1, "Campus selection is required"),
+  instructors: z.array(z.string()).min(1, "Assign at least one instructor").optional(),
+  schedule_days: z.array(z.string()).min(1, "Select at least one class day"),
   start_time: z.string().min(1, "Class Start Time is required"),
   end_time: z.string().min(1, "Class End Time is required"),
-  
-  // 🚀 ডাইনামিক ডেট ভ্যালিডেশন: শুধু Add মুডে পাস্ট ডেট চেক করবে
   start_date: z.string().min(1, "Official Start Date is required").refine((date) => {
     if (mode === "add") {
       const today = new Date();
-      today.setHours(0, 0, 0, 0); // আজকের রাত ১২টার সময়
-      const selectedDate = new Date(date);
-      return selectedDate >= today; // আজকের আগের দিন হলে false রিটার্ন করবে
+      today.setHours(0, 0, 0, 0);
+      return new Date(date) >= today;
     }
-    return true; // Edit মুডে যেকোনো ডেট অ্যালাউড
+    return true;
   }, { message: "Start date cannot be in the past" }),
-
-  status: z.enum(["Upcoming", "Active"]).default("Upcoming")
+  status: z.string().default("Upcoming")
 }).refine((data) => {
   if (data.start_time && data.end_time) {
-      return data.end_time > data.start_time;
+    return data.end_time > data.start_time;
   }
   return true;
 }, {
