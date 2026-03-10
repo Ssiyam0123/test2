@@ -16,6 +16,7 @@ import QuickScheduleModal from "./QuickScheduleModal";
 
 import useAuth from "../../store/useAuth";
 import { useUpdateClassAttendance } from "../../hooks/useClasses";
+import { PERMISSIONS } from "../../config/permissionConfig";
 
 export default function BatchWorkspace({
   batch,
@@ -33,8 +34,6 @@ export default function BatchWorkspace({
   const [selectedClass, setSelectedClass] = useState(null);
   const [schedulingClass, setSchedulingClass] = useState(null);
 
-  console.log(batch);
-
   const [modals, setModals] = useState({
     import: false,
     attendance: false,
@@ -43,6 +42,19 @@ export default function BatchWorkspace({
   });
 
   const updateMutation = useUpdateClassAttendance();
+
+  // 🚀 গ্র্যানুলার ট্যাব পারমিশন চেক
+  const canViewCalendar = hasPermission(PERMISSIONS.VIEW_BATCH_CALENDAR);
+  const canViewCurriculum = hasPermission(PERMISSIONS.CURRICULUM_MATRIX);
+  const canViewAttendanceBook = hasPermission(PERMISSIONS.VIEW_ATTENDANCE_BOOK);
+
+  // Tab auto-correction if current tab is not allowed
+  useEffect(() => {
+    if (activeTab === "calendar" && !canViewCalendar) {
+      if (canViewCurriculum) setActiveTab("curriculum");
+      else if (canViewAttendanceBook) setActiveTab("attendance");
+    }
+  }, [canViewCalendar, canViewCurriculum, canViewAttendanceBook]);
 
   const handleOpenClassDetails = (cls) => {
     if (cls.date_scheduled) {
@@ -64,39 +76,43 @@ export default function BatchWorkspace({
     );
   }, [allClasses, selectedDate]);
 
-  useEffect(() => {
-    if (selectedClass) {
-      const fresh = allClasses.find((c) => c._id === selectedClass._id);
-      if (fresh) setSelectedClass(fresh);
-    }
-  }, [allClasses]);
-
   return (
     <div className="h-full flex flex-col lg:flex-row gap-6">
       <div className="flex-1 flex flex-col min-w-0 bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
         <div className="flex items-center gap-2 p-4 bg-slate-50 border-b border-slate-100 shrink-0 overflow-x-auto custom-scrollbar">
-          <button
-            onClick={() => setActiveTab("calendar")}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === "calendar" ? "bg-white text-teal-600 shadow-sm border border-slate-200" : "text-slate-400 hover:text-slate-700"}`}
-          >
-            <CalendarIcon size={14} /> Calendar
-          </button>
-          <button
-            onClick={() => setActiveTab("curriculum")}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === "curriculum" ? "bg-white text-indigo-600 shadow-sm border border-slate-200" : "text-slate-400 hover:text-slate-700"}`}
-          >
-            <BookOpen size={14} /> Curriculum Matrix
-          </button>
-          <button
-            onClick={() => setActiveTab("attendance")}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === "attendance" ? "bg-white text-orange-600 shadow-sm border border-slate-200" : "text-slate-400 hover:text-slate-700"}`}
-          >
-            <ListChecks size={14} /> Master Attendance
-          </button>
+          {/* 📅 ক্যালেন্ডার ট্যাব */}
+          {canViewCalendar && (
+            <button
+              onClick={() => setActiveTab("calendar")}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === "calendar" ? "bg-white text-teal-600 shadow-sm border border-slate-200" : "text-slate-400 hover:text-slate-700"}`}
+            >
+              <CalendarIcon size={14} /> Calendar
+            </button>
+          )}
+
+          {/* 📋 কারিকুলাম ট্যাব */}
+          {canViewCurriculum && (
+            <button
+              onClick={() => setActiveTab("curriculum")}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === "curriculum" ? "bg-white text-indigo-600 shadow-sm border border-slate-200" : "text-slate-400 hover:text-slate-700"}`}
+            >
+              <BookOpen size={14} /> Curriculum Matrix
+            </button>
+          )}
+
+          {/* 📊 এটেনডেন্স লেজার ট্যাব */}
+          {canViewAttendanceBook && (
+            <button
+              onClick={() => setActiveTab("attendance")}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === "attendance" ? "bg-white text-orange-600 shadow-sm border border-slate-200" : "text-slate-400 hover:text-slate-700"}`}
+            >
+              <ListChecks size={14} /> Master Attendance
+            </button>
+          )}
         </div>
 
         <div className="flex-1 overflow-hidden relative p-4">
-          {activeTab === "calendar" && (
+          {activeTab === "calendar" && canViewCalendar && (
             <ClassCalendar
               currentDate={currentDate}
               setCurrentDate={setCurrentDate}
@@ -105,7 +121,7 @@ export default function BatchWorkspace({
               allClasses={allClasses}
             />
           )}
-          {activeTab === "curriculum" && (
+          {activeTab === "curriculum" && canViewCurriculum && (
             <BatchCurriculumList
               batch={batch}
               classes={allClasses}
@@ -117,7 +133,7 @@ export default function BatchWorkspace({
               onReschedule={handleRescheduleTrigger}
             />
           )}
-          {activeTab === "attendance" && (
+          {activeTab === "attendance" && canViewAttendanceBook && (
             <div className="h-full overflow-y-auto custom-scrollbar border border-slate-100 rounded-2xl">
               <AttendanceBook batch={batch} classes={allClasses} />
             </div>
@@ -157,7 +173,6 @@ export default function BatchWorkspace({
           <div className="p-4">
             <ClassDetailsPanel
               cls={selectedClass}
-              hasPermission={hasPermission}
               onMarkAttendance={() =>
                 setModals({ ...modals, attendance: true })
               }

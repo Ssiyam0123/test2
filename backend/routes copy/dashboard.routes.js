@@ -6,7 +6,7 @@ import { PERMISSIONS } from "../constants/permissions.js";
 const router = express.Router();
 router.use(verifyToken);
 
-router.get("/stats", requirePermission(PERMISSIONS.VIEW_ADMIN_DASHBOARD), injectBranchFilter, getDashboardStats);
-router.get("/branch-stats/:branchId", requirePermission(PERMISSIONS.VIEW_BRANCH_DASHBOARD), injectBranchFilter, getBranchStats);
+router.get("/stats", requirePermission(PERMISSIONS.VIEW_DASHBOARD), injectBranchFilter, getDashboardStats);
+router.get("/branch-stats/:branchId", requirePermission(PERMISSIONS.VIEW_BRANCH_STATS), injectBranchFilter, getBranchStats);
 
 export default router;

@@ -5,7 +5,7 @@ import {
   useDeleteUser,
   useUpdateUserStatus,
   useUpdateUserRole,
-} from "../../hooks/useUser.js"; // Ensure this matches your hook filename
+} from "../../hooks/useUser.js";
 import useAuth from "../../store/useAuth.js";
 import toast from "react-hot-toast";
 
@@ -32,13 +32,10 @@ const INITIAL_FILTERS = {
 
 const AllEmployees = () => {
   const navigate = useNavigate();
-  const { authUser } = useAuth();
+  const { authUser, isMaster } = useAuth();
   const currentUserId = authUser?.id || authUser?._id;
 
-  const isMaster =
-    authUser?.permissions?.includes("all_access") ||
-    authUser?.role === "superadmin" ||
-    authUser?.role?.name === "superadmin";
+  const isSuper = isMaster();
 
   const context = useOutletContext() || {};
   const { branchId } = context;
@@ -60,11 +57,10 @@ const AllEmployees = () => {
 
   const queryFilters = useMemo(() => {
     const activeFilters = { ...filters };
-
-    if (!isMaster) {
+    if (!isSuper) {
       activeFilters.branch = branchId;
-    } else {
-      if (activeFilters.branch === "all") delete activeFilters.branch;
+    } else if (activeFilters.branch === "all") {
+      delete activeFilters.branch;
     }
 
     if (debouncedSearch) activeFilters.search = debouncedSearch;
@@ -72,9 +68,8 @@ const AllEmployees = () => {
     Object.entries(activeFilters).forEach(([key, value]) => {
       if (value === "all" || value === "") delete activeFilters[key];
     });
-
     return activeFilters;
-  }, [filters, debouncedSearch, branchId, isMaster]);
+  }, [filters, debouncedSearch, branchId, isSuper]);
 
   const {
     data: usersRes,
@@ -83,7 +78,7 @@ const AllEmployees = () => {
     refetch,
     isRefetching,
   } = useUsers(page, limit, queryFilters, {
-    enabled: isMaster ? true : !!branchId,
+    enabled: isSuper ? true : !!branchId,
   });
 
   const deleteUserMutation = useDeleteUser();
@@ -93,42 +88,29 @@ const AllEmployees = () => {
   const employees = usersRes?.data || [];
   const pagination = usersRes?.pagination;
 
-  const filterOptions = useMemo(
-    () => ({
-      roles: roles,
-    }),
-    [roles],
-  );
+  const filterOptions = useMemo(() => ({ roles }), [roles]);
 
   useEffect(() => {
     setPage(1);
   }, [queryFilters]);
 
   const handleDelete = (id) => {
-    if (id === currentUserId)
-      return toast.error("You cannot delete your own account.");
+    if (id === currentUserId) return toast.error("You cannot delete your own account.");
     deleteUserMutation.mutate(id);
   };
 
   const handleToggleStatus = (id, currentStatus) => {
-    if (id === currentUserId)
-      return toast.error("You cannot change your own status.");
+    if (id === currentUserId) return toast.error("You cannot change your own status.");
     const newStatus = currentStatus === "Active" ? "On Leave" : "Active";
     updateStatusMutation.mutate({ id, status: newStatus });
   };
 
   const handleUpdateRole = (id, newRole) => {
-    if (id === currentUserId)
-      return toast.error("You cannot change your own role.");
+    if (id === currentUserId) return toast.error("You cannot change your own role.");
     updateRoleMutation.mutate({ id, role: newRole });
   };
 
-  if (!isMaster && !branchId)
-    return (
-      <div className="p-6">
-        <TableSkeleton rows={8} />
-      </div>
-    );
+  if (!isSuper && !branchId) return <div className="p-6"><TableSkeleton rows={8} /></div>;
 
   return (
     <div className="p-6 max-w-[1600px] mx-auto min-h-screen relative">
@@ -139,13 +121,13 @@ const AllEmployees = () => {
         disableExport={isLoading || employees.length === 0}
         onAdd={() => navigate("/admin/add-employee")}
         addText="Add Employee"
-        addPermission={PERMISSIONS.ADD_EMPLOYEE}
+        addPermission={PERMISSIONS.EMPLOYEE_EDIT}
       />
 
       <PermissionGuard requiredPermission={PERMISSIONS.VIEW_BRANCHES}>
-        {isMaster && (
+        {isSuper && (
           <BranchDropdown
-            isMaster={isMaster}
+            isMaster={isSuper}
             branches={branches}
             value={filters.branch}
             onChange={(val) => setFilters((prev) => ({ ...prev, branch: val }))}
@@ -166,11 +148,7 @@ const AllEmployees = () => {
       </div>
 
       {error ? (
-        <DataErrorState
-          error={error}
-          onRetry={refetch}
-          isRetrying={isRefetching}
-        />
+        <DataErrorState error={error} onRetry={refetch} isRetrying={isRefetching} />
       ) : (
         <>
           {isLoading ? (
@@ -180,11 +158,6 @@ const AllEmployees = () => {
               employees={employees}
               roles={roles}
               currentUserId={currentUserId}
-              currentUserRole={
-                typeof authUser?.role === "string"
-                  ? authUser.role
-                  : authUser?.role?.name
-              }
               pagination={pagination}
               onDelete={handleDelete}
               onToggleStatus={handleToggleStatus}
@@ -194,11 +167,7 @@ const AllEmployees = () => {
               onEdit={(id) => navigate(`/admin/update-employee/${id}`)}
               deleteLoading={deleteUserMutation.isPending}
               toggleLoading={updateStatusMutation.isPending}
-              roleLoadingId={
-                updateRoleMutation.isPending
-                  ? updateRoleMutation.variables?.id
-                  : null
-              }
+              roleLoadingId={updateRoleMutation.isPending ? updateRoleMutation.variables?.id : null}
               page={page}
               onPageChange={setPage}
               searchTerm={debouncedSearch}

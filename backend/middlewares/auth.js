@@ -33,15 +33,31 @@ export const verifyToken = catchAsync(async (req, res, next) => {
 });
 
 
-export const requirePermission = (requiredPermission) => {
+// export const requirePermission = (requiredPermission) => {
+//   return (req, res, next) => {
+//     if (req.isMaster) return next();
+
+//     const permissions = req.user.role?.permissions || [];
+//     // console.log(permissions)
+//     if (permissions.includes(requiredPermission)) return next();
+
+//     return next(new AppError(`Access denied. Missing permission: ${requiredPermission}`, 403));
+//   };
+// };
+
+
+export const requirePermission = (permission) => {
   return (req, res, next) => {
-    if (req.isMaster) return next();
+    // Master Admin hole permission check charai access pabe
+    if (req.isMaster) {
+      return next();
+    }
 
-    const permissions = req.user.role?.permissions || [];
-    // console.log(permissions)
-    if (permissions.includes(requiredPermission)) return next();
-
-    return next(new AppError(`Access denied. Missing permission: ${requiredPermission}`, 403));
+    const userPermissions = req.user.permissions || req.user.role?.permissions || [];
+    if (!userPermissions.includes(permission)) {
+      return next(new AppError("Access Denied: Insufficient permissions", 403));
+    }
+    next();
   };
 };
 

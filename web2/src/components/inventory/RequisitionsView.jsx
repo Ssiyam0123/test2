@@ -2,31 +2,45 @@ import React, { useState } from "react";
 import { ClipboardList, CheckCircle2, ShoppingBag, Check, X, Loader2 } from "lucide-react";
 import { useAllRequisitions, useApproveRequisition, useRejectRequisition } from "../../hooks/useRequisitions"; 
 import Loader from "../../components/Loader";
-import { toast } from "react-hot-toast"; // assuming you use react-hot-toast
+import { toast } from "react-hot-toast";
+import useAuth from "../../store/useAuth";
+import { PERMISSIONS } from "../../config/permissionConfig";
+import { confirmDelete } from "../../utils/swalUtils"; // 🚀 Reusable Swal Import
 
 export default function RequisitionsView({ branchId }) { 
+  const { hasPermission } = useAuth();
   const { data: requisitions = [], isLoading } = useAllRequisitions(branchId);
   
   const approveMutation = useApproveRequisition();
   const rejectMutation = useRejectRequisition();
 
-  // local loading state to track which ID is being processed
   const [processingId, setProcessingId] = useState(null);
+
+  // 🚀 গ্র্যানুলার পারমিশন ফ্ল্যাগ
+  const canTakeAction = hasPermission(PERMISSIONS.INVENTORY_REQUISITION_ACTION);
 
   if (isLoading) return <div className="py-20 flex justify-center"><Loader /></div>;
 
   const pending = requisitions.filter(r => r.status?.toLowerCase() === "pending");
 
-  const handleApprove = async (id) => {
-    setProcessingId(id);
-    try {
-      await approveMutation.mutateAsync({ id, payload: {} }); 
-      toast.success("Requisition Approved & Stock Updated!");
-    } catch (err) {
-      toast.error(err.response?.data?.message || "Approval Failed");
-    } finally {
-      setProcessingId(null);
-    }
+  const handleApprove = (id) => {
+    // অ্যাকশন কনফার্মেশনের জন্য Swal ইউটিলিটি ব্যবহার (confirmDelete কে কাস্টমাইজ করে)
+    confirmDelete({
+      title: "Approve Requisition?",
+      text: "This will issue the items and update current stock levels.",
+      confirmText: "Yes, Approve & Issue",
+      onConfirm: async () => {
+        setProcessingId(id);
+        try {
+          await approveMutation.mutateAsync({ id, payload: {} }); 
+          toast.success("Requisition Approved & Stock Updated!");
+        } catch (err) {
+          toast.error(err.response?.data?.message || "Approval Failed");
+        } finally {
+          setProcessingId(null);
+        }
+      }
+    });
   };
 
   const handleReject = async (id) => {
@@ -46,7 +60,6 @@ export default function RequisitionsView({ branchId }) {
 
   return (
     <div className="bg-white rounded-[2rem] border border-slate-200 shadow-xl overflow-hidden animate-in fade-in duration-300">
-      
       <div className="p-6 bg-amber-50/50 flex items-center justify-between border-b border-slate-100">
         <div className="flex items-center gap-2 text-amber-700">
           <ClipboardList size={20} />
@@ -62,10 +75,7 @@ export default function RequisitionsView({ branchId }) {
           </div>
         ) : (
           pending.map(req => (
-            <div 
-              key={req._id} 
-              className="group p-5 border border-slate-200 rounded-2xl bg-white hover:border-amber-300 hover:shadow-md transition-all duration-300"
-            >
+            <div key={req._id} className="group p-5 border border-slate-200 rounded-2xl bg-white hover:border-amber-300 hover:shadow-md transition-all duration-300">
               <div className="flex justify-between items-start">
                 <div>
                   <h4 className="font-bold text-slate-800">{req.class_content?.topic || "Custom Request"}</h4>
@@ -77,27 +87,29 @@ export default function RequisitionsView({ branchId }) {
                   </p>
                 </div>
 
-                {/* ACTION BUTTONS */}
-                <div className="flex gap-2">
-                  <button 
-                    disabled={processingId === req._id}
-                    onClick={() => handleReject(req._id)}
-                    className="p-2 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-100 transition-colors disabled:opacity-50"
-                  >
-                    <X size={18} strokeWidth={3} />
-                  </button>
-                  <button 
-                    disabled={processingId === req._id}
-                    onClick={() => handleApprove(req._id)}
-                    className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 shadow-lg shadow-emerald-200 transition-all disabled:opacity-50"
-                  >
-                    {processingId === req._id ? <Loader2 size={16} className="animate-spin" /> : <Check size={18} strokeWidth={3} />}
-                    <span className="text-xs font-black uppercase tracking-widest">Approve</span>
-                  </button>
-                </div>
+                {/* 🚀 অ্যাকশন বাটন: পারমিশন প্রটেক্টড */}
+                {canTakeAction && (
+                  <div className="flex gap-2">
+                    <button 
+                      disabled={processingId === req._id}
+                      onClick={() => handleReject(req._id)}
+                      className="p-2 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-100 transition-colors disabled:opacity-50"
+                      title="Reject Request"
+                    >
+                      <X size={18} strokeWidth={3} />
+                    </button>
+                    <button 
+                      disabled={processingId === req._id}
+                      onClick={() => handleApprove(req._id)}
+                      className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 shadow-lg shadow-emerald-200 transition-all disabled:opacity-50"
+                    >
+                      {processingId === req._id ? <Loader2 size={16} className="animate-spin" /> : <Check size={18} strokeWidth={3} />}
+                      <span className="text-xs font-black uppercase tracking-widest">Approve</span>
+                    </button>
+                  </div>
+                )}
               </div>
 
-              {/* Details on Hover / Always visible section */}
               <div className="mt-4 pt-4 border-t border-slate-50">
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1">
                   <ShoppingBag size={12} /> Items to Issue:

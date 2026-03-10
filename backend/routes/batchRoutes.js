@@ -7,10 +7,10 @@ const router = express.Router();
 router.use(verifyToken);
 router.use(injectBranchFilter);
 
-router.get("/", requirePermission(PERMISSIONS.VIEW_BATCHES), batchCtrl.getAllBatches);
-router.get("/:id", requirePermission(PERMISSIONS.VIEW_BATCHES), batchCtrl.getBatchById);
-router.post("/", requirePermission(PERMISSIONS.MANAGE_BATCHES), batchCtrl.createBatch);
-router.put("/:id", requirePermission(PERMISSIONS.MANAGE_BATCHES), batchCtrl.updateBatch);
-router.delete("/:id", requirePermission(PERMISSIONS.DELETE_BATCH), batchCtrl.deleteBatch);
+router.get("/", requirePermission(PERMISSIONS.VIEW_ALL_BATCHES), batchCtrl.getAllBatches);
+router.get("/:id", requirePermission(PERMISSIONS.VIEW_BATCH_WORKSPACE), batchCtrl.getBatchById);
+router.post("/", requirePermission(PERMISSIONS.BATCH_EDIT), batchCtrl.createBatch);
+router.put("/:id", requirePermission(PERMISSIONS.BATCH_EDIT), batchCtrl.updateBatch);
+router.delete("/:id", requirePermission(PERMISSIONS.BATCH_DELETE), batchCtrl.deleteBatch);
 
 export default router;

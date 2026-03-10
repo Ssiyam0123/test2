@@ -5,9 +5,8 @@ import { downloadEmployeeID } from "../controllers/employeeid.controller.js";
 import { PERMISSIONS } from "../constants/permissions.js";
 
 const router = express.Router();
-router.use(verifyToken);
 
-router.get("/download/:id", requirePermission(PERMISSIONS.STUDENT_CERTIFICATE), downloadCertificatePDF);
-router.get("/employeeid/download/:id", requirePermission(PERMISSIONS.EMPLOYEE_IDCARD), downloadEmployeeID);
+router.get("/download/:id", verifyToken, requirePermission(PERMISSIONS.VIEW_STUDENT_DETAILS), downloadCertificatePDF);
+router.get("/employeeid/download/:id", verifyToken, requirePermission(PERMISSIONS.VIEW_EMPLOYEES), downloadEmployeeID);
 
 export default router;

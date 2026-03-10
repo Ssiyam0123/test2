@@ -50,3 +50,16 @@ export const removeUserPhoto = async (id) => {
   const { data } = await API.delete(`/users/${id}/image`);
   return data.data;
 };
+
+
+export const fetchMyProfile = async () => {
+  const { data } = await API.get("/users/profile/me");
+  return data.data;
+};
+
+export const updateMyProfile = async (formData) => {
+  const { data } = await API.put("/users/profile/update", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return data.data;
+};

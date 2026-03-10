@@ -95,3 +95,26 @@ export const searchUser = catchAsync(async (req, res) => {
   const { users } = await UserService.fetchUsers(filters, 1, 20);
   res.status(200).json(new ApiResponse(200, users, "Search completed", { count: users.length }));
 });
+
+
+// Get currently logged in user profile
+export const getMyProfile = catchAsync(async (req, res) => {
+  const user = await UserService.fetchUserById(req.user._id, {});
+  res.status(200).json(new ApiResponse(200, user, "Profile fetched successfully"));
+});
+
+// Update own profile
+export const updateMyProfile = catchAsync(async (req, res) => {
+  // সিকিউরিটির জন্য আমরা এখানে role বা branch আপডেট করতে দেব না
+  const { role, branch, employee_id, ...updateData } = req.body;
+  
+  const updatedUser = await UserService.modifyUser(
+    req.user._id, 
+    updateData, 
+    req.file, 
+    true, // force allow since it's their own profile
+    req.user.branch, 
+    {}
+  );
+  res.status(200).json(new ApiResponse(200, updatedUser, "Profile updated successfully"));
+});

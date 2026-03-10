@@ -6,13 +6,15 @@ import { branchCreateSchema, branchUpdateSchema } from "../validators/branch.val
 import { PERMISSIONS } from "../constants/permissions.js";
 
 const router = express.Router();
+
 router.use(verifyToken);
 
 router.get("/all", requirePermission(PERMISSIONS.VIEW_BRANCHES), ctrl.getAllBranches);
 router.get("/:id", requirePermission(PERMISSIONS.VIEW_BRANCHES), ctrl.getBranchById);
-router.post("/create", requirePermission(PERMISSIONS.BRANCH_EDIT), validate(branchCreateSchema), ctrl.createBranch);
-router.put("/:id", requirePermission(PERMISSIONS.BRANCH_EDIT), validate(branchUpdateSchema), ctrl.updateBranch);
-router.patch("/:id/toggle", requirePermission(PERMISSIONS.BRANCH_ACTIVE_STATUS), ctrl.toggleBranchStatus);
-router.delete("/:id", requirePermission(PERMISSIONS.BRANCH_DELETE), ctrl.deleteBranch);
+
+router.post("/create", requirePermission(PERMISSIONS.MANAGE_BRANCHES), validate(branchCreateSchema), ctrl.createBranch);
+router.put("/:id", requirePermission(PERMISSIONS.MANAGE_BRANCHES), validate(branchUpdateSchema), ctrl.updateBranch);
+router.patch("/:id/toggle", requirePermission(PERMISSIONS.MANAGE_BRANCHES), ctrl.toggleBranchStatus);
+router.delete("/:id", requirePermission(PERMISSIONS.MANAGE_BRANCHES), ctrl.deleteBranch);
 
 export default router;

@@ -38,8 +38,7 @@ const AllStudents = () => {
   const { authUser, isMaster } = useAuth();
 
   const context = useOutletContext() || {};
-  const branchId =
-    context.branchId || authUser?.branch?._id || authUser?.branch;
+  const branchId = context.branchId || authUser?.branch?._id || authUser?.branch;
 
   const [filters, setFilters] = useState(INITIAL_FILTERS);
   const [superAdminBranchFilter, setSuperAdminBranchFilter] = useState("all");
@@ -48,23 +47,19 @@ const AllStudents = () => {
   const [page, setPage] = useState(1);
 
   const [selectedStudentForQr, setSelectedStudentForQr] = useState(null);
-  const [selectedStudentForComment, setSelectedStudentForComment] =
-    useState(null);
+  const [selectedStudentForComment, setSelectedStudentForComment] = useState(null);
 
   const limit = 20;
   const isSuper = isMaster();
 
   const effectiveBranchId = useMemo(() => {
-    if (isSuper)
-      return superAdminBranchFilter === "all" ? null : superAdminBranchFilter;
+    if (isSuper) return superAdminBranchFilter === "all" ? null : superAdminBranchFilter;
     return branchId;
   }, [isSuper, superAdminBranchFilter, branchId]);
 
-  const { data: batchesRes } = useBatches(
-    effectiveBranchId ? { branch: effectiveBranchId } : {},
-  );
+  const { data: batchesRes } = useBatches(effectiveBranchId ? { branch: effectiveBranchId } : {});
   const { data: courses = [] } = useActiveCourses();
-  const { data: branches = [] } = useBranches({}, { enabled: isSuper }); // Directly an array
+  const { data: branches = [] } = useBranches({}, { enabled: isSuper });
 
   useEffect(() => {
     const handler = setTimeout(() => setDebouncedSearch(searchTerm), 500);
@@ -73,24 +68,19 @@ const AllStudents = () => {
 
   const queryFilters = useMemo(() => {
     const activeFilters = { ...filters };
-
     if (!isSuper) {
       activeFilters.branch = branchId;
     } else if (superAdminBranchFilter !== "all") {
       activeFilters.branch = superAdminBranchFilter;
     }
-
     if (debouncedSearch) activeFilters.search = debouncedSearch;
 
     Object.keys(activeFilters).forEach((key) => {
-      if (activeFilters[key] === "all" || activeFilters[key] === "")
-        delete activeFilters[key];
+      if (activeFilters[key] === "all" || activeFilters[key] === "") delete activeFilters[key];
     });
-
     return activeFilters;
   }, [filters, debouncedSearch, branchId, isSuper, superAdminBranchFilter]);
 
-  // 3. Fetching Main Student Data
   const {
     data: studentsRes,
     isLoading,
@@ -101,13 +91,10 @@ const AllStudents = () => {
     enabled: isSuper ? true : !!branchId,
   });
 
-  const combinedFilterOptions = useMemo(
-    () => ({
-      batches: batchesRes?.data || [],
-      courses: courses,
-    }),
-    [batchesRes, courses],
-  );
+  const combinedFilterOptions = useMemo(() => ({
+    batches: batchesRes?.data || [],
+    courses: courses,
+  }), [batchesRes, courses]);
 
   const deleteStudentMutation = useDeleteStudent();
   const toggleStatusMutation = useToggleStudentStatus();
@@ -121,20 +108,7 @@ const AllStudents = () => {
     setFilters((prev) => ({ ...prev, batch: "all", course: "all" }));
   };
 
-  if (error)
-    return (
-      <DataErrorState
-        error={error}
-        onRetry={refetch}
-        isRetrying={isRefetching}
-      />
-    );
-  if (!isSuper && !branchId)
-    return (
-      <div className="p-6">
-        <TableSkeleton rows={8} />
-      </div>
-    );
+  if (error) return <DataErrorState error={error} onRetry={refetch} isRetrying={isRefetching} />;
 
   return (
     <div className="p-6 max-w-[1600px] mx-auto min-h-screen">
@@ -143,10 +117,12 @@ const AllStudents = () => {
         subtitle={`Viewing ${isSuper ? "All Campuses" : "Your Campus"} Records`}
         onAdd={() => navigate("/admin/add-student")}
         addText="Add Student"
-        addPermission={PERMISSIONS.ADD_STUDENT}
+        // 🚀 গ্র্যানুলার পারমিশন: এডিট/অ্যাড পারমিশন থাকলে বাটন দেখাবে
+        addPermission={PERMISSIONS.STUDENT_EDIT}
       />
 
       <div className="mb-6 space-y-4">
+        {/* 🚀 ব্রাঞ্চ দেখার পারমিশন থাকলে এবং সুপার এডমিন হলে ড্রপডাউন দেখাবে */}
         <PermissionGuard requiredPermission={PERMISSIONS.VIEW_BRANCHES}>
           {isSuper && (
             <div className="flex justify-end">
@@ -185,9 +161,7 @@ const AllStudents = () => {
             onToggleStatus={(id) => toggleStatusMutation.mutate(id)}
             onGenerateQR={setSelectedStudentForQr}
             onAddComment={setSelectedStudentForComment}
-            onPay={(student) =>
-              navigate(`/admin/student-finance/${student._id}`)
-            }
+            onPay={(student) => navigate(`/admin/student-finance/${student._id}`)}
             onEdit={(id) => navigate(`/admin/update-student/${id}`)}
             page={page}
             onPageChange={setPage}
@@ -200,16 +174,10 @@ const AllStudents = () => {
       </Suspense>
 
       {selectedStudentForQr && (
-        <QRCodeModal
-          student={selectedStudentForQr}
-          onClose={() => setSelectedStudentForQr(null)}
-        />
+        <QRCodeModal student={selectedStudentForQr} onClose={() => setSelectedStudentForQr(null)} />
       )}
       {selectedStudentForComment && (
-        <CommentModal
-          student={selectedStudentForComment}
-          onClose={() => setSelectedStudentForComment(null)}
-        />
+        <CommentModal student={selectedStudentForComment} onClose={() => setSelectedStudentForComment(null)} />
       )}
     </div>
   );

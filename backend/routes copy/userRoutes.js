@@ -15,6 +15,7 @@ import {
 import { PERMISSIONS } from "../constants/permissions.js";
 
 const router = express.Router();
+
 router.use(verifyToken);
 
 router.get(
@@ -37,49 +38,39 @@ router.get(
 
 router.post(
   "/create",
-  requirePermission(PERMISSIONS.EMPLOYEE_EDIT),
+  requirePermission(PERMISSIONS.ADD_EMPLOYEE),
   upload.single("photo"),
   validate(userCreateSchema),
   userCtrl.addUser,
 );
 router.put(
   "/:id",
-  requirePermission(PERMISSIONS.EMPLOYEE_EDIT),
+  requirePermission(PERMISSIONS.EDIT_EMPLOYEE),
   upload.single("photo"),
   validate(updateUserSchema),
   userCtrl.updateUser,
 );
 router.patch(
   "/update-status/:id",
-  requirePermission(PERMISSIONS.EMPLOYEE_ACTIVE_STATUS),
+  requirePermission(PERMISSIONS.EDIT_EMPLOYEE),
   userCtrl.updateUserStatus,
 );
 router.patch(
   "/:id/role",
-  requirePermission(PERMISSIONS.EMPLOYEE_ROLE_CONTROL),
+  requirePermission(PERMISSIONS.MANAGE_ROLES),
   validate(roleUpdateSchema),
   userCtrl.updateUserRole,
 );
 
 router.delete(
   "/:id/image",
-  requirePermission(PERMISSIONS.EMPLOYEE_EDIT),
+  requirePermission(PERMISSIONS.EDIT_EMPLOYEE),
   userCtrl.removeUserImage,
 );
 router.delete(
   "/:id",
-  requirePermission(PERMISSIONS.EMPLOYEE_DELETE),
+  requirePermission(PERMISSIONS.DELETE_EMPLOYEE),
   userCtrl.deleteUser,
-);
-
-router.get("/profile/me", userCtrl.getMyProfile);
-
-router.put(
-  "/profile/update",
-  requirePermission(PERMISSIONS.UPDATE_MY_PROFILE),
-  upload.single("photo"),
-  validate(updateUserSchema),
-  userCtrl.updateMyProfile,
 );
 
 export default router;

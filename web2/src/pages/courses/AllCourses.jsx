@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { useCourses, useDeleteCourse, useToggleCourseStatus } from "../../hooks/useCourses";
 import useAuth from "../../store/useAuth"; 
 import { confirmDelete } from "../../utils/swalUtils"; 
-import PermissionGuard from "../../components/common/PermissionGuard"; 
 import { PERMISSIONS } from "../../config/permissionConfig";
 
 // Components
@@ -18,10 +17,15 @@ import { Edit, Trash2, BookOpen, Hash, Clock, Power, PowerOff } from "lucide-rea
 
 const AllCourses = () => {
   const navigate = useNavigate();
-  const { authUser, hasPermission } = useAuth();
+  const { authUser, hasPermission, isMaster: checkIsMaster } = useAuth();
   
-  const isMaster = authUser?.permissions?.includes("all_access") || authUser?.role === "superadmin" || authUser?.role?.name === "superadmin";
-  const canManageCourses = isMaster || hasPermission(PERMISSIONS.MANAGE_COURSES);
+  const isSuper = checkIsMaster();
+
+  // 🚀 গ্র্যানুলার পারমিশন ফ্ল্যাগস
+  const canEdit = hasPermission(PERMISSIONS.COURSE_EDIT);
+  const canToggleStatus = hasPermission(PERMISSIONS.COURSE_ACTIVE);
+  const canDelete = hasPermission(PERMISSIONS.COURSE_DELETE);
+  const hasActionAccess = canEdit || canToggleStatus || canDelete;
 
   const [page, setPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
@@ -43,10 +47,8 @@ const AllCourses = () => {
   const deleteCourseMutation = useDeleteCourse();
   const toggleStatusMutation = useToggleCourseStatus();
   
-  const courses = coursesRes?.data|| [];
+  const courses = coursesRes?.data || [];
   const pagination = coursesRes?.pagination;
-
-  // console.log(coursesRes)
 
   useEffect(() => { setPage(1); }, [filters]);
 
@@ -68,11 +70,11 @@ const AllCourses = () => {
     { label: "Code" },
     { label: "Duration" },
     { label: "Status" },
-    ...(canManageCourses ? [{ label: "Actions", align: "right" }] : []) 
+    ...(hasActionAccess ? [{ label: "Actions", align: "right" }] : []) 
   ];
 
   const renderCourseRow = (course) => (
-    <tr key={course._id} className="hover:bg-gray-50 transition-colors">
+    <tr key={course._id} className="group hover:bg-gray-50 transition-colors">
       <td className="px-5 py-4">
         <div className="font-medium text-gray-900 flex items-center">
           <BookOpen size={16} className="mr-2 text-blue-500" /> {course.course_name}
@@ -103,37 +105,49 @@ const AllCourses = () => {
       </td>
 
       <td className="px-5 py-4">
-        <span className={`px-2.5 py-1 inline-flex items-center text-xs font-semibold rounded-full ${course.is_active ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
+        <span className={`text-[11px] font-black tracking-widest uppercase px-2.5 py-1 rounded-full ${course.is_active ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
           {course.is_active ? "Active" : "Inactive"}
         </span>
       </td>
 
-      <PermissionGuard requiredPermission={PERMISSIONS.MANAGE_COURSES}>
+      {hasActionAccess && (
         <td className="px-5 py-4 text-right">
-          <div className="flex items-center justify-end space-x-1.5">
-            <ActionIconButton 
-              icon={course.is_active ? Power : PowerOff} 
-              variant={course.is_active ? "activeToggle" : "inactiveToggle"} 
-              onClick={() => handleStatusToggle(course._id)} 
-              disabled={toggleStatusMutation.isPending} 
-              title={course.is_active ? "Deactivate Course" : "Activate Course"} 
-            />
-            <ActionIconButton 
-              icon={Edit} 
-              variant="primary" 
-              onClick={() => navigate(`/admin/update-course/${course._id}`)} 
-              title="Edit" 
-            />
-            <ActionIconButton 
-              icon={Trash2} 
-              variant="danger" 
-              disabled={deleteCourseMutation.isPending} 
-              onClick={() => handleDeleteClick(course._id, course.course_name)} 
-              title="Delete" 
-            />
+          <div className="flex items-center justify-end space-x-1.5 opacity-60 group-hover:opacity-100 transition-opacity duration-200">
+            
+            {/* ⚡ অ্যাক্টিভ/ইনঅ্যাক্টিভ পারমিশন */}
+            {canToggleStatus && (
+              <ActionIconButton 
+                icon={course.is_active ? Power : PowerOff} 
+                variant={course.is_active ? "activeToggle" : "inactiveToggle"} 
+                onClick={() => handleStatusToggle(course._id)} 
+                disabled={toggleStatusMutation.isPending} 
+                title={course.is_active ? "Deactivate Course" : "Activate Course"} 
+              />
+            )}
+
+            {/* 📝 এডিট পারমিশন */}
+            {canEdit && (
+              <ActionIconButton 
+                icon={Edit} 
+                variant="primary" 
+                onClick={() => navigate(`/admin/update-course/${course._id}`)} 
+                title="Edit" 
+              />
+            )}
+
+            {/* 🗑️ ডিলিট পারমিশন */}
+            {canDelete && (
+              <ActionIconButton 
+                icon={Trash2} 
+                variant="danger" 
+                disabled={deleteCourseMutation.isPending} 
+                onClick={() => handleDeleteClick(course._id, course.course_name)} 
+                title="Delete" 
+              />
+            )}
           </div>
         </td>
-      </PermissionGuard>
+      )}
     </tr>
   );
 
@@ -144,7 +158,8 @@ const AllCourses = () => {
         subtitle={`Total active courses: ${pagination?.total || 0}`}
         onAdd={() => navigate("/admin/add-course")}
         addText="Add Course"
-        addPermission={PERMISSIONS.MANAGE_COURSES} 
+        // 🚀 গ্র্যানুলার পারমিশন: নতুন কোর্স অ্যাড করা এডিটের আন্ডারে রাখা হয়েছে
+        addPermission={PERMISSIONS.COURSE_EDIT} 
       />
 
       <div className="mb-6">

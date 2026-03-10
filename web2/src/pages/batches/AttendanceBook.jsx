@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { Check, X, Minus, UserCircle } from "lucide-react";
+import { Check, X, Minus, UserCircle, PieChart } from "lucide-react";
 import { format } from "date-fns";
 
 export default function AttendanceBook({ batch, classes }) {
@@ -45,62 +45,74 @@ export default function AttendanceBook({ batch, classes }) {
 
   if (!batch?.students?.length)
     return (
-      <div className="p-20 text-center font-bold text-slate-400">
-        No students enrolled yet.
+      <div className="p-20 text-center font-black text-slate-300 uppercase tracking-[0.2em] bg-white rounded-[2.5rem] border border-slate-100">
+        No students enrolled in this batch yet.
       </div>
     );
 
   return (
-    <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden">
+    <div className="bg-white rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden">
       <div className="overflow-x-auto custom-scrollbar">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="bg-slate-50">
-              <th className="sticky left-0 z-20 bg-slate-50 p-5 border-b border-r border-slate-200 min-w-[240px]">
-                Student
+            <tr className="bg-slate-50/80">
+              <th className="sticky left-0 z-30 bg-slate-100/90 backdrop-blur-md p-6 border-b border-r border-slate-200 min-w-[260px]">
+                <div className="flex items-center gap-2">
+                   <UserCircle size={16} className="text-slate-400" />
+                   <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Candidate Identity</span>
+                </div>
               </th>
-              <th className="p-5 border-b border-slate-200 text-center min-w-[100px]">
-                Avg Score
+              <th className="p-6 border-b border-slate-200 text-center min-w-[120px]">
+                <div className="flex flex-col items-center gap-1">
+                   <PieChart size={14} className="text-indigo-500" />
+                   <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Retention %</span>
+                </div>
               </th>
               {sortedClasses.map((cls) => (
                 <th
                   key={cls._id}
-                  className="p-5 border-b border-slate-200 text-center min-w-[110px]"
+                  className="p-6 border-b border-slate-200 text-center min-w-[120px]"
                 >
-                  <span className="block text-[10px] font-black uppercase text-slate-400">
-                    Class {cls.class_number}
+                  <span className="block text-[10px] font-black uppercase text-teal-600 tracking-tighter">
+                    L-{cls.class_number}
                   </span>
-                  <span className="text-[11px] font-bold text-slate-600">
-                    {cls.date_scheduled
-                      ? format(new Date(cls.date_scheduled), "MMM dd")
-                      : "TBA"}
+                  <span className="text-[11px] font-bold text-slate-400 mt-1 block">
+                    {cls.date_scheduled ? format(new Date(cls.date_scheduled), "dd MMM") : "TBA"}
                   </span>
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-slate-50">
             {attendanceMatrix.map((row) => (
               <tr
                 key={row.student._id}
                 className="hover:bg-slate-50/50 transition-colors group"
               >
-                <td className="sticky left-0 z-10 bg-white group-hover:bg-slate-50 p-4 border-b border-r border-slate-100 shadow-sm transition-colors">
-                  <div className="flex items-center gap-3">
-                    <UserCircle className="w-8 h-8 text-slate-300 shrink-0" />
+                <td className="sticky left-0 z-20 bg-white group-hover:bg-slate-50 p-5 border-r border-slate-100 transition-colors shadow-[4px_0_10px_-5px_rgba(0,0,0,0.05)]">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 font-black text-xs border border-slate-200">
+                       {row.student.student_name?.charAt(0)}
+                    </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-bold text-slate-800 truncate">
+                      <p className="text-sm font-black text-slate-800 truncate uppercase tracking-tight">
                         {row.student.student_name}
                       </p>
-                      <p className="text-[10px] font-black text-slate-400 uppercase">
-                        {row.student.student_id}
+                      <p className="text-[10px] font-bold text-indigo-500 tracking-widest">
+                        #{row.student.student_id}
                       </p>
                     </div>
                   </div>
                 </td>
-                <td className="p-4 border-b border-slate-100 text-center">
+                <td className="p-5 text-center">
                   <span
-                    className={`px-2.5 py-1 rounded-lg text-xs font-black ${row.percentage >= 80 ? "bg-emerald-50 text-emerald-600" : row.percentage >= 50 ? "bg-amber-50 text-amber-600" : "bg-rose-50 text-rose-600"}`}
+                    className={`px-3 py-1.5 rounded-xl text-[11px] font-black border ${
+                      row.percentage >= 80 
+                        ? "bg-emerald-50 text-emerald-600 border-emerald-100" 
+                        : row.percentage >= 50 
+                          ? "bg-amber-50 text-amber-600 border-amber-100" 
+                          : "bg-rose-50 text-rose-600 border-rose-100"
+                    }`}
                   >
                     {row.percentage}%
                   </span>
@@ -108,21 +120,17 @@ export default function AttendanceBook({ batch, classes }) {
                 {row.attendance.map((record, i) => (
                   <td
                     key={i}
-                    className="p-4 border-b border-slate-100 text-center"
+                    className="p-5 text-center"
                   >
                     <div className="flex justify-center">
                       {record.status === "present" ? (
-                        <Check
-                          className="text-emerald-500"
-                          size={18}
-                          strokeWidth={4}
-                        />
+                        <div className="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center border border-emerald-100">
+                           <Check className="text-emerald-500" size={16} strokeWidth={4} />
+                        </div>
                       ) : record.status === "absent" ? (
-                        <X
-                          className="text-rose-500"
-                          size={18}
-                          strokeWidth={4}
-                        />
+                        <div className="w-8 h-8 rounded-full bg-rose-50 flex items-center justify-center border border-rose-100">
+                           <X className="text-rose-500" size={16} strokeWidth={4} />
+                        </div>
                       ) : (
                         <Minus className="text-slate-200" size={16} />
                       )}

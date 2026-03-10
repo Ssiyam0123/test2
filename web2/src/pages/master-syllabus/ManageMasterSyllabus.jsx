@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Edit3, Trash2, Search, BookOpen, Layers } from "lucide-react";
+import { Edit3, Trash2, Search, BookOpen } from "lucide-react";
 import {
   useMasterTopics,
   useDeleteMasterSyllabus,
@@ -9,8 +9,9 @@ import {
 import { confirmDelete } from "../../utils/swalUtils"; 
 import DataTable from "../../components/common/DataTable";
 import PageHeader from "../../components/common/PageHeader";
-import PermissionGuard from "../../components/common/PermissionGuard"; 
+import useAuth from "../../store/useAuth"; 
 import { PERMISSIONS } from "../../config/permissionConfig";
+import ActionIconButton from "../../components/common/ActionIconButton";
 
 const CATEGORIES = [
   "Foundations",
@@ -25,10 +26,16 @@ const CATEGORIES = [
 
 export default function ManageMasterSyllabus() {
   const navigate = useNavigate();
+  const { hasPermission } = useAuth();
   
   const [category, setCategory] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+
+  // 🚀 গ্র্যানুলার পারমিশন ফ্ল্যাগস
+  const canEdit = hasPermission(PERMISSIONS.SYLLABUS_EDIT);
+  const canDelete = hasPermission(PERMISSIONS.SYLLABUS_DELETE);
+  const hasActionAccess = canEdit || canDelete;
 
   const { data: topics = [], isLoading } = useMasterTopics({ category, search });
   const deleteMutation = useDeleteMasterSyllabus();
@@ -49,7 +56,7 @@ export default function ManageMasterSyllabus() {
     { label: "Syllabus Topic & Recipes", align: "left" },
     { label: "Category", align: "left" },
     { label: "Type", align: "left" },
-    { label: "Actions", align: "right" },
+    ...(hasActionAccess ? [{ label: "Actions", align: "right" }] : [])
   ];
 
   const renderRow = (item) => (
@@ -92,34 +99,33 @@ export default function ManageMasterSyllabus() {
         </span>
       </td>
 
-      <td className="px-6 py-5 text-right">
-        <div className="flex justify-end gap-2">
-          <PermissionGuard 
-            requiredPermission={PERMISSIONS.MANAGE_SYLLABUS}
-            fallback={
-              <span className="text-[10px] text-slate-300 font-bold uppercase tracking-widest">
-                View Only
-              </span>
-            }
-          >
-            <button
-              onClick={() => navigate(`/admin/update-syllabus/${item._id}`)}
-              className="p-2 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-xl border border-transparent hover:border-teal-100 transition-all"
-              title="Edit Topic"
-            >
-              <Edit3 size={16} />
-            </button>
-            <button
-              onClick={() => handleDelete(item._id, item.topic)}
-              disabled={deleteMutation.isPending}
-              className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl border border-transparent hover:border-rose-100 transition-all disabled:opacity-50"
-              title="Delete Topic"
-            >
-              <Trash2 size={16} />
-            </button>
-          </PermissionGuard>
-        </div>
-      </td>
+      {hasActionAccess && (
+        <td className="px-6 py-5 text-right">
+          <div className="flex justify-end gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
+            
+            {/* 📝 সিলেবাস এডিট পারমিশন */}
+            {canEdit && (
+              <ActionIconButton 
+                icon={Edit3} 
+                variant="neutral"
+                onClick={() => navigate(`/admin/update-syllabus/${item._id}`)}
+                title="Edit Topic"
+              />
+            )}
+
+            {/* 🗑️ সিলেবাস ডিলিট পারমিশন */}
+            {canDelete && (
+              <ActionIconButton 
+                icon={Trash2} 
+                variant="danger"
+                onClick={() => handleDelete(item._id, item.topic)}
+                disabled={deleteMutation.isPending}
+                title="Delete Topic"
+              />
+            )}
+          </div>
+        </td>
+      )}
     </tr>
   );
 
@@ -130,8 +136,10 @@ export default function ManageMasterSyllabus() {
         subtitle="Global blueprint for all batch curricula."
         onAdd={() => navigate("/admin/add-syllabus")}
         addText="Add Topics"
-        addPermission={PERMISSIONS.MANAGE_SYLLABUS} 
+        // 🚀 গ্র্যানুলার পারমিশন: নতুন টপিক অ্যাড করা এডিটের আন্ডারে
+        addPermission={PERMISSIONS.SYLLABUS_EDIT} 
       />
+
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mb-8">
         <div className="md:col-span-8 relative group">
           <div className="absolute inset-y-0 left-0 pl-4 flex items-center text-slate-400">
@@ -160,6 +168,7 @@ export default function ManageMasterSyllabus() {
           </select>
         </div>
       </div>
+
       <DataTable
         columns={columns}
         data={syllabusData}
@@ -169,6 +178,8 @@ export default function ManageMasterSyllabus() {
         page={page}
         onPageChange={setPage}
         pagination={{ total: syllabusData.length, totalPages: 1 }}
+        emptyStateIcon={BookOpen}
+        emptyStateTitle="No Syllabus Topics Found"
       />
     </div>
   );

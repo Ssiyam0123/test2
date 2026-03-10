@@ -10,7 +10,10 @@ export const userCreateSchema = z.object({
     .string()
     .min(3)
     .max(30)
-    .regex(usernameRegex, "Only alphanumeric characters, underscores, and dots allowed"),
+    .regex(
+      usernameRegex,
+      "Only alphanumeric characters, underscores, and dots allowed",
+    ),
   email: z.string().email().toLowerCase(),
   password: z.string().min(6),
   full_name: z.string().regex(nameRegex, "Invalid name format."),
@@ -37,30 +40,17 @@ export const updateUserSchema = z
   .object({
     full_name: z.string().regex(nameRegex, "Invalid name format.").optional(),
     email: z.string().email().toLowerCase().optional(),
-    username: z
-      .string()
-      .min(3)
-      .max(30)
-      .regex(usernameRegex, "Only alphanumeric characters, underscores, and dots allowed")
-      .optional(),
+    phone: z.string().optional(),
     password: z
       .string()
       .min(6, "Password must be at least 6 characters")
       .optional()
       .or(z.literal("")),
-    phone: z.string().optional(),
-    designation: z.string().optional(),
-    department: z.string().optional(),
-    status: z.enum(["Active", "On Leave", "Resigned"]).optional(),
-    branch: objectIdSchema.optional(),
-    role: objectIdSchema.optional(),
-    employee_id: z.string().optional(),
-    joining_date: z.string().optional(),
-    facebook: z.string().optional(),
-    linkedin: z.string().optional(),
-    twitter: z.string().optional(),
-    instagram: z.string().optional(),
-    others: z.string().optional(),
+    facebook: z.string().url("Invalid URL").optional().or(z.literal("")),
+    linkedin: z.string().url("Invalid URL").optional().or(z.literal("")),
+    twitter: z.string().url("Invalid URL").optional().or(z.literal("")),
+    instagram: z.string().url("Invalid URL").optional().or(z.literal("")),
+    others: z.string().url("Invalid URL").optional().or(z.literal("")),
     photo: z.any().optional(),
   })
   .refine((data) => Object.keys(data).length > 0, {

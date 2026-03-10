@@ -16,6 +16,8 @@ import useAuth from "../../store/useAuth";
 import Loader from "../../components/Loader";
 import BranchDropdown from "../../components/common/BranchDropdown";
 import { toast } from "react-hot-toast";
+import { PERMISSIONS } from "../../config/permissionConfig"; // 🚀 Import Permissions
+import PermissionGuard from "../../components/common/PermissionGuard"; // 🚀 Import Guard
 
 const CATEGORIES = [
   "Meat",
@@ -109,27 +111,19 @@ const DynamicStockField = ({ value = [], onChange }) => {
                 type="text"
                 required
                 value={item.name}
-                onChange={(e) =>
-                  handleItemChange(index, "name", e.target.value)
-                }
+                onChange={(e) => handleItemChange(index, "name", e.target.value)}
                 placeholder="Item name..."
                 className="flex-[2.5] px-4 py-3.5 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm font-bold text-slate-700 focus:bg-white focus:border-teal-500 outline-none transition-all"
               />
               <select
                 required
                 value={item.category}
-                onChange={(e) =>
-                  handleItemChange(index, "category", e.target.value)
-                }
+                onChange={(e) => handleItemChange(index, "category", e.target.value)}
                 className="flex-1 px-3 py-3.5 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm font-bold text-slate-700 focus:bg-white focus:border-teal-500 outline-none appearance-none"
               >
-                <option value="" disabled>
-                  Category
-                </option>
+                <option value="" disabled>Category</option>
                 {CATEGORIES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
+                  <option key={c} value={c}>{c}</option>
                 ))}
               </select>
               <input
@@ -145,15 +139,11 @@ const DynamicStockField = ({ value = [], onChange }) => {
               <select
                 required
                 value={item.unit}
-                onChange={(e) =>
-                  handleItemChange(index, "unit", e.target.value)
-                }
+                onChange={(e) => handleItemChange(index, "unit", e.target.value)}
                 className="w-24 px-2 py-3.5 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm font-bold text-center outline-none"
               >
                 {UNITS.map((u) => (
-                  <option key={u} value={u}>
-                    {u}
-                  </option>
+                  <option key={u} value={u}>{u}</option>
                 ))}
               </select>
               <input
@@ -161,9 +151,7 @@ const DynamicStockField = ({ value = [], onChange }) => {
                 required
                 min="0"
                 value={item.rowTotal}
-                onChange={(e) =>
-                  handleItemChange(index, "rowTotal", e.target.value)
-                }
+                onChange={(e) => handleItemChange(index, "rowTotal", e.target.value)}
                 placeholder="0.00"
                 className="w-32 px-4 py-3.5 bg-slate-100/50 border-2 border-slate-100 rounded-2xl text-sm font-black text-right text-teal-700 outline-none focus:bg-white focus:border-teal-500"
               />
@@ -193,25 +181,17 @@ const DynamicStockField = ({ value = [], onChange }) => {
 // --- Main Page Component ---
 export default function AddInventory() {
   const navigate = useNavigate();
-  const { authUser, isMaster: checkMaster } = useAuth();
-
-  // FIXED: Call checkMaster() function correctly
+  const { authUser, isMaster: checkMaster, hasPermission } = useAuth();
   const isSuper = checkMaster();
 
   const [selectedBranch, setSelectedBranch] = useState("");
-
-  // FIXED: Directly receive branches array
   const { data: branches = [] } = useBranches({}, { enabled: !!isSuper });
 
-  // Initializing branch
   useEffect(() => {
     if (isSuper && branches.length > 0 && !selectedBranch) {
       setSelectedBranch(branches[0]._id);
     } else if (!isSuper && authUser?.branch) {
-      const bId =
-        typeof authUser.branch === "object"
-          ? authUser.branch._id
-          : authUser.branch;
+      const bId = typeof authUser.branch === "object" ? authUser.branch._id : authUser.branch;
       setSelectedBranch(bId);
     }
   }, [isSuper, branches, authUser, selectedBranch]);
@@ -220,7 +200,6 @@ export default function AddInventory() {
 
   const handleSubmit = async (formDataObj, rawFormData) => {
     const { items, supplier, notes } = rawFormData;
-
     if (!selectedBranch) return toast.error("Please select a target branch");
 
     const payload = {
@@ -231,10 +210,7 @@ export default function AddInventory() {
         unit: i.unit,
         total_price: Number(i.rowTotal),
       })),
-      total_cost: items.reduce(
-        (sum, item) => sum + (Number(item.rowTotal) || 0),
-        0,
-      ),
+      total_cost: items.reduce((sum, item) => sum + (Number(item.rowTotal) || 0), 0),
       supplier: supplier || "Direct Purchase",
       notes: notes || "",
       branch: selectedBranch,
@@ -242,11 +218,9 @@ export default function AddInventory() {
 
     try {
       await addStockMutation.mutateAsync(payload);
-      toast.success("Inventory updated and ledger record posted!");
+      toast.success("Inventory updated successfully!");
       navigate("/admin/inventory");
-    } catch (error) {
-      // toast is already handled in mutation onError usually
-    }
+    } catch (error) {}
   };
 
   const formConfig = [
@@ -263,27 +237,22 @@ export default function AddInventory() {
       name: "supplier",
       label: "Vendor / Store",
       type: "text",
-      placeholder: "Karwan Bazar, Shop #42...",
+      placeholder: "Vendor name...",
       icon: Store,
     },
     {
       name: "notes",
       label: "Transaction Reference",
       type: "text",
-      placeholder: "e.g. Bazar for Batch 14 graduation",
+      placeholder: "e.g. Bazar for Batch 14",
       fullWidth: true,
     },
   ];
 
-  if (!selectedBranch && !isSuper)
-    return (
-      <div className="h-screen flex justify-center items-center">
-        <Loader />
-      </div>
-    );
+  if (!selectedBranch && !isSuper) return <div className="h-screen flex justify-center items-center"><Loader /></div>;
 
   return (
-    <div className="min-h-screen p-6 md:p-12 bg-[#F8FAFC]">
+    <div className="min-h-screen p-6 md:p-12">
       <div className="max-w-6xl mx-auto">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div>
@@ -291,40 +260,33 @@ export default function AddInventory() {
               onClick={() => navigate(-1)}
               className="flex items-center gap-2 text-[10px] font-black text-slate-400 hover:text-teal-600 uppercase tracking-[0.2em] mb-6 transition-all group"
             >
-              <ArrowLeft
-                size={14}
-                className="group-hover:-translate-x-1 transition-transform"
-              />
+              <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform" />
               Back to Inventory
             </button>
-            <h1 className="text-4xl font-black text-slate-900 tracking-tight">
-              Log Stock Purchase
-            </h1>
-            <p className="text-slate-500 text-sm font-bold mt-2">
-              Record arrival of ingredients and auto-update stock levels.
-            </p>
+            <h1 className="text-4xl font-black text-slate-900 tracking-tight">Log Stock Purchase</h1>
+            <p className="text-slate-500 text-sm font-bold mt-2">Record arrival of ingredients and auto-update stock levels.</p>
           </div>
 
-          {isSuper && (
-            <BranchDropdown
-              isMaster={isSuper}
-              branches={branches} // FIXED: Using the clean branches array
-              value={selectedBranch}
-              onChange={setSelectedBranch}
-              showAllOption={false}
-              wrapperClassName="w-full md:w-64"
-            />
-          )}
+          {/* 🚀 ব্রাঞ্চ ড্রপডাউন পারমিশন চেক */}
+          <PermissionGuard requiredPermission={PERMISSIONS.VIEW_BRANCHES}>
+            {isSuper && (
+              <BranchDropdown
+                isMaster={isSuper}
+                branches={branches}
+                value={selectedBranch}
+                onChange={setSelectedBranch}
+                showAllOption={false}
+                wrapperClassName="w-full md:w-64"
+              />
+            )}
+          </PermissionGuard>
         </div>
 
-        {/* FIXED: Removed the white background and shadow from the form container */}
         <div className="animate-in fade-in slide-in-from-bottom-8 duration-700">
           <EntityForm
             config={formConfig}
             initialData={{
-              items: [
-                { name: "", category: "", qty: "", unit: "kg", rowTotal: "" },
-              ],
+              items: [{ name: "", category: "", qty: "", unit: "kg", rowTotal: "" }],
             }}
             onSubmit={handleSubmit}
             onCancel={() => navigate("/admin/inventory")}

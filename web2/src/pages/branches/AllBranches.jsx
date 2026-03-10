@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Plus, Search, Edit3, Trash2, Power, PowerOff, MapPin, Mail, Phone, Building2 } from "lucide-react";
 import { useBranches, useToggleBranchStatus, useDeleteBranch } from "../../hooks/useBranches.js";
 import useAuth from "../../store/useAuth.js";
-import { useConfirmToast } from "../../components/ConfirmToast.jsx";
+import { confirmDelete } from "../../utils/swalUtils"; // 🚀 Reusable Swal Import
 import DataTable from "../../components/common/DataTable.jsx";
 import ActionIconButton from "../../components/common/ActionIconButton.jsx";
 import PermissionGuard from "../../components/common/PermissionGuard.jsx";
@@ -12,25 +12,37 @@ import { PERMISSIONS } from "../../config/permissionConfig.js";
 export default function AllBranches() {
   const navigate = useNavigate();
   const { isMaster, hasPermission } = useAuth();
-  const { showConfirmToast } = useConfirmToast();
   const [searchTerm, setSearchTerm] = useState("");
 
-  const { data: branches = [], isLoading, isError } = useBranches();
+  const { data: branches = [], isLoading } = useBranches();
   const toggleMutation = useToggleBranchStatus();
   const deleteMutation = useDeleteBranch();
 
-  const canManage = isMaster() || hasPermission(PERMISSIONS.MANAGE_BRANCHES);
+  // 🚀 গ্র্যানুলার পারমিশন ফ্ল্যাগস
+  const canEdit = hasPermission(PERMISSIONS.BRANCH_EDIT);
+  const canToggle = hasPermission(PERMISSIONS.BRANCH_ACTIVE_STATUS);
+  const canDelete = hasPermission(PERMISSIONS.BRANCH_DELETE);
+  const hasActionAccess = canEdit || canToggle || canDelete;
 
   const filteredBranches = branches.filter((b) => 
     b.branch_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     b.branch_code.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const handleDeleteClick = (id, name) => {
+    confirmDelete({
+      title: "Delete Branch?",
+      text: `Are you sure you want to permanently remove "${name}"? This action cannot be undone.`,
+      confirmText: "Yes, delete branch",
+      onConfirm: () => deleteMutation.mutate(id),
+    });
+  };
+
   const columns = [
     { label: "Branch Details", className: "w-[40%] pl-6" },
     { label: "Contact Info", className: "hidden md:table-cell w-[30%]" },
     { label: "Status", className: "text-center w-[15%]" },
-    ...(canManage ? [{ label: "Actions", align: "right", className: "w-[15%] pr-6" }] : [])
+    ...(hasActionAccess ? [{ label: "Actions", align: "right", className: "w-[15%] pr-6" }] : [])
   ];
 
   const renderBranchRow = (branch) => (
@@ -53,43 +65,49 @@ export default function AllBranches() {
         </div>
       </td>
       <td className="px-6 py-4 text-center">
-        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[11px] font-bold uppercase ${branch.is_active ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"}`}>
+        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[11px] font-black uppercase ${branch.is_active ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"}`}>
           {branch.is_active ? "Operational" : "Suspended"}
         </span>
       </td>
-      <PermissionGuard requiredPermission={PERMISSIONS.MANAGE_BRANCHES}>
+      
+      {hasActionAccess && (
         <td className="px-6 py-4 text-right">
-          <div className="flex justify-end gap-1">
-            <ActionIconButton 
-              icon={branch.is_active ? PowerOff : Power} 
-              onClick={() => toggleMutation.mutate(branch._id)} 
-              disabled={toggleMutation.isPending}
-              title="Toggle Status"
-            />
-            <ActionIconButton 
-              icon={Edit3} 
-              onClick={() => navigate(`/admin/update-branch/${branch._id}`)} 
-              title="Edit" 
-            />
-            <ActionIconButton 
-              icon={Trash2} 
-              variant="danger" 
-              onClick={() => showConfirmToast({
-                type: "delete",
-                title: "Delete Branch",
-                itemName: branch.branch_name,
-                onConfirm: () => deleteMutation.mutate(branch._id),
-              })} 
-              title="Delete" 
-            />
+          <div className="flex justify-end gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+            {/* ⚡ অ্যাক্টিভ স্ট্যাটাস কন্ট্রোল */}
+            {canToggle && (
+              <ActionIconButton 
+                icon={branch.is_active ? PowerOff : Power} 
+                onClick={() => toggleMutation.mutate(branch._id)} 
+                disabled={toggleMutation.isPending}
+                title="Toggle Status"
+              />
+            )}
+            {/* 📝 এডিট ব্রাঞ্চ */}
+            {canEdit && (
+              <ActionIconButton 
+                icon={Edit3} 
+                onClick={() => navigate(`/admin/update-branch/${branch._id}`)} 
+                title="Edit Branch" 
+              />
+            )}
+            {/* 🗑️ ডিলিট ব্রাঞ্চ */}
+            {canDelete && (
+              <ActionIconButton 
+                icon={Trash2} 
+                variant="danger" 
+                onClick={() => handleDeleteClick(branch._id, branch.branch_name)} 
+                disabled={deleteMutation.isPending}
+                title="Delete Branch" 
+              />
+            )}
           </div>
         </td>
-      </PermissionGuard>
+      )}
     </tr>
   );
 
   return (
-    <div className="p-4 md:p-8 max-w-[1600px] mx-auto min-h-screen bg-[#f4f7fb]">
+    <div className="p-4 md:p-8 max-w-[1600px] mx-auto min-h-screen">
       <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-8">
         <div>
           <h1 className="text-3xl font-black text-slate-800 tracking-tight flex items-center gap-3">
@@ -101,14 +119,15 @@ export default function AllBranches() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
             <input type="text" placeholder="Search branches..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
           </div>
-          <PermissionGuard requiredPermission={PERMISSIONS.MANAGE_BRANCHES}>
+          {/* 🚀 নতুন ব্রাঞ্চ তৈরি করা এডিট পারমিশনের আন্ডারে */}
+          {canEdit && (
             <button onClick={() => navigate("/admin/add-branch")} className="px-5 py-2.5 bg-slate-900 hover:bg-indigo-600 text-white font-bold rounded-xl transition-all flex items-center gap-2">
               <Plus size={18} /> New Branch
             </button>
-          </PermissionGuard>
+          )}
         </div>
       </div>
-      <DataTable columns={columns} data={filteredBranches} renderRow={renderBranchRow} isLoading={isLoading} />
+      <DataTable columns={columns} data={filteredBranches} renderRow={renderBranchRow} isLoading={isLoading} emptyStateTitle="No branches found" />
     </div>
   );
 }

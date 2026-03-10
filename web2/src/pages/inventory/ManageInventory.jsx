@@ -14,39 +14,36 @@ import { PERMISSIONS } from "../../config/permissionConfig";
 
 export default function ManageInventory() {
   const { branchId, branchName } = useOutletContext() || {};
-  const { authUser, hasPermission, isMaster } = useAuth();
+  const { hasPermission, isMaster: checkIsMaster } = useAuth();
   const navigate = useNavigate();
   
-  const isSuper = isMaster ? isMaster() : authUser?.role === "superadmin";
+  const isSuper = checkIsMaster();
 
   const [activeTab, setActiveTab] = useState("pantry");
   const [superAdminBranch, setSuperAdminBranch] = useState(""); 
   
-  // CLEAN DATA FETCHING: Directly receive the branches array
   const { data: branches = [] } = useBranches({}, { enabled: !!isSuper });
 
-  // Auto-select the first branch for Super Admin when data loads cleanly
   useEffect(() => {
     if (isSuper && branches.length > 0 && !superAdminBranch) {
       setSuperAdminBranch(branches[0]._id);
     }
   }, [isSuper, branches, superAdminBranch]);
 
-  // Calculate effective branch ID
   const effectiveBranchId = isSuper ? superAdminBranch : branchId;
 
   const displayBranchName = useMemo(() => {
     if (!isSuper) return branchName;
     if (!superAdminBranch) return "Loading...";
-    // Directly search the clean array
     const selected = branches.find(b => b._id === superAdminBranch);
     return selected ? selected.branch_name : "Loading...";
   }, [isSuper, superAdminBranch, branchName, branches]);
 
+  // 🚀 ট্যাব কন্ট্রোল: রিকুইজিশন দেখার পারমিশন চেক
   const tabs = [
     { id: "pantry", label: "Fast Count", icon: PackageSearch },
     { id: "hisab", label: "Valuation", icon: Calculator },
-    { id: "requisitions", label: "Requisitions", icon: ClipboardList, permission: PERMISSIONS.VIEW_REQUISITIONS },
+    { id: "requisitions", label: "Requisitions", icon: ClipboardList, permission: PERMISSIONS.VIEW_INVENTORY },
     { id: "history", label: "History", icon: History },
   ].filter(t => !t.permission || hasPermission(t.permission));
 
@@ -61,12 +58,11 @@ export default function ManageInventory() {
         </div>
         
         <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
-          {/* Protect Branch Dropdown with PermissionGuard */}
           <PermissionGuard requiredPermission={PERMISSIONS.VIEW_BRANCHES}>
             {isSuper && (
               <BranchDropdown 
                 isMaster={isSuper} 
-                branches={branches} // Pass clean array
+                branches={branches} 
                 value={superAdminBranch} 
                 onChange={setSuperAdminBranch} 
                 showAllOption={false} 
@@ -75,8 +71,8 @@ export default function ManageInventory() {
             )}
           </PermissionGuard>
 
-          {/* Ensure only authorized users can add inventory */}
-          {hasPermission(PERMISSIONS.MANAGE_INVENTORY) && (
+          {/* 🚀 গ্র্যানুলার পারমিশন: স্টক অ্যাড করার পারমিশন থাকলে বাটন দেখাবে */}
+          {hasPermission(PERMISSIONS.INVENTORY_ADD_STOCK) && (
             <button 
               onClick={() => navigate("/admin/add-inventory")} 
               className="w-full sm:w-auto h-[42px] px-6 bg-teal-600 text-white text-xs font-black uppercase rounded-xl hover:bg-teal-700 transition-all flex items-center justify-center gap-2"
@@ -100,14 +96,13 @@ export default function ManageInventory() {
         ))}
       </div>
 
-      {/* Render active views based on effective branch */}
       {effectiveBranchId && (
-        <>
+        <div className="animate-in slide-in-from-bottom-2 duration-500">
           {activeTab === "pantry" && <PantryView branchId={effectiveBranchId} />}
           {activeTab === "hisab" && <HisabNikashView branchId={effectiveBranchId} />}
           {activeTab === "requisitions" && <RequisitionsView branchId={effectiveBranchId} />}
           {activeTab === "history" && <InventoryHistory branchId={effectiveBranchId} />}
-        </>
+        </div>
       )}
     </div>
   );
