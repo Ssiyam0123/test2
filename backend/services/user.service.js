@@ -91,24 +91,88 @@ export const createUser = async (userData, file, isMaster, adminBranch) => {
   }
 };
 
-// Modify Existing User
+// // Modify Existing User
+// export const modifyUser = async (userId, updateData, file, isMaster, adminBranch, branchFilter) => {
+//   const uploadedFilePath = file ? `/uploads/employees/${file.filename}` : null;
+
+//   try {
+//     // 🚀 THE MAGIC FIX: added .select("+password") 
+//     const targetUser = await User.findOne({ _id: userId, ...branchFilter }).select("+password");
+//     if (!targetUser) throw new AppError("User not found or access denied.", 404);
+
+//     if (!isMaster) {
+//       if (updateData.role && updateData.role.toString() !== targetUser.role.toString()) {
+//         const requestedRole = await Role.findById(updateData.role);
+//         if (requestedRole && (requestedRole.permissions.includes("all_access") || requestedRole.name === "superadmin")) {
+//           throw new AppError("Action blocked: Cannot elevate role to Master level.", 403);
+//         }
+//       }
+//       updateData.branch = adminBranch; 
+//     }
+
+//     if (!updateData.password || updateData.password === "") delete updateData.password;
+
+//     if (uploadedFilePath) {
+//       if (targetUser.photo_url) deleteLocalFile(targetUser.photo_url); 
+//       updateData.photo_url = uploadedFilePath;
+//     }
+
+//     updateData.social_links = {
+//       facebook: updateData.facebook ?? targetUser.social_links?.facebook ?? "",
+//       linkedin: updateData.linkedin ?? targetUser.social_links?.linkedin ?? "",
+//       twitter: updateData.twitter ?? targetUser.social_links?.twitter ?? "",
+//       instagram: updateData.instagram ?? targetUser.social_links?.instagram ?? "",
+//       custom: updateData.others ?? targetUser.social_links?.custom ?? "",
+//     };
+
+//     delete updateData.facebook;
+//     delete updateData.linkedin;
+//     delete updateData.twitter;
+//     delete updateData.instagram;
+//     delete updateData.others;
+
+//     Object.assign(targetUser, updateData);
+//     await targetUser.save(); // 🚀 Now Mongoose won't panic because password is present!
+
+//     await targetUser.populate([
+//       { path: "branch", select: "branch_name branch_code" },
+//       { path: "role", select: "name is_system_role permissions" }
+//     ]);
+
+//     const userObj = targetUser.toObject();
+//     delete userObj.password; // সিকিউরিটির জন্য রেসপন্স থেকে আবার ডিলিট করে দিচ্ছি
+//     return userObj;
+
+//   } catch (error) {
+//     if (uploadedFilePath) deleteLocalFile(uploadedFilePath);
+//     throw error;
+//   }
+// };
+
+
+
 export const modifyUser = async (userId, updateData, file, isMaster, adminBranch, branchFilter) => {
   const uploadedFilePath = file ? `/uploads/employees/${file.filename}` : null;
 
   try {
-    // 🚀 THE MAGIC FIX: added .select("+password") 
     const targetUser = await User.findOne({ _id: userId, ...branchFilter }).select("+password");
     if (!targetUser) throw new AppError("User not found or access denied.", 404);
 
+    // 🚀 ফিক্সড লজিক: 
     if (!isMaster) {
+      // ১. যদি সে মাস্টার না হয়, সে রোল এলিভেট (Superadmin বানানো) করতে পারবে না
       if (updateData.role && updateData.role.toString() !== targetUser.role.toString()) {
         const requestedRole = await Role.findById(updateData.role);
         if (requestedRole && (requestedRole.permissions.includes("all_access") || requestedRole.name === "superadmin")) {
           throw new AppError("Action blocked: Cannot elevate role to Master level.", 403);
         }
       }
-      updateData.branch = adminBranch; 
-    }
+      
+      // ২. মাস্টার না হলে সে অন্য ব্রাঞ্চে এমপ্লয়ি সরাতে পারবে না (নিরাপত্তার জন্য)
+      // কিন্তু যদি তুই চাস লোকাল এডমিনও ব্রাঞ্চ চেঞ্জ করতে পারবে, তবে নিচের লাইনটি মুছে দিস:
+      delete updateData.branch; 
+    } 
+    // যদি isMaster (Super Admin) হয়, তবে updateData.branch যা আসবে তাই সেট হবে।
 
     if (!updateData.password || updateData.password === "") delete updateData.password;
 
@@ -117,6 +181,7 @@ export const modifyUser = async (userId, updateData, file, isMaster, adminBranch
       updateData.photo_url = uploadedFilePath;
     }
 
+    // সোশ্যাল লিঙ্ক প্রসেসিং
     updateData.social_links = {
       facebook: updateData.facebook ?? targetUser.social_links?.facebook ?? "",
       linkedin: updateData.linkedin ?? targetUser.social_links?.linkedin ?? "",
@@ -132,7 +197,7 @@ export const modifyUser = async (userId, updateData, file, isMaster, adminBranch
     delete updateData.others;
 
     Object.assign(targetUser, updateData);
-    await targetUser.save(); // 🚀 Now Mongoose won't panic because password is present!
+    await targetUser.save();
 
     await targetUser.populate([
       { path: "branch", select: "branch_name branch_code" },
@@ -140,7 +205,7 @@ export const modifyUser = async (userId, updateData, file, isMaster, adminBranch
     ]);
 
     const userObj = targetUser.toObject();
-    delete userObj.password; // সিকিউরিটির জন্য রেসপন্স থেকে আবার ডিলিট করে দিচ্ছি
+    delete userObj.password;
     return userObj;
 
   } catch (error) {
@@ -148,6 +213,13 @@ export const modifyUser = async (userId, updateData, file, isMaster, adminBranch
     throw error;
   }
 };
+
+
+
+
+
+
+
 
 // Delete User
 export const removeUser = async (userId, branchFilter) => {

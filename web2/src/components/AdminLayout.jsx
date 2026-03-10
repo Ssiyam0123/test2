@@ -26,7 +26,9 @@ const AdminLayout = () => {
     {},
     { enabled: !!isSuperAdmin } 
   );
-  const branches = branchRes?.data || [];
+  const branches = branchRes || [];
+
+  console.log(branchRes)
 
   useEffect(() => {
     if (authUser && !activeBranch) {

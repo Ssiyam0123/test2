@@ -36,26 +36,61 @@ export const userCreateSchema = z.object({
   photo: z.any().optional(),
 });
 
-export const updateUserSchema = z
-  .object({
+// export const updateUserSchema = z
+//   .object({
+//     full_name: z.string().regex(nameRegex, "Invalid name format.").optional(),
+//     email: z.string().email().toLowerCase().optional(),
+//     phone: z.string().optional(),
+//     password: z
+//       .string()
+//       .min(6, "Password must be at least 6 characters")
+//       .optional()
+//       .or(z.literal("")),
+//     facebook: z.string().url("Invalid URL").optional().or(z.literal("")),
+//     linkedin: z.string().url("Invalid URL").optional().or(z.literal("")),
+//     twitter: z.string().url("Invalid URL").optional().or(z.literal("")),
+//     instagram: z.string().url("Invalid URL").optional().or(z.literal("")),
+//     others: z.string().url("Invalid URL").optional().or(z.literal("")),
+//     photo: z.any().optional(),
+//   })
+//   .refine((data) => Object.keys(data).length > 0, {
+//     message: "At least one field must be provided for update",
+//   });
+
+
+
+
+
+export const updateUserSchema = z.object({
     full_name: z.string().regex(nameRegex, "Invalid name format.").optional(),
     email: z.string().email().toLowerCase().optional(),
     phone: z.string().optional(),
-    password: z
-      .string()
-      .min(6, "Password must be at least 6 characters")
-      .optional()
-      .or(z.literal("")),
-    facebook: z.string().url("Invalid URL").optional().or(z.literal("")),
-    linkedin: z.string().url("Invalid URL").optional().or(z.literal("")),
-    twitter: z.string().url("Invalid URL").optional().or(z.literal("")),
-    instagram: z.string().url("Invalid URL").optional().or(z.literal("")),
-    others: z.string().url("Invalid URL").optional().or(z.literal("")),
+    designation: z.string().optional(),
+    department: z.string().optional(),
+    status: z.enum(["Active", "On Leave", "Resigned"]).optional(),
+    
+    // 🚀 এই ফিল্ডগুলো অবশ্যই থাকতে হবে যাতে ফর্ম থেকে ডেটা রিসিভ হয়
+    branch: objectIdSchema.optional(), 
+    role: objectIdSchema.optional(),
+    
+    password: z.string().min(6).optional().or(z.literal("")),
+    facebook: z.string().url().optional().or(z.literal("")),
+    linkedin: z.string().url().optional().or(z.literal("")),
+    twitter: z.string().url().optional().or(z.literal("")),
+    instagram: z.string().url().optional().or(z.literal("")),
+    others: z.string().url().optional().or(z.literal("")),
     photo: z.any().optional(),
-  })
-  .refine((data) => Object.keys(data).length > 0, {
+}).refine((data) => Object.keys(data).length > 0, {
     message: "At least one field must be provided for update",
-  });
+});
+
+
+
+
+
+
+
+
 
 export const roleUpdateSchema = z.object({
   role: objectIdSchema,

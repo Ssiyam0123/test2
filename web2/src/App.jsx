@@ -55,7 +55,7 @@ import ProfilePage from "./pages/ProfilePage";
 
 const queryClient = new QueryClient();
 
-// 🔐 পাসওয়ার্ড প্রটেক্টেড রাউট (লগইন চেক)
+// 🔐 প্রটেক্টেড রাউট (লগইন করা ইউজারদের জন্য)
 const ProtectedRoute = ({ children }) => {
   const { authUser } = useAuth();
   return authUser ? children : <Navigate to="/login" replace />;
@@ -69,7 +69,7 @@ const RoleGuard = ({ requiredPermission }) => {
 
   useEffect(() => {
     if (!hasAccess) {
-      toast.error("Access Denied: You don't have the required permission.");
+      toast.error("Access Denied: Required permission missing.");
     }
   }, [hasAccess]);
 
@@ -82,7 +82,6 @@ const RoleGuard = ({ requiredPermission }) => {
 
 /**
  * 🚀 Dashboard Dispatcher
- * ইউজারের রোল অনুযায়ী সঠিক ড্যাশবোর্ডে পাঠায়
  */
 const AdminIndex = () => {
   const { hasPermission, isMaster: checkIsMaster } = useAuth();
@@ -104,7 +103,7 @@ const AdminIndex = () => {
   return (
     <div className="p-12 text-center mt-20 bg-white rounded-[2.5rem] shadow-sm max-w-2xl mx-auto border border-slate-100">
       <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">Access Denied</h2>
-      <p className="text-slate-500 font-bold mt-2">Please contact your Super Admin for module access.</p>
+      <p className="text-slate-500 font-bold mt-2">Please contact your Super Admin for access permissions.</p>
     </div>
   );
 };
@@ -123,31 +122,33 @@ function App() {
       <Router>
         <Toaster position="top-right" />
         <Routes>
-          {/* 🌐 PUBLIC ROUTES */}
+          
+          {/* 🌐 1. PUBLIC ROUTES (Accessible to everyone) */}
           <Route element={<PublicLayout />}>
             <Route path="/" element={<SearchStudent />} />
+            {/* 🚀 Public Student & Employee Profiles */}
             <Route path="/student/:id" element={<StudentDetails />} />
             <Route path="/employee/:id" element={<EmployeeDetails />} />
           </Route>
 
-          {/* 🔑 AUTHENTICATION */}
+          {/* 🔑 2. AUTHENTICATION */}
           <Route
             path="/login"
             element={authUser ? <Navigate to="/admin" replace /> : <LoginPage />}
           />
 
-          {/* 🛠️ ADMIN PANEL (All Nested Routes) */}
+          {/* 🛠️ 3. ADMIN PANEL (Protected Routes) */}
           <Route path="/admin" element={<ProtectedRoute><AdminLayout /></ProtectedRoute>}>
             
-            {/* 0. Dashboard Home */}
+            {/* Dashboard Home */}
             <Route index element={<AdminIndex />} />
 
-            {/* 1. Account Settings */}
+            {/* My Account (Profile) */}
             <Route element={<RoleGuard requiredPermission={PERMISSIONS.VIEW_MY_PROFILE} />}>
               <Route path="profile" element={<ProfilePage />} />
             </Route>
 
-            {/* 2. Student Management */}
+            {/* Students */}
             <Route element={<RoleGuard requiredPermission={PERMISSIONS.VIEW_STUDENTS} />}>
               <Route path="all-students" element={<AllStudents />} />
             </Route>
@@ -158,10 +159,9 @@ function App() {
               <Route path="update-student/:id" element={<UpdateStudent />} />
             </Route>
 
-            {/* 3. Staff & HR */}
+            {/* Staff & HR (Admin Side Only List/Edit) */}
             <Route element={<RoleGuard requiredPermission={PERMISSIONS.VIEW_EMPLOYEES} />}>
               <Route path="all-employees" element={<AllEmployees />} />
-              <Route path="employee/:id" element={<EmployeeDetails />} />
             </Route>
             <Route element={<RoleGuard requiredPermission={PERMISSIONS.ADD_EMPLOYEE} />}>
               <Route path="add-employee" element={<AddEmployeeForm mode="add" />} />
@@ -170,7 +170,7 @@ function App() {
               <Route path="update-employee/:id" element={<UpdateEmployee mode="edit" />} />
             </Route>
 
-            {/* 4. Academic Courses */}
+            {/* Academics */}
             <Route element={<RoleGuard requiredPermission={PERMISSIONS.VIEW_COURSES} />}>
               <Route path="all-courses" element={<AllCourses />} />
             </Route>
@@ -179,7 +179,6 @@ function App() {
               <Route path="update-course/:id" element={<AddCourse mode="edit" />} />
             </Route>
 
-            {/* 5. Master Syllabus */}
             <Route element={<RoleGuard requiredPermission={PERMISSIONS.VIEW_SYLLABUS} />}>
               <Route path="manage-syllabus" element={<ManageMasterSyllabus />} />
             </Route>
@@ -188,7 +187,7 @@ function App() {
               <Route path="update-syllabus/:id" element={<AddMasterSyllabus mode="edit" />} />
             </Route>
 
-            {/* 6. Batch & Attendance */}
+            {/* Batch Management */}
             <Route element={<RoleGuard requiredPermission={PERMISSIONS.VIEW_ALL_BATCHES} />}>
               <Route path="all-batches" element={<BatchListPage />} />
             </Route>
@@ -206,12 +205,12 @@ function App() {
               <Route path="edit-batch/:id" element={<AddBatch />} />
             </Route>
 
-            {/* 7. Financial Records */}
+            {/* Financials */}
             <Route element={<RoleGuard requiredPermission={PERMISSIONS.STUDENT_PAYMENTS} />}>
               <Route path="student-finance/:id" element={<StudentFinance />} />
             </Route>
 
-            {/* 8. Organization Branches */}
+            {/* Branches */}
             <Route element={<RoleGuard requiredPermission={PERMISSIONS.VIEW_BRANCHES} />}>
               <Route path="branches" element={<AllBranches />} />
               <Route path="branches/:id" element={<BranchDetails />} />
@@ -222,7 +221,7 @@ function App() {
               <Route path="update-branch/:id" element={<ManageBranchForm mode="edit" />} />
             </Route>
 
-            {/* 9. Inventory Control */}
+            {/* Inventory */}
             <Route element={<RoleGuard requiredPermission={PERMISSIONS.VIEW_INVENTORY} />}>
               <Route path="inventory" element={<ManageInventory />} />
             </Route>
@@ -230,7 +229,7 @@ function App() {
               <Route path="add-inventory" element={<AddInventory />} />
             </Route>
 
-            {/* 10. System Controls */}
+            {/* System Admin */}
             <Route element={<RoleGuard requiredPermission={PERMISSIONS.MANAGE_ROLES} />}>
               <Route path="manage-admins" element={<ManageAdmins />} />
               <Route path="manage-roles" element={<ManageRoles />} />
@@ -241,7 +240,7 @@ function App() {
 
           </Route>
 
-          {/* 🛑 404 & FALLBACK */}
+          {/* 🛑 4. FALLBACK */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Router>

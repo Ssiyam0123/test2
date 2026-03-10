@@ -31,7 +31,7 @@ router.get(
 );
 router.get(
   "/:id",
-  requirePermission(PERMISSIONS.VIEW_EMPLOYEES),
+  // requirePermission(PERMISSIONS.VIEW_EMPLOYEES),
   userCtrl.getUserById,
 );
 
