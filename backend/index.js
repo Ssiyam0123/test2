@@ -85,6 +85,10 @@ app.use("/api/requisitions", requisitionRoutes);
 // Utilities
 app.use("/api/generate-certificate", certificateRoutes);
 app.use("/api/holidays", holidayRoutes);
+
+app.get("/",(req,res)=>{
+  res.send("hello world");
+})
 // ==========================================
 // 🛑 GLOBAL ERROR HANDLING ARCHITECTURE
 // ==========================================

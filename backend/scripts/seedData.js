@@ -1,167 +1,153 @@
 import mongoose from "mongoose";
-import { faker } from "@faker-js/faker";
 import dotenv from "dotenv";
-import { addDays, subMonths } from "date-fns";
-
-// Models
-import User from "../models/user.js";
-import Course from "../models/course.js";
-import Batch from "../models/batch.js";
-import Student from "../models/student.js";
-import ClassContent from "../models/classContent.js";
-import Branch from "../models/branch.js"; 
-import Inventory from "../models/inventory.js";
-import Fee from "../models/fee.js";
-import Payment from "../models/payment.js";
-import Role from "../models/role.js"; 
-import MasterSyllabus from "../models/masterSyllabus.js";
 
 dotenv.config();
 
-const seedDatabase = async () => {
+const migrateDatabase = async () => {
   try {
-    console.log("🚀 Syncing with MongoDB Compass Structure...");
-    await mongoose.connect(process.env.MONGO_URI || "mongodb://localhost:27017/cibdhk_test");
-
-    console.log("🔐 Synchronizing Roles & Permissions Matrix...");
+    console.log("🚀 Starting Database Migration...");
+    const mongoUri = process.env.MONGO_URI || '';
     
-    const superadminPerms = [
-      "view_dashboard", "manage_users", "view_roles", "manage_roles",
-      "view_branches", "manage_branches", "view_courses", "manage_courses",
-      "view_batches", "manage_batches", "view_students", "manage_students",
-      "view_finance", "manage_finance", "view_inventory", "manage_inventory",
-      "view_requisitions", "manage_requisitions", "view_attendance", "manage_attendance",
-      "view_reports", "view_settings", "manage_settings"
-    ];
+    // মঙ্গুজের মাধ্যমে কানেক্ট করা
+    await mongoose.connect(mongoUri);
+    const db = mongoose.connection.db; // 🚀 Native DB instance (Bypasses Schema Strictness)
+    console.log("🔗 Connected to Native MongoDB.");
 
-    const rolesToEnsure = [
-      { name: "superadmin", description: "Full System Access", permissions: superadminPerms, is_system_role: true },
-      { name: "admin", description: "Branch Management Access", permissions: ["view_dashboard", "view_students", "manage_students"], is_system_role: true },
-      { name: "registrar", description: "Handles student admissions and basic records.", permissions: ["view_students", "manage_students"], is_system_role: true },
-      { name: "instructor", description: "Class & Student Management", permissions: ["view_dashboard", "view_courses", "manage_attendance"], is_system_role: true },
-      { name: "staff", description: "General campus staff.", permissions: ["view_dashboard"], is_system_role: true }
-    ];
-
-    for (const r of rolesToEnsure) {
-      await Role.findOneAndUpdate({ name: r.name }, r, { upsert: true, new: true });
+    // ==========================================
+    // STEP 1: Default Branch Setup
+    // ==========================================
+    console.log("🏢 Checking Default Branch...");
+    let defaultBranch = await db.collection("branches").findOne({ branch_code: "DHK" });
+    
+    if (!defaultBranch) {
+      const branchRes = await db.collection("branches").insertOne({
+        branch_name: "Dhaka HQ",
+        branch_code: "DHK",
+        address: "Dhanmondi, Dhaka",
+        is_active: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+      defaultBranch = { _id: branchRes.insertedId };
+      console.log("✅ Created Default Branch.");
+    } else {
+      console.log("✅ Default Branch exists.");
     }
 
-    const superRole = await Role.findOne({ name: "superadmin" });
-    const instRole = await Role.findOne({ name: "instructor" });
+    // ==========================================
+    // STEP 2: Roles Setup
+    // ==========================================
+    console.log("🔐 Checking and Mapping Roles...");
+    const rolesToMap = ["superadmin", "admin", "instructor", "registrar", "staff"];
+    const roleCache = {};
 
-    // 🧹 STEP 2: DEEP CLEAN (Except Roles)
-    console.log("🧹 Clearing collections for fresh analytics...");
-    await Promise.all([
-      Branch.deleteMany({}), User.deleteMany({}), Course.deleteMany({}),
-      Batch.deleteMany({}), Student.deleteMany({}), ClassContent.deleteMany({}),
-      Inventory.deleteMany({}), Fee.deleteMany({}), Payment.deleteMany({}),
-      MasterSyllabus.deleteMany({})
-    ]);
-
-    // 🏢 STEP 3: INFRASTRUCTURE
-    console.log("🏢 Building Campuses...");
-    const branches = await Branch.insertMany([
-      { branch_name: "Dhaka HQ", branch_code: "DHK", address: "Dhanmondi", is_active: true },
-      { branch_name: "Chittagong", branch_code: "CTG", address: "Agrabad", is_active: true }
-    ]);
-
-    // 👑 STEP 4: CREATE SIYAM ADMIN
-    console.log("👑 Onboarding Master Superadmin...");
-    await User.create({
-      username: "suiii",
-      email: "admin12@gmail.com",
-      full_name: "Siyam Admin",
-      password: "password123", 
-      role: superRole._id,
-      branch: branches[0]._id, 
-      employee_id: "ADM-001",
-      status: "Active"
-    });
-
-    // 📚 STEP 5: SYLLABUS & COURSES
-    const courses = await Course.insertMany([
-        { course_name: "Culinary Arts", course_code: "CAD", base_fee: 70000, duration: { value: 6, unit: "months" } }
-    ]);
-
-    const masterTopics = [];
-    for(let i=1; i<=5; i++) {
-        masterTopics.push({ topic: `Topic ${i}: Culinary Skills`, category: "General", order_index: i });
+    for (const roleName of rolesToMap) {
+      let roleDoc = await db.collection("roles").findOne({ name: roleName });
+      if (!roleDoc) {
+        const roleRes = await db.collection("roles").insertOne({
+          name: roleName,
+          description: `Migrated ${roleName} role`,
+          permissions: ["view_dashboard"], // বেসিক পারমিশন
+          is_system_role: true,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        });
+        roleDoc = { _id: roleRes.insertedId };
+      }
+      roleCache[roleName] = roleDoc._id;
     }
-    await MasterSyllabus.insertMany(masterTopics);
+    console.log("✅ Roles Ready.");
 
-    // 📊 STEP 6: OPERATIONAL DATA (Analytics)
-    console.log("📊 Injecting 6 months of financial history...");
-    for (const branch of branches) {
-      const chef = await User.create({
-        username: `chef_${branch.branch_code.toLowerCase()}`,
-        email: `chef.${branch.branch_code.toLowerCase()}@cib.com`,
-        password: "password123",
-        role: instRole._id,
-        branch: branch._id,
-        full_name: `Chef ${faker.person.firstName()}`,
-        employee_id: `EMP-${branch.branch_code}`,
-        status: "Active"
-      });
+    // ==========================================
+    // STEP 3: Migrate Users (String -> ObjectId)
+    // ==========================================
+    console.log("👤 Migrating Users...");
+    const users = await db.collection("users").find().toArray();
+    let userUpdateCount = 0;
 
-      const batch = await Batch.create({
-        batch_name: `${branch.branch_code}-B1`,
-        course: courses[0]._id,
-        instructors: [chef._id],
-        branch: branch._id,
-        start_date: subMonths(new Date(), 4),
-        schedule_days: ["Monday", "Wednesday"],
-        time_slot: { start_time: "10:00 AM", end_time: "01:00 PM" }, // ✅ REQUIRED
-        status: "Active"
-      });
+    for (const user of users) {
+      // যদি role আগে থেকেই ObjectId হয়, তাহলে স্কিপ করবে
+      if (typeof user.role === "string") {
+        let newRoleName = "staff"; // Default fallback
+        if (user.role === "admin") newRoleName = "superadmin";
+        if (user.role === "instructor") newRoleName = "instructor";
+        if (user.role === "register") newRoleName = "registrar";
 
-      for (let s = 0; s < 5; s++) {
-        const student = await Student.create({
-          student_name: faker.person.fullName(),
-          fathers_name: faker.person.fullName({ gender: 'male' }), // ✅ REQUIRED
-          student_id: `STU-${branch.branch_code}-${faker.string.numeric(4)}`,
-          course: courses[0]._id,
-          batch: batch._id,
-          branch: branch._id,
-          gender: "male", // ✅ REQUIRED
-          issue_date: subMonths(new Date(), 4), // ✅ REQUIRED
-          status: "active"
-        });
-
-        const fee = await Fee.create({
-          student: student._id, branch: branch._id, course: courses[0]._id,
-          total_amount: 70000, net_payable: 65000, paid_amount: 0, status: "Partial"
-        });
-
-        // 📈 Fake Payments across 4 months for Revenue Chart
-        for (let m = 0; m < 4; m++) {
-          const amount = 5000 + (m * 2000);
-          await Payment.create({
-            fee_record: fee._id,
-            student: student._id,
-            branch: branch._id,
-            amount: amount,
-            payment_type: "Installment", // ✅ REQUIRED
-            payment_method: "Cash", // ✅ REQUIRED
-            collected_by: chef._id,
-            receipt_number: `RCPT-${faker.string.alphanumeric(8).toUpperCase()}`, // ✅ UNIQUE
-            createdAt: subMonths(new Date(), m)
-          });
-          fee.paid_amount += amount;
-        }
-        await fee.save();
+        await db.collection("users").updateOne(
+          { _id: user._id },
+          { 
+            $set: { 
+              role: roleCache[newRoleName], 
+              branch: defaultBranch._id 
+            } 
+          }
+        );
+        userUpdateCount++;
       }
     }
+    console.log(`✅ Migrated ${userUpdateCount} Users.`);
 
-    console.log("\n------------------------------------------");
-    console.log("✅ COMPASS SYNCED & DATABASE SEEDED!");
-    console.log("🚀 Admin: admin12@gmail.com / password123");
-    console.log("------------------------------------------");
+    // ==========================================
+    // STEP 4: Migrate Students & Create Batches
+    // ==========================================
+    console.log("🎓 Migrating Students and Batches...");
+    const students = await db.collection("students").find().toArray();
+    let studentUpdateCount = 0;
+    const batchCache = {}; // মেমোরিতে ব্যাচ আইডি সেভ রাখার জন্য
+
+    for (const student of students) {
+      // যদি batch স্ট্রিং হয় (যেমন: "Batch-01") তবেই আপডেট করবে
+      if (typeof student.batch === "string") {
+        const batchStringName = student.batch;
+
+        // ১. চেক করবে এই নামের ব্যাচ কালেকশনে আছে কি না
+        let batchDocId = batchCache[batchStringName];
+        
+        if (!batchDocId) {
+          let existingBatch = await db.collection("batches").findOne({ batch_name: batchStringName });
+          
+          if (!existingBatch) {
+            // নতুন ব্যাচ ক্রিয়েট করা (Dummy data দিয়ে)
+            const newBatchRes = await db.collection("batches").insertOne({
+              batch_name: batchStringName,
+              course: student.course, // স্টুডেন্টের কোর্স রেফারেন্স ব্যবহার করা হলো
+              branch: defaultBranch._id,
+              start_date: new Date(), // ডিফল্ট ডেট
+              schedule_days: ["Saturday", "Sunday"], // ডামি শিডিউল
+              time_slot: { start_time: "10:00 AM", end_time: "02:00 PM" },
+              status: "Active",
+              createdAt: new Date(),
+              updatedAt: new Date()
+            });
+            batchDocId = newBatchRes.insertedId;
+          } else {
+            batchDocId = existingBatch._id;
+          }
+          batchCache[batchStringName] = batchDocId; // ক্যাশে সেভ করে রাখলাম
+        }
+
+        // ২. স্টুডেন্টের স্ট্রিং ব্যাচকে নতুন ObjectId দিয়ে রিপ্লেস করা এবং Branch অ্যাড করা
+        await db.collection("students").updateOne(
+          { _id: student._id },
+          { 
+            $set: { 
+              batch: batchDocId, 
+              branch: defaultBranch._id 
+            } 
+          }
+        );
+        studentUpdateCount++;
+      }
+    }
+    console.log(`✅ Migrated ${studentUpdateCount} Students and created Batches.`);
+
+    console.log("\n🎉 DATABASE MIGRATION COMPLETED SUCCESSFULLY!");
     process.exit(0);
 
   } catch (error) {
-    console.error("❌ Seed Failed:", error);
+    console.error("\n❌ Migration Failed:", error);
     process.exit(1);
   }
 };
 
-seedDatabase();
+migrateDatabase();

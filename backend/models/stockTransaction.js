@@ -20,11 +20,25 @@ const stockTransactionSchema = new mongoose.Schema(
     quantity: { type: Number, required: true },
     total_cost: { type: Number, default: 0 },
     supplier: { type: String, trim: true },
+    
     performed_by: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
     },
+    
+    requested_by: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    
+    requisition: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Requisition", 
+      default: null,
+    },
+
     reference_class: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "ClassContent",

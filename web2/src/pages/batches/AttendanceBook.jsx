@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import { Check, X, Minus, UserCircle, PieChart } from "lucide-react";
 import { format } from "date-fns";
+import Avatar from "../../components/common/Avatar";
 
 export default function AttendanceBook({ batch, classes }) {
   const sortedClasses = useMemo(() => {
@@ -91,9 +92,15 @@ export default function AttendanceBook({ batch, classes }) {
               >
                 <td className="sticky left-0 z-20 bg-white group-hover:bg-slate-50 p-5 border-r border-slate-100 transition-colors shadow-[4px_0_10px_-5px_rgba(0,0,0,0.05)]">
                   <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 font-black text-xs border border-slate-200">
-                       {row.student.student_name?.charAt(0)}
-                    </div>
+                    
+                    {/* 🚀 Avatar Component Integration */}
+                    <Avatar 
+                      src={row.student.profile_picture || row.student.image} 
+                      alt={row.student.student_name}
+                      fallbackText={row.student.student_name}
+                      sizeClass="w-10 h-10"
+                    />
+
                     <div className="min-w-0">
                       <p className="text-sm font-black text-slate-800 truncate uppercase tracking-tight">
                         {row.student.student_name}

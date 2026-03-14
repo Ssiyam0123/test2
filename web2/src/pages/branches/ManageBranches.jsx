@@ -17,7 +17,7 @@ export default function ManageBranches() {
     b.branch_code.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // 🚀 এনালিটিক্স দেখার পারমিশন চেক (যদি ড্যাশবোর্ড পারমিশন থাকে)
+
   const canViewAnalytics = hasPermission(PERMISSIONS.VIEW_BRANCH_DASHBOARD) || hasPermission(PERMISSIONS.VIEW_ADMIN_DASHBOARD);
 
   if (isLoading) return <LogoLoader />;

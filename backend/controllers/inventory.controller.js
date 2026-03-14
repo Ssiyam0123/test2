@@ -9,6 +9,7 @@ export const getBranchInventory = catchAsync(async (req, res) => {
 
 export const getBranchTransactions = catchAsync(async (req, res) => {
   const transactions = await InventoryService.fetchBranchTransactions(req.branchFilter.branch);
+  // console.log(transactions)
   res.status(200).json(new ApiResponse(200, transactions, "Transactions fetched successfully"));
 });
 

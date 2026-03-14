@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { X, Check, XCircle, Users, Loader2, CheckSquare, ArrowLeft } from "lucide-react";
+import Avatar from "../../components/common/Avatar"; 
 import toast from "react-hot-toast";
 
 export default function MarkClassCompleteModal({ 
@@ -16,7 +17,6 @@ export default function MarkClassCompleteModal({
           (a.student?._id || a.student) === student._id
         );
         
-        // 🚀 Matches Backend Zod Enum ("Present", "Absent")
         let defaultStatus = "Present";
         if (existingRecord && existingRecord.status) {
           const s = existingRecord.status;
@@ -53,7 +53,6 @@ export default function MarkClassCompleteModal({
 
     setIsSubmitting(true);
     
-    // 🚀 PERFECT ZOD MATCH
     const formattedRecords = Object.entries(attendance).map(([studentId, status]) => ({
       student: studentId,
       status: status 
@@ -62,7 +61,7 @@ export default function MarkClassCompleteModal({
     try {
       await onSave({
         classId: classData._id,
-        batchId: batchData._id, // 🚀 ADDED: Required for React Query to invalidate cache!
+        batchId: batchData._id, 
         payload: {
           attendanceRecords: formattedRecords, 
           is_completed: true
@@ -114,13 +113,16 @@ export default function MarkClassCompleteModal({
                 return (
                   <div key={student._id} onClick={() => toggleAttendance(student._id)} className={`flex items-center justify-between p-3 rounded-2xl border cursor-pointer transition-all active:scale-[0.99] ${isPresent ? "bg-white border-slate-200 shadow-sm" : "bg-rose-50/50 border-rose-100 opacity-75"}`}>
                     <div className="flex items-center gap-3">
-                      {student.photo_url ? (
-                        <img src={student.photo_url} alt="student" className="w-10 h-10 rounded-full object-cover shadow-sm border border-slate-100" />
-                      ) : (
-                        <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-sm">
-                          {student.student_name.charAt(0)}
-                        </div>
-                      )}
+                      
+                      {/* 🚀 Avatar Integrated Here */}
+                      <Avatar 
+                        src={student.photo_url || student.profile_picture || student.image} 
+                        alt={student.student_name}
+                        fallbackText={student.student_name} 
+                        sizeClass="w-10 h-10"
+                        isInactive={!isPresent} // 🚀 Absent থাকলে ফ্যাকাসে হয়ে যাবে
+                      />
+
                       <div>
                         <p className={`text-sm font-bold ${isPresent ? "text-slate-800" : "text-slate-500 line-through decoration-slate-300"}`}>{student.student_name}</p>
                         <p className="text-[10px] font-black tracking-widest text-slate-400 uppercase">{student.student_id}</p>

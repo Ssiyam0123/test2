@@ -1,29 +1,24 @@
 import React from "react";
 import {
   Edit, Trash2, QrCode, Power, PowerOff, Eye, Loader2, MessageSquare, 
-  ShieldCheck, Award, MapPin, Wallet, BookOpen
+  ShieldCheck, Award, MapPin, Wallet, BookOpen, Mail, Download 
 } from "lucide-react";
-import { useDownloadCertificate } from "../../hooks/useStudents.js";
 import DataTable from "../common/DataTable.jsx";
 import ActionIconButton from "../common/ActionIconButton.jsx";
 import Avatar from "../common/Avatar.jsx";
 import { useNavigate } from "react-router-dom";
 import useAuth from "../../store/useAuth.js";
 import { PERMISSIONS } from "../../config/permissionConfig.js";
-import { confirmDelete } from "../../utils/swalUtils"; // 🚀 Reusable Swal Import
+import { confirmDelete } from "../../utils/swalUtils"; 
 
 const StudentsTable = ({
   students, pagination, onDelete, onToggleStatus, 
   onGenerateQR, onAddComment, onEdit, onPay, 
+  onSendCertificate, onDownloadCertificate, // 🚀 onDownloadCertificate রিসিভ করা হলো
   deleteLoading, toggleLoading, page, onPageChange, searchTerm, isLoading = false,
 }) => {
-  const downloadMutation = useDownloadCertificate();
   const navigate = useNavigate();
   const { hasPermission } = useAuth();
-
-  const handleDownloadCertificate = (student) => {
-    downloadMutation.mutate(student);
-  };
 
   const handleDeleteClick = (studentId, studentName) => {
     confirmDelete({
@@ -34,9 +29,6 @@ const StudentsTable = ({
     });
   };
 
-  // ==========================================
-  // 🚀 ডাইনামিক গ্র্যানুলার পারমিশন ফ্ল্যাগস
-  // ==========================================
   const canManagePayments = hasPermission(PERMISSIONS.STUDENT_PAYMENTS);
   const canViewProfile = hasPermission(PERMISSIONS.STUDENT_PROFILE);
   const canComment = hasPermission(PERMISSIONS.STUDENT_COMMENT);
@@ -57,7 +49,6 @@ const StudentsTable = ({
 
   const renderStudentRow = (student) => {
     const isInactive = !student.is_active;
-    const isDownloadingThis = downloadMutation.isPending && downloadMutation.variables?._id === student._id;
 
     return (
       <tr key={student._id} className={`group transition-colors duration-300 hover:bg-slate-50/50 ${isInactive ? "opacity-60 grayscale-[20%]" : ""}`}>
@@ -103,49 +94,50 @@ const StudentsTable = ({
           </span>
         </td>
 
-        {/* 6. ACTIONS (Granular Role Protected) */}
         <td className="px-6 py-4 text-right align-middle">
           <div className="flex items-center justify-end gap-1 opacity-60 group-hover:opacity-100 transition-opacity duration-200">
             
-            {/* 💰 পেমেন্ট পারমিশন */}
             {canManagePayments && (
               <ActionIconButton icon={Wallet} variant="neutral" onClick={() => onPay(student)} title="Finance & Payments" />
             )}
             
-            {/* 👁️ প্রোফাইল ভিউ পারমিশন */}
             {canViewProfile && (
               <ActionIconButton icon={Eye} onClick={() => navigate(`/student/${student._id}`)} title="View Details" />
             )}
 
-            {/* 💬 কমেন্ট পারমিশন */}
             {canComment && (
               <ActionIconButton icon={MessageSquare} variant="neutral" onClick={() => onAddComment(student)} title="Add Comment" />
             )}
 
-            {/* 📝 এডিট পারমিশন */}
             {canEdit && (
               <ActionIconButton icon={Edit} variant="neutral" onClick={() => onEdit(student._id)} title="Edit Student" />
             )}
 
-            {/* ⚡ অ্যাক্টিভ কন্ট্রোল পারমিশন */}
             {canToggleActive && (
               <ActionIconButton icon={student.is_active ? PowerOff : Power} variant="neutral" onClick={() => onToggleStatus(student._id)} disabled={toggleLoading} title={student.is_active ? "Deactivate" : "Activate"} />
             )}
 
-            {/* 📱 কিউআর কোড পারমিশন */}
             {canGenerateQR && (
               <ActionIconButton icon={QrCode} variant="neutral" onClick={() => onGenerateQR(student)} title="Generate QR Code" />
             )}
 
-            {/* 🏆 সার্টিফিকেট পারমিশন */}
+            {/* 🚀 Email Certificate */}
             {canIssueCertificate && (
               <ActionIconButton
-                icon={isDownloadingThis ? Loader2 : Award}
+                icon={Mail}
+                variant="indigo"
+                onClick={() => onSendCertificate(student)}
+                title="Email Certificate"
+              />
+            )}
+
+            {/* 🚀 Download Certificate */}
+            {canIssueCertificate && (
+              <ActionIconButton
+                icon={Download} // Loader রিমুভ করা হয়েছে কারণ এটা মডালে দেখাবে
                 variant="purple"
-                onClick={() => handleDownloadCertificate(student)}
-                disabled={isDownloadingThis}
-                loading={isDownloadingThis}
-                title="Download Certificate"
+                onClick={() => onDownloadCertificate(student)} // সরাসরি মিউটেশনের বদলে মডাল ওপেন করবে
+                title="Download Certificate PDF"
               />
             )}
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 
-import { useBatchById } from "../../hooks/useBatches"; // useBatches এর বদলে useBatchById
+import { useBatchById } from "../../hooks/useBatches"; 
 import { useBatchClasses, useAutoSchedule, useDeleteClass } from "../../hooks/useClasses";
 import useAuth from "../../store/useAuth";
 
@@ -17,7 +17,6 @@ export default function ManageBatches() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [currentDate, setCurrentDate] = useState(new Date());
 
-  // সরাসরি ব্যাচ আইডি দিয়ে পপুলেটেড ডাটা ফেচ করা হচ্ছে
   const { data: selectedBatch, isLoading: isBatchLoading } = useBatchById(batchId);
 
   const { data: classesRes, isLoading: isClassesLoading } = useBatchClasses(batchId);
@@ -43,8 +42,9 @@ export default function ManageBatches() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f1f5f9] p-4 lg:p-8">
-      <div className="max-w-[1600px] mx-auto flex flex-col h-[calc(100vh-4rem)]">
+    <div className="min-h-screen p-4 lg:p-8">
+      {/* 🚀 FIXED: min-h for mobile, h- for desktop */}
+      <div className="max-w-[1600px] mx-auto flex flex-col min-h-[calc(100vh-4rem)] lg:h-[calc(100vh-4rem)]">
         
         {/* TOP BAR */}
         <div className="flex items-center gap-4 mb-6 shrink-0">

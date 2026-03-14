@@ -2,14 +2,14 @@ import mongoose from "mongoose";
 import Requisition from "../models/requisition.js";
 import Inventory from "../models/inventory.js";
 import StockTransaction from "../models/stockTransaction.js";
+import Expense from "../models/expense.js"; // 🚀 NEW: Expense মডেল ইম্পোর্ট করা হলো
 import AppError from "../utils/AppError.js";
 
-// ==========================================
-// 🛠️ HELPER: Safe Transaction Execution
-// ==========================================
 const executeTransaction = async (callback) => {
   const session = await mongoose.startSession();
-  const isReplicaSet = mongoose.connection.getClient().topology.description.type.includes("ReplicaSet");
+  const isReplicaSet = mongoose.connection
+    .getClient()
+    .topology.description.type.includes("ReplicaSet");
 
   try {
     if (isReplicaSet) session.startTransaction();
@@ -17,7 +17,8 @@ const executeTransaction = async (callback) => {
     if (isReplicaSet) await session.commitTransaction();
     return result;
   } catch (error) {
-    if (isReplicaSet && session.inTransaction()) await session.abortTransaction();
+    if (isReplicaSet && session.inTransaction())
+      await session.abortTransaction();
     throw error;
   } finally {
     session.endSession();
@@ -25,93 +26,144 @@ const executeTransaction = async (callback) => {
 };
 
 export const getRequisitionByClass = async (classId, branchFilter) => {
-  return await Requisition.findOne({ class_content: classId, ...branchFilter })
+  return await Requisition.find({ class_content: classId, ...branchFilter })
     .populate("requested_by", "full_name")
     .populate("approved_by", "full_name")
+    .sort({ createdAt: -1 })
     .lean();
 };
 
 export const createRequisition = async (data, userId, branchFilter) => {
-  const existingReq = await Requisition.findOne({ class_content: data.class_content });
-  if (existingReq) throw new AppError("A requisition already exists for this class.", 400);
-
   const newReq = new Requisition({
     ...data,
-    branch: branchFilter?.branch || data.branch, 
+    branch: branchFilter?.branch || data.branch,
     requested_by: userId,
-    status: "pending"
+    status: "pending",
   });
 
   await newReq.save();
   return newReq;
 };
 
-// 🚀 The Magic: Approve & Deduct Stock
-export const approveRequisition = async (reqId, payload, adminId, branchFilter) => {
+// ৩. Approve Requisition with Automatic Expense Logging
+export const approveRequisition = async (
+  reqId,
+  payload,
+  adminId,
+  branchFilter,
+) => {
   return await executeTransaction(async (session, isReplicaSet) => {
     const opts = isReplicaSet ? { session } : {};
 
-    const requisition = await Requisition.findOne({ _id: reqId, ...branchFilter }, null, opts);
+    const requisition = await Requisition.findOne(
+      { _id: reqId, ...branchFilter },
+      null,
+      opts,
+    );
     if (!requisition) throw new AppError("Requisition not found.", 404);
-    if (requisition.status !== "pending") throw new AppError(`Requisition is already ${requisition.status}.`, 400);
+    if (requisition.status !== "pending")
+      throw new AppError(`Requisition is already ${requisition.status}.`, 400);
 
     const updatedItems = payload.items || requisition.items;
-    
-    // Process Inventory Deductions
+    let totalClassCost = 0; // 🚀 খরচ ক্যালকুলেট করার জন্য ভেরিয়েবল
+
+    // Inventory Deductions & Cost Calculation
     for (const item of updatedItems) {
       if (!item.is_custom && item.inventory_item) {
-        const invItem = await Inventory.findOne({ _id: item.inventory_item, branch: branchFilter.branch }, null, opts);
-        if (!invItem) throw new AppError(`Inventory item ${item.item_name} not found.`, 404);
-        
+        const invItem = await Inventory.findOne(
+          { _id: item.inventory_item, branch: requisition.branch },
+          null,
+          opts,
+        );
+        if (!invItem)
+          throw new AppError(
+            `Inventory item ${item.item_name} not found.`,
+            404,
+          );
+
         if (invItem.quantity_in_stock < item.quantity) {
-          throw new AppError(`Not enough stock for ${item.item_name}. Only ${invItem.quantity_in_stock} ${invItem.unit} left.`, 400);
+          throw new AppError(`Not enough stock for ${item.item_name}.`, 400);
         }
 
-        // Deduct Stock
+        // 🚀 খরচ হিসেব: quantity * unit_price (Inventory মডেলে unit_price থাকা বাধ্যতামূলক)
+        const itemExpense = item.quantity * (invItem.unit_price || 0);
+        totalClassCost += itemExpense;
+
         invItem.quantity_in_stock -= item.quantity;
         await invItem.save(opts);
 
-        // Create Stock Transaction Record
-        await StockTransaction.create([{
-          inventory_item: invItem._id,
-          branch: branchFilter.branch,
-          transaction_type: "CLASS_USAGE",
-          quantity: -Math.abs(item.quantity), // Negative for usage
-          performed_by: adminId,
-          reference_class: requisition.class_content,
-          notes: `Used for Class Requisition`
-        }], opts);
+        // লেজার ট্রানজেকশন তৈরি
+        await StockTransaction.create(
+          [
+            {
+              inventory_item: invItem._id,
+              branch: requisition.branch,
+              transaction_type: "CLASS_USAGE",
+              quantity: -Math.abs(item.quantity),
+              total_cost: itemExpense, // ট্রানজেকশনেও খরচ লিখে রাখা হলো
+              performed_by: adminId,
+              requested_by: requisition.requested_by, 
+              requisition: requisition._id,           
+              reference_class: requisition.class_content,
+              notes: payload.admin_note || `Class Requisition #${requisition._id.toString().slice(-6)}`,
+            },
+          ],
+          opts,
+        );
       }
     }
 
-    // Mark as Approved
+    // 🚀 ৪. যদি খরচ ০ এর বেশি হয়, তবে অটোমেটিক Expense মডেলে ডাটা পুশ করা
+    if (totalClassCost > 0) {
+      await Expense.create(
+        [
+          {
+            title: `Class Material Cost: ${requisition._id.toString().slice(-6)}`,
+            amount: totalClassCost,
+            category: "Inventory",
+            class_content: requisition.class_content, // 👈 এটাই ড্যাশবোর্ডে ক্লাস অনুযায়ী ডাটা আনবে
+            batch: requisition.batch,
+            branch: requisition.branch,
+            recorded_by: adminId,
+            date_incurred: new Date()
+          },
+        ],
+        opts,
+      );
+    }
+
     requisition.items = updatedItems;
     requisition.status = "approved";
     requisition.approved_by = adminId;
-    requisition.total_estimated_cost = payload.total_estimated_cost || 0;
     requisition.admin_note = payload.admin_note || "";
-    
+
     await requisition.save(opts);
     return requisition;
   });
 };
 
-export const rejectRequisition = async (reqId, adminNote, adminId, branchFilter) => {
+export const rejectRequisition = async (
+  reqId,
+  adminNote,
+  adminId,
+  branchFilter,
+) => {
   const req = await Requisition.findOneAndUpdate(
     { _id: reqId, ...branchFilter, status: "pending" },
     { status: "rejected", approved_by: adminId, admin_note: adminNote },
-    { new: true }
-  ).lean(); // 🚀 Lean added for performance
+    { new: true },
+  ).lean();
 
-  if (!req) throw new AppError("Requisition not found or already processed.", 404);
+  if (!req)
+    throw new AppError("Requisition not found or already processed.", 404);
   return req;
 };
 
 export const getAllRequisitions = async (branchFilter) => {
   return await Requisition.find(branchFilter)
-    .populate("class_content", "topic class_number") 
-    .populate("batch", "batch_name") 
-    .populate("requested_by", "full_name username") 
-    .sort({ createdAt: -1 }) 
+    .populate("class_content", "topic class_number")
+    .populate("batch", "batch_name")
+    .populate("requested_by", "full_name username")
+    .sort({ createdAt: -1 })
     .lean();
 };

@@ -3,7 +3,7 @@ import { API } from "./axios.js";
 export const fetchStudents = async (page = 1, limit = 30, filters = {}) => {
   const params = new URLSearchParams({ page, limit, ...filters });
   const { data } = await API.get(`/students/all?${params}`);
-  return data; // Keeping this as `data` because you return pagination outside of `data.data` in backend
+  return data;
 };
 
 export const fetchAdminStudentById = async (id) => {
@@ -72,9 +72,20 @@ export const deleteStudentComment = async (commentId) => {
   return data.data;
 };
 
-export const downloadStudentCertificate = async (studentId) => {
-  const response = await API.get(`/download/${studentId}`, { 
-    responseType: "blob" 
-  });
+// 🎓 Certificate Download
+// 🎓 Certificate Download
+export const downloadStudentCertificate = async ({ studentId, awardedOn }) => {
+  // 🚀 API.get এর বদলে API.post করা হলো এবং বডিতে ডেটা পাঠানো হলো
+  const response = await API.post(
+    `/generate-certificate/download/${studentId}`, 
+    { awardedOn }, 
+    { responseType: "blob" } 
+  );
   return response.data;
+};
+
+// 🚀 🎓 Certificate Email Send (New Function)
+export const sendStudentCertificateEmail = async ({ studentId, payload }) => {
+  const { data } = await API.post(`/generate-certificate/send/${studentId}`, payload);
+  return data.data;
 };

@@ -1,175 +1,101 @@
-import PDFDocument from "pdfkit";
-import QRCode from "qrcode";
-import path from "path";
-import fs from "fs";
-import { fileURLToPath } from "url";
-import Student from "../models/student.js"; // Adjust based on your model path
+import Student from "../models/student.js";
+import { generateCertificateBuffer } from "../services/certificate.service.js";
+import nodemailer from "nodemailer";
+import { getCertificateEmailTemplate } from "../utils/emailTemplates.js"; 
+import "dotenv/config";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
+// 🟢 1. PDF Download Controller
 export const downloadCertificatePDF = async (req, res) => {
   try {
+    const { awardedOn } = req.body;
+
     const student = await Student.findById(req.params.id);
     if (!student) {
       return res.status(404).json({ message: "Student not found" });
     }
 
-    const doc = new PDFDocument({
-      size: "A4",
-      layout: "landscape",
-      margin: 0,
-    });
-
+    const pdfBuffer = await generateCertificateBuffer(student, awardedOn);
     const safeName = student.student_name.replace(/[^a-zA-Z0-9]/g, "_");
+
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename=CIB_Certificate_${safeName}.pdf`);
-    
-    doc.pipe(res);
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=CIB_Certificate_${safeName}.pdf`,
+    );
+    res.setHeader("Content-Length", pdfBuffer.length);
 
-
-    const fontsPath = path.join(__dirname, "../assets/fonts");
-    const imagesPath = path.join(__dirname, "../assets/images");
-
-
-    doc.image(`${imagesPath}/WavesBackground.png`, 0, 0, { width: 842, height: 595 });
-    
-    // Corner Accents and Signatures
-    doc.image(`${imagesPath}/GoldCorners.png`, 0, 0, { width: 842, height: 595 });
-    doc.image(`${imagesPath}/SealSignature.png`, 0, 0, { width: 842, height: 595 });
-
-    
-    const logoWidth = 540; 
-    const logoX = (842 / 2) - (logoWidth / 2);
-
-    const logoY = 190; 
-    
-    if (fs.existsSync(path.join(imagesPath, "logo.png"))) {
-        
-        doc.image(`${imagesPath}/logo.png`, logoX, logoY, { width: logoWidth });
-    }
-    
-
-    
-    doc.lineWidth(2).strokeColor("#bd9b5e").rect(20, 20, 802, 555).stroke();
-
-    
-    doc.font(`${fontsPath}/Cinzel-Bold.ttf`)
-       .fontSize(19)
-       .fillColor("#111111")
-       .text("THE CULINARY INSTITUTE OF BANGLADESH", 0, 50, { align: "center", characterSpacing: 1.5 });
-
-    doc.font(`${fontsPath}/Montserrat-SemiBold.ttf`)
-       .fontSize(10)
-       .fillColor("#555555")
-       .text(`Registration No: STP-DHA-003244`, 0, 75, { align: "center" });
-
-    doc.font(`${fontsPath}/GreatVibes-Regular.ttf`)
-       .fontSize(22)
-       .fillColor("#444444")
-       .text("Excellence in culinary training, certified with pride", 0, 90, { align: "center" });
-
-    // Main Title 
-    doc.font(`${fontsPath}/Cinzel-Bold.ttf`)
-       .fontSize(60)
-       .fillColor("#111111")
-       .text("CERTIFICATE", 0, 135, { align: "center", characterSpacing: 10 });
-
-    doc.font(`${fontsPath}/Montserrat-Regular.ttf`)
-       .fontSize(17)
-       .fillColor("#c5a059")
-       .text("OF ACHIEVEMENT", 0, 200, { align: "center", characterSpacing: 8 });
-
-    // Awardee Name 
-    doc.font(`${fontsPath}/Montserrat-SemiBold.ttf`)
-       .fontSize(10)
-       .fillColor("#333333")
-       .text("THIS CERTIFICATE IS PROUDLY GIVEN TO", 0, 250, { align: "center", characterSpacing: 2 });
-
-    doc.font(`${fontsPath}/GreatVibes-Regular.ttf`)
-       .fontSize(85)
-       .fillColor("#111111")
-       .text(student.student_name, 0, 265, { align: "center" });
-
-    // Gold Divider Line
-    doc.lineWidth(1.5).strokeColor("#c5a059").moveTo(180, 370).lineTo(662, 370).stroke();
-
-    doc.font(`${fontsPath}/Montserrat-Regular.ttf`)
-       .fontSize(12)
-       .fillColor("#333333")
-       .text("In recognition of accomplishment and demonstrated excellence in the culinary arts.", 0, 390, { align: "center" });
-
-    doc.font(`${fontsPath}/Montserrat-Bold.ttf`)
-       .fontSize(18)
-       .fillColor("#111111")
-       .text(student.course_name, 0, 415, { align: "center" });
-
-    // Format Date Helper
-    const d = new Date(student.issue_date || Date.now());
-    const issueDate = `Awarded on ${d.getDate()} ${d.toLocaleDateString("en-GB", { month: "long" })} ${d.getFullYear()}`;
-
-    doc.font(`${fontsPath}/Montserrat-MediumItalic.ttf`)
-       .fontSize(12)
-       .fillColor("#555555")
-       .text(issueDate, 0, 440, { align: "center" });
-
-
-    
-    const studentUrl = `https://verification.cibdhk.com/student/${student._id}`;
-    const qrCodeDataUrl = await QRCode.toDataURL(studentUrl, { margin: 0, width: 150 });
-    
-    const qrX = 60;
-    const qrSize = 55;
-    const footerY = 485;
-    const textX = qrX + qrSize + 15;
-    
-    // Insert QR Code & Box
-    doc.image(qrCodeDataUrl, qrX, footerY, { width: qrSize });
-    doc.lineWidth(0.5).strokeColor("#bd9b5e").rect(qrX, footerY, qrSize, qrSize).stroke();
-
-    // Footer Text (NSDA Accreditation)
-    let textY = footerY;
-
-    doc.font(`${fontsPath}/Montserrat-Regular.ttf`).fontSize(7).fillColor("#333333")
-       .text("This academy is accredited by the ", textX, textY, { continued: true })
-       .font(`${fontsPath}/Montserrat-Bold.ttf`)
-       .text("National");
-    
-    textY += 10;
-    doc.font(`${fontsPath}/Montserrat-Bold.ttf`)
-       .text("Skills Development Authority (NSDA)", textX, textY);
-    
-    textY += 10;
-    doc.font(`${fontsPath}/Montserrat-Regular.ttf`)
-       .text("and adheres to NSDA & international food", textX, textY);
-    
-    textY += 10;
-    doc.font(`${fontsPath}/Montserrat-Regular.ttf`)
-       .text("safety & quality management standards.", textX, textY);
-
-    // Spacer
-    textY += 15;
-
-    // Registration & Verification Lines
-    doc.font(`${fontsPath}/Montserrat-Bold.ttf`)
-       .fillColor("#111111")
-       .text(`Student Reg No: `, textX, textY, { continued: true })
-       .font(`${fontsPath}/Montserrat-Regular.ttf`)
-       .text(student.registration_number || student._id);
-
-    textY += 10;
-    doc.font(`${fontsPath}/Montserrat-Bold.ttf`)
-       .text(`Manual Verification: `, textX, textY, { continued: true })
-       .font(`${fontsPath}/Montserrat-Regular.ttf`)
-       .text("contact@cibdhk.com | www.cibdhk.com");
-
-    // Finalize the PDF
-    doc.end();
-
+    res.send(pdfBuffer);
   } catch (error) {
     console.error("PDF Generation Error:", error);
-    if (!res.headersSent) {
-      res.status(500).json({ message: "Failed to generate certificate" });
+    res.status(500).json({ message: "Failed to generate certificate" });
+  }
+};
+
+export const sendCertificateEmail = async (req, res) => {
+  try {
+    const { email, awardedOn } = req.body;
+    const { id } = req.params;
+
+    const student = await Student.findById(id);
+    if (!student) {
+      return res.status(404).json({ success: false, message: "Student not found" });
     }
+
+    if (!email) {
+      return res.status(400).json({ success: false, message: "Recipient email is required" });
+    }
+
+    const pdfBuffer = await generateCertificateBuffer(student, awardedOn);
+    const safeName = student.student_name.replace(/[^a-zA-Z0-9]/g, "_");
+
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: parseInt(process.env.SMTP_PORT) || 465,
+      secure: true, 
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+      tls: {
+        rejectUnauthorized: false
+      },
+      connectionTimeout: 10000, 
+    });
+
+    const htmlContent = getCertificateEmailTemplate(student); 
+
+    // 5. Mail Options
+    const mailOptions = {
+      from: `"Culinary Institute of Bangladesh" <${process.env.SMTP_USER}>`,
+      to: email,
+      subject: `Official Certificate - ${student.student_name}`,
+      html: htmlContent,
+      attachments: [
+        {
+          filename: `CIB_Certificate_${safeName}.pdf`,
+          content: pdfBuffer,
+          contentType: "application/pdf",
+        },
+      ],
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    
+    console.log("✅ Email sent: %s", info.messageId);
+
+    return res.status(200).json({ 
+      success: true, 
+      message: "Certificate sent successfully!",
+      messageId: info.messageId 
+    });
+
+  } catch (error) {
+    console.error("❌ Email Sending Error:", error.message);
+    
+    return res.status(500).json({ 
+      success: false, 
+      message: "Failed to send email.",
+      error: process.env.NODE_ENV === "development" ? error.message : "SMTP Configuration Error"
+    });
   }
 };

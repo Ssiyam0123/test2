@@ -17,7 +17,7 @@ export default function InventoryHistory({ branchId }) {
 
   // FILTER DATA BASED ON TABS
   const inTransactions = transactions.filter(t => t.transaction_type === "PURCHASE");
-  const outTransactions = transactions.filter(t => t.transaction_type !== "PURCHASE"); // Assuming others are ISSUES/REQUISITIONS
+  const outTransactions = transactions.filter(t => t.transaction_type !== "PURCHASE"); // Issues/Requisitions
   
   const currentData = activeTab === "in" ? inTransactions : outTransactions;
 
@@ -83,7 +83,6 @@ export default function InventoryHistory({ branchId }) {
                 <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Item & Action</th>
                 <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Qty Impact</th>
                 
-                {/* CONDITIONAL COLUMN FOR MONEY */}
                 {activeTab === "in" && (
                   <th className="p-5 text-[10px] font-black text-emerald-600 uppercase tracking-widest text-right">Total Cost</th>
                 )}
@@ -178,12 +177,17 @@ export default function InventoryHistory({ branchId }) {
                             <div className="flex items-start gap-3">
                               <span className="px-2 py-0.5 bg-blue-50 text-blue-600 border border-blue-100 text-[8px] font-black uppercase tracking-widest rounded w-20 text-center shrink-0 mt-0.5">Req. From</span>
                               <div className="flex flex-col">
+                                
+                                {/* 🚀 UPDATED LOGIC HERE: prioritizing requested_by */}
                                 <span className="text-xs font-black text-slate-800">
-                                  {txn.reference_class?.instructor?.full_name || "Instructor Name"} 
-                                  <span className="text-[9px] font-bold text-slate-400 font-normal ml-1">(Instructor)</span>
+                                  {txn.requested_by?.full_name || txn.reference_class?.instructor?.full_name || "System Request"} 
+                                  <span className="text-[9px] font-bold text-slate-400 font-normal ml-1">
+                                    ({txn.requested_by?.role?.name || "Instructor"})
+                                  </span>
                                 </span>
+                                
                                 <span className="text-[10px] font-bold text-indigo-600 mt-0.5 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded inline-block w-fit">
-                                  {txn.reference_class?.batch?.batch_name || "Batch"} • Class {txn.reference_class?.class_number || "X"}
+                                  {txn.reference_class?.batch?.batch_name || "Batch"} • {txn.reference_class?.topic || `Class ${txn.reference_class?.class_number || "X"}`}
                                 </span>
                               </div>
                             </div>

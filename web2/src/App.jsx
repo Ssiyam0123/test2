@@ -52,16 +52,16 @@ import StudentFinance from "./pages/finance/StudentFinance";
 import ManageHolidays from "./pages/setting/ManageHolidays";
 import AttendanceBookPage from "./pages/batches/AttendanceBookPage";
 import ProfilePage from "./pages/ProfilePage";
+import ExpenseAnalyticsPage from "./pages/ExpenseAnalyticsPage.JSX";
+import CampusFinanceList from "./pages/students/CampusFinanceList";
 
 const queryClient = new QueryClient();
 
-// 🔐 প্রটেক্টেড রাউট (লগইন করা ইউজারদের জন্য)
 const ProtectedRoute = ({ children }) => {
   const { authUser } = useAuth();
   return authUser ? children : <Navigate to="/login" replace />;
 };
 
-// 🛡️ রোল বেজড এক্সেস গার্ড
 const RoleGuard = ({ requiredPermission }) => {
   const { hasPermission } = useAuth();
   const context = useOutletContext();
@@ -80,9 +80,7 @@ const RoleGuard = ({ requiredPermission }) => {
   return <Outlet context={context} />;
 };
 
-/**
- * 🚀 Dashboard Dispatcher
- */
+
 const AdminIndex = () => {
   const { hasPermission, isMaster: checkIsMaster } = useAuth();
   const isSuperAdmin = checkIsMaster();
@@ -123,21 +121,20 @@ function App() {
         <Toaster position="top-right" />
         <Routes>
           
-          {/* 🌐 1. PUBLIC ROUTES (Accessible to everyone) */}
           <Route element={<PublicLayout />}>
             <Route path="/" element={<SearchStudent />} />
-            {/* 🚀 Public Student & Employee Profiles */}
+            {/* Public Student & Employee Profiles */}
             <Route path="/student/:id" element={<StudentDetails />} />
             <Route path="/employee/:id" element={<EmployeeDetails />} />
           </Route>
 
-          {/* 🔑 2. AUTHENTICATION */}
+          {/* 2. AUTHENTICATION */}
           <Route
             path="/login"
             element={authUser ? <Navigate to="/admin" replace /> : <LoginPage />}
           />
 
-          {/* 🛠️ 3. ADMIN PANEL (Protected Routes) */}
+          {/* 3. ADMIN PANEL (Protected Routes) */}
           <Route path="/admin" element={<ProtectedRoute><AdminLayout /></ProtectedRoute>}>
             
             {/* Dashboard Home */}
@@ -197,6 +194,7 @@ function App() {
             </Route>
             <Route element={<RoleGuard requiredPermission={PERMISSIONS.VIEW_ATTENDANCE_BOOK} />}>
               <Route path="attendance-book" element={<AttendanceBookPage />} />
+              <Route path="class-exp" element={<ExpenseAnalyticsPage />} />
             </Route>
             <Route element={<RoleGuard requiredPermission={PERMISSIONS.ADD_BATCH} />}>
               <Route path="add-batch" element={<AddBatch />} />
@@ -207,13 +205,15 @@ function App() {
 
             {/* Financials */}
             <Route element={<RoleGuard requiredPermission={PERMISSIONS.STUDENT_PAYMENTS} />}>
+              <Route path="student-finance" element={<CampusFinanceList />} />
               <Route path="student-finance/:id" element={<StudentFinance />} />
             </Route>
 
             {/* Branches */}
             <Route element={<RoleGuard requiredPermission={PERMISSIONS.VIEW_BRANCHES} />}>
               <Route path="branches" element={<AllBranches />} />
-              <Route path="branches/:id" element={<BranchDetails />} />
+              <Route path="branches/:id" element={<BranchDashboard />} />
+              {/* <Route path="exp-branch" element={<ExpenseAnalyticsPage />} /> */}
             </Route>
             <Route element={<RoleGuard requiredPermission={PERMISSIONS.BRANCH_EDIT} />}>
               <Route path="manage-branches" element={<ManageBranches />} />
@@ -240,7 +240,7 @@ function App() {
 
           </Route>
 
-          {/* 🛑 4. FALLBACK */}
+          {/* 4. FALLBACK */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Router>

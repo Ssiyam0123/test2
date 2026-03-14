@@ -4,6 +4,8 @@ import {
   useStudents,
   useDeleteStudent,
   useToggleStudentStatus,
+  useSendCertificateEmail,
+  useDownloadCertificate, // 🚀 Download হুক ইম্পোর্ট
 } from "../../hooks/useStudents.js";
 import { useBatches } from "../../hooks/useBatches.js";
 import { useActiveCourses } from "../../hooks/useCourses.js";
@@ -12,6 +14,8 @@ import StudentFilters from "../../components/Search_filter/StudentFilters.jsx";
 import BranchDropdown from "../../components/common/BranchDropdown.jsx";
 import QRCodeModal from "../../components/modal/QRCodeModal.jsx";
 import CommentModal from "../../components/modal/CommentModal.jsx";
+import SendCertificateModal from "../../components/modal/SendCertificateModal.jsx";
+import DownloadCertificateModal from "../../components/modal/DownloadCertificateModal.jsx"; // 🚀 Download মডাল ইম্পোর্ট
 import PageHeader from "../../components/common/PageHeader.jsx";
 import TableSkeleton from "../../components/common/TableSkeleton.jsx";
 import DataErrorState from "../../components/common/DataErrorState.jsx";
@@ -48,6 +52,8 @@ const AllStudents = () => {
 
   const [selectedStudentForQr, setSelectedStudentForQr] = useState(null);
   const [selectedStudentForComment, setSelectedStudentForComment] = useState(null);
+  const [selectedStudentForCert, setSelectedStudentForCert] = useState(null); 
+  const [selectedStudentForDownload, setSelectedStudentForDownload] = useState(null); // 🚀 Download মডালের স্টেট
 
   const limit = 20;
   const isSuper = isMaster();
@@ -98,6 +104,24 @@ const AllStudents = () => {
 
   const deleteStudentMutation = useDeleteStudent();
   const toggleStatusMutation = useToggleStudentStatus();
+  
+  // ইমেইল পাঠানোর মিউটেশন
+  const { mutate: sendCertEmail, isPending: isSendingCert } = useSendCertificateEmail();
+
+  const handleSendCertEmail = (data) => {
+    sendCertEmail(data, {
+      onSuccess: () => setSelectedStudentForCert(null), 
+    });
+  };
+
+  // 🚀 পিডিএফ ডাউনলোড মিউটেশন
+  const { mutate: downloadCert, isPending: isDownloadingCert } = useDownloadCertificate();
+
+  const handleDownloadCertSubmit = (data) => {
+    downloadCert(data, {
+      onSuccess: () => setSelectedStudentForDownload(null), // সাকসেস হলে মডাল বন্ধ
+    });
+  };
 
   useEffect(() => {
     setPage(1);
@@ -117,12 +141,10 @@ const AllStudents = () => {
         subtitle={`Viewing ${isSuper ? "All Campuses" : "Your Campus"} Records`}
         onAdd={() => navigate("/admin/add-student")}
         addText="Add Student"
-        // 🚀 গ্র্যানুলার পারমিশন: এডিট/অ্যাড পারমিশন থাকলে বাটন দেখাবে
         addPermission={PERMISSIONS.STUDENT_EDIT}
       />
 
       <div className="mb-6 space-y-4">
-        {/* 🚀 ব্রাঞ্চ দেখার পারমিশন থাকলে এবং সুপার এডমিন হলে ড্রপডাউন দেখাবে */}
         <PermissionGuard requiredPermission={PERMISSIONS.VIEW_BRANCHES}>
           {isSuper && (
             <div className="flex justify-end">
@@ -161,6 +183,8 @@ const AllStudents = () => {
             onToggleStatus={(id) => toggleStatusMutation.mutate(id)}
             onGenerateQR={setSelectedStudentForQr}
             onAddComment={setSelectedStudentForComment}
+            onSendCertificate={setSelectedStudentForCert} 
+            onDownloadCertificate={setSelectedStudentForDownload} // 🚀 প্রপস পাস করা হলো
             onPay={(student) => navigate(`/admin/student-finance/${student._id}`)}
             onEdit={(id) => navigate(`/admin/update-student/${id}`)}
             page={page}
@@ -173,11 +197,31 @@ const AllStudents = () => {
         )}
       </Suspense>
 
+      {/* মডালগুলো */}
       {selectedStudentForQr && (
         <QRCodeModal student={selectedStudentForQr} onClose={() => setSelectedStudentForQr(null)} />
       )}
       {selectedStudentForComment && (
         <CommentModal student={selectedStudentForComment} onClose={() => setSelectedStudentForComment(null)} />
+      )}
+      {selectedStudentForCert && (
+        <SendCertificateModal 
+          isOpen={!!selectedStudentForCert} 
+          onClose={() => setSelectedStudentForCert(null)} 
+          student={selectedStudentForCert}
+          onSend={handleSendCertEmail}
+          isSending={isSendingCert}
+        />
+      )}
+      {/* 🚀 Download Certificate Modal */}
+      {selectedStudentForDownload && (
+        <DownloadCertificateModal
+          isOpen={!!selectedStudentForDownload}
+          onClose={() => setSelectedStudentForDownload(null)}
+          student={selectedStudentForDownload}
+          onDownload={handleDownloadCertSubmit}
+          isDownloading={isDownloadingCert}
+        />
       )}
     </div>
   );

@@ -21,7 +21,6 @@ export default function StudentFinance() {
   const [activeHistoryTab, setActiveHistoryTab] = useState("payments"); 
 
   const { data, isLoading, error } = useStudentFinance(studentId);
-  console.log(data)
   const { mutate: downloadReceipt, isPending: isDownloading } = useDownloadReceipt();
   const [downloadingTxnId, setDownloadingTxnId] = useState(null);
 
@@ -140,11 +139,15 @@ export default function StudentFinance() {
                             <p className="text-[10px] font-bold text-slate-400 mt-1">
                               {format(new Date(txn.createdAt), "dd MMM yyyy, hh:mm a")}
                             </p>
+                            {/* 🚀 ADDED: Payment Collected By */}
+                            <p className="text-[9px] font-bold text-indigo-400 mt-1 flex items-center gap-1 uppercase tracking-widest">
+                              <User size={10} /> {txn.collected_by?.full_name || "System"}
+                            </p>
                           </div>
                         </div>
                         <div className="flex items-center gap-4">
                            <div className="text-right">
-                              <p className="text-[9px] font-black text-slate-400 uppercase uppercase">Receipt No.</p>
+                              <p className="text-[9px] font-black text-slate-400 uppercase">Receipt No.</p>
                               <p className="text-xs font-bold text-slate-700 font-mono">{txn.receipt_number}</p>
                            </div>
                            <button onClick={() => handleDownload(txn._id)} className="p-3 bg-slate-50 hover:bg-teal-50 text-slate-400 hover:text-teal-600 rounded-xl border border-slate-200 transition-all">
@@ -166,16 +169,20 @@ export default function StudentFinance() {
                 ) : (
                   <div className="space-y-4">
                     {discountHistory.map((d, idx) => (
-                      <div key={idx} className="flex items-center justify-between p-4 rounded-2xl border border-slate-100 bg-white">
+                      <div key={idx} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 rounded-2xl border border-slate-100 bg-white gap-4">
                         <div className="flex items-center gap-4">
                           <div className="w-10 h-10 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0"><Tags size={16} /></div>
                           <div>
                             <h4 className="text-sm font-black text-slate-800">New Discount: ৳{d.new_discount.toLocaleString()}</h4>
                             <p className="text-[10px] font-bold text-slate-400">Previous: ৳{d.previous_discount.toLocaleString()}</p>
+                            {/* 🚀 ADDED: Discount Updated By */}
+                            <p className="text-[9px] font-bold text-teal-500 mt-1 flex items-center gap-1 uppercase tracking-widest">
+                              <User size={10} /> {d.updated_by?.full_name || "System"}
+                            </p>
                           </div>
                         </div>
-                        <div className="text-right text-[10px] font-bold text-slate-400">
-                           {format(new Date(d.updated_at), "dd MMM yyyy")}
+                        <div className="text-left sm:text-right text-[10px] font-bold text-slate-400">
+                           {format(new Date(d.updated_at), "dd MMM yyyy, hh:mm a")}
                         </div>
                       </div>
                     ))}

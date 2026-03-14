@@ -155,14 +155,39 @@ export const useDeleteComment = () => {
   });
 };
 
+// export const useDownloadCertificate = () => {
+//   return useMutation({
+//     mutationFn: (student) => StudentAPI.downloadStudentCertificate(student._id),
+//     onSuccess: (blobData, student) => {
+//       const url = window.URL.createObjectURL(new Blob([blobData], { type: "application/pdf" }));
+//       const link = document.createElement("a");
+//       link.href = url;
+//       const safeName = student.student_name.replace(/[^a-zA-Z0-9]/g, "_");
+//       link.setAttribute("download", `CIB_Certificate_${safeName}.pdf`);
+//       document.body.appendChild(link);
+//       link.click();
+//       link.remove();
+//       window.URL.revokeObjectURL(url);
+//       toast.success("Certificate downloaded successfully");
+//     },
+//     onError: () => toast.error("Failed to generate certificate"),
+//   });
+// };
+
+
+
 export const useDownloadCertificate = () => {
   return useMutation({
-    mutationFn: (student) => StudentAPI.downloadStudentCertificate(student._id),
-    onSuccess: (blobData, student) => {
+    // 🚀 API তে { studentId, awardedOn } অবজেক্ট পাঠানো হচ্ছে
+    mutationFn: (data) => StudentAPI.downloadStudentCertificate({ 
+      studentId: data.student._id, 
+      awardedOn: data.awardedOn 
+    }),
+    onSuccess: (blobData, variables) => {
       const url = window.URL.createObjectURL(new Blob([blobData], { type: "application/pdf" }));
       const link = document.createElement("a");
       link.href = url;
-      const safeName = student.student_name.replace(/[^a-zA-Z0-9]/g, "_");
+      const safeName = variables.student.student_name.replace(/[^a-zA-Z0-9]/g, "_");
       link.setAttribute("download", `CIB_Certificate_${safeName}.pdf`);
       document.body.appendChild(link);
       link.click();
@@ -171,5 +196,16 @@ export const useDownloadCertificate = () => {
       toast.success("Certificate downloaded successfully");
     },
     onError: () => toast.error("Failed to generate certificate"),
+  });
+};
+
+
+
+//  useSendCertificateEmail Hook 
+export const useSendCertificateEmail = () => {
+  return useMutation({
+    mutationFn: StudentAPI.sendStudentCertificateEmail,
+    onSuccess: () => toast.success("Certificate sent to email successfully!"),
+    onError: (error) => toast.error(error.response?.data?.message || "Failed to send email"),
   });
 };

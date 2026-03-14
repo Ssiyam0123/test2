@@ -71,7 +71,6 @@ export default function ManageInventory() {
             )}
           </PermissionGuard>
 
-          {/* 🚀 গ্র্যানুলার পারমিশন: স্টক অ্যাড করার পারমিশন থাকলে বাটন দেখাবে */}
           {hasPermission(PERMISSIONS.INVENTORY_ADD_STOCK) && (
             <button 
               onClick={() => navigate("/admin/add-inventory")} 

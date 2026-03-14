@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Check, X, Save, UserX, Loader2 } from "lucide-react";
-import Avatar from "../../components/common/Avatar";
-import { useUpdateClassAttendance } from "../../hooks/useClasses"; // 🚀 Ensure correct hook import
+import Avatar from "../../components/common/Avatar"; // 🚀 Make sure this path points to your new Avatar component
+import { useUpdateClassAttendance } from "../../hooks/useClasses"; 
 import toast from "react-hot-toast";
 
 const AttendancePanel = ({ selectedClass, batchStudents }) => {
@@ -99,7 +99,16 @@ const AttendancePanel = ({ selectedClass, batchStudents }) => {
               }`}
             >
               <div className="flex items-center gap-3">
-                <Avatar src={student.photo_url} fallbackText={student.student_name} size="sm" />
+                
+                {/* 🚀 Avatar Component Integration */}
+                <Avatar 
+                  src={student.profile_picture || student.image || student.photo_url} 
+                  alt={student.student_name}
+                  fallbackText={student.student_name} 
+                  sizeClass="w-8 h-8" // Adjusted size to match the UI flow
+                  isInactive={status === 'Absent'} // Optional: Make avatar grayscale if absent
+                />
+
                 <div className="leading-tight">
                   <p className={`text-xs font-bold ${status === 'Absent' ? 'text-slate-400 line-through' : 'text-slate-800'}`}>
                     {student.student_name}

@@ -11,8 +11,8 @@ const createAdmin = async () => {
     await mongoose.connect(process.env.MONGO_URI || "mongodb://localhost:27017/cibdhk");
     console.log("🚀 MongoDB Connected...");
 
-    const adminEmail = "admin12@gmail.com";
-    const adminUsername = "suiii";
+    const adminEmail = "admin122@gmail.com";
+    const adminUsername = "hiiii";
 
     // 🚀 2. FETCH THE SUPERADMIN ROLE FROM THE DATABASE
     const superAdminRole = await Role.findOne({ name: "superadmin" });

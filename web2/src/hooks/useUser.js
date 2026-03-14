@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import * as UserAPI from "../api/user.api.js";
-import useAuth from "../store/useAuth"; // 🚀 Auth store import
+import useAuth from "../store/useAuth";
 
 export const useUsers = (page = 1, limit = 30, filters = {}) => {
   return useQuery({
@@ -20,9 +20,7 @@ export const useUser = (id) => {
   });
 };
 
-// ---------------------------------------------------------
 // MUTATIONS (Admin Actions)
-// ---------------------------------------------------------
 
 export const useAddUser = () => {
   const queryClient = useQueryClient();
@@ -31,7 +29,7 @@ export const useAddUser = () => {
     onSuccess: () => {
       toast.success("User created successfully!");
       queryClient.invalidateQueries({ queryKey: ["users"] });
-    }
+    },
   });
 };
 
@@ -43,7 +41,7 @@ export const useUpdateUser = () => {
       toast.success("User updated successfully!");
       queryClient.invalidateQueries({ queryKey: ["users"] });
       queryClient.invalidateQueries({ queryKey: ["user", variables.id] });
-    }
+    },
   });
 };
 
@@ -55,7 +53,7 @@ export const useUpdateUserStatus = () => {
       toast.success("User status updated!");
       queryClient.invalidateQueries({ queryKey: ["users"] });
       queryClient.invalidateQueries({ queryKey: ["user", variables.id] });
-    }
+    },
   });
 };
 
@@ -63,11 +61,11 @@ export const useUpdateUserRole = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: UserAPI.updateUserRole,
-    onSuccess: (_, variables) => { // 🚀 variables থেকে ID নিয়ে সিঙ্ক করলাম
+    onSuccess: (_, variables) => {
       toast.success("User role updated!");
       queryClient.invalidateQueries({ queryKey: ["users"] });
       queryClient.invalidateQueries({ queryKey: ["user", variables.id] });
-    }
+    },
   });
 };
 
@@ -80,15 +78,16 @@ export const useDeleteUser = () => {
       const previousUsers = queryClient.getQueryData(["users"]);
       queryClient.setQueryData(["users"], (old) => {
         if (!old || !old.data) return old;
-        return { ...old, data: old.data.filter(user => user._id !== id) };
+        return { ...old, data: old.data.filter((user) => user._id !== id) };
       });
       return { previousUsers };
     },
     onSuccess: () => toast.success("User deleted successfully!"),
     onError: (err, id, context) => {
-      if (context?.previousUsers) queryClient.setQueryData(["users"], context.previousUsers);
+      if (context?.previousUsers)
+        queryClient.setQueryData(["users"], context.previousUsers);
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ["users"] })
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["users"] }),
   });
 };
 
@@ -100,41 +99,36 @@ export const useRemoveUserPhoto = () => {
       toast.success("Photo removed!");
       queryClient.invalidateQueries({ queryKey: ["users"] });
       queryClient.invalidateQueries({ queryKey: ["user", id] });
-    }
+    },
   });
 };
 
-// ---------------------------------------------------------
 // PROFILE ACTIONS (Own Profile)
-// ---------------------------------------------------------
 
 export const useMyProfile = () => {
   return useQuery({
     queryKey: ["my-profile"],
     queryFn: UserAPI.fetchMyProfile,
-    staleTime: 5 * 60 * 1000, // নিজের প্রোফাইল বারবার চেঞ্জ হয় না
+    staleTime: 5 * 60 * 1000,
   });
 };
 
 export const useUpdateMyProfile = () => {
   const queryClient = useQueryClient();
-  const { setAuthUser } = useAuth(); // 🚀 Global Auth State update এর জন্য
-  
+  const { setAuthUser } = useAuth();
+
   return useMutation({
     mutationFn: UserAPI.updateMyProfile,
     onSuccess: (data) => {
       toast.success("Profile updated!");
-      
-      // ১. প্রোফাইল কুয়েরি রিফ্রেশ
+
       queryClient.invalidateQueries({ queryKey: ["my-profile"] });
-      
-      // ২. যদি লিস্টিং পেজে এই ইউজার থাকে তবে সেখানেও ডেটা আপডেট হবে
+
       queryClient.invalidateQueries({ queryKey: ["users"] });
-      
-      // ৩. 🚀 Auth Store আপডেট (যাতে হেডার/সাইডবার সাথে সাথে নতুন ছবি/নাম পায়)
+
       if (setAuthUser) {
-        setAuthUser(data); 
+        setAuthUser(data);
       }
-    }
+    },
   });
 };

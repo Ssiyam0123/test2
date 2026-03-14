@@ -14,6 +14,10 @@ import {
   Settings,
   Wallet,
   GraduationCap,
+  Package,
+  CalendarCheck,
+  Building2,
+  BookOpen
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -44,14 +48,14 @@ const QuickActionButton = ({ label, icon: Icon, to, colorClass, onClick }) => (
   <Link
     to={to}
     onClick={onClick}
-    className="flex flex-col items-center justify-center gap-3 p-4 bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md hover:border-indigo-100 transition-all group"
+    className="flex flex-col items-center justify-center gap-3 p-4 bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md hover:border-indigo-100 transition-all group h-full"
   >
     <div
       className={`p-3 rounded-2xl ${colorClass} group-hover:scale-110 transition-transform duration-300`}
     >
       <Icon size={22} strokeWidth={2.5} />
     </div>
-    <span className="text-[11px] font-black uppercase tracking-widest text-slate-600 group-hover:text-indigo-600 transition-colors text-center">
+    <span className="text-[10px] font-black uppercase tracking-widest text-slate-600 group-hover:text-indigo-600 transition-colors text-center leading-tight">
       {label}
     </span>
   </Link>
@@ -121,6 +125,20 @@ const Dashboard = () => {
   const stats = dashboardData || {};
   const { totals = {}, charts = {} } = stats;
 
+  // 🚀 QUICK ACTIONS ARRAY CONFIGURATION
+  const QUICK_ACTIONS = [
+    { label: "New Student", icon: UserPlus, to: "/admin/add-student", color: "bg-blue-50 text-blue-600" },
+    { label: "Collect Fee", icon: CreditCard, to: "/admin/all-students", color: "bg-emerald-50 text-emerald-600" },
+    { label: "New Batch", icon: Layers, to: "/admin/add-batch", color: "bg-indigo-50 text-indigo-600" },
+    { label: "Class Workspace", icon: ClipboardList, to: "/admin/manage-batches", color: "bg-amber-50 text-amber-600" },
+    { label: "Attendance", icon: CalendarCheck, to: "/admin/attendance-book", color: "bg-rose-50 text-rose-600" },
+    { label: "Inventory", icon: Package, to: "/admin/inventory", color: "bg-cyan-50 text-cyan-600" },
+    { label: "Staff", icon: GraduationCap, to: "/admin/all-employees", color: "bg-purple-50 text-purple-600" },
+    { label: "Courses", icon: BookOpen, to: "/admin/all-courses", color: "bg-fuchsia-50 text-fuchsia-600" },
+    { label: "Branches", icon: Building2, to: "/admin/branches", color: "bg-teal-50 text-teal-600" },
+    { label: "Holidays", icon: Settings, to: "/admin/manage-holidays", color: "bg-slate-100 text-slate-600" },
+  ];
+
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[70vh] gap-4">
@@ -156,6 +174,7 @@ const Dashboard = () => {
 
   return (
     <div className="p-4 md:p-8 max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-500">
+      
       {/* 1. HEADER */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
         <div>
@@ -182,58 +201,7 @@ const Dashboard = () => {
         </button>
       </div>
 
-      {/* 2. QUICK ACCESS BUTTONS (With GA4 Tracking) */}
-      <div>
-        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 pl-2">
-          Quick Operations
-        </h3>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          <QuickActionButton
-            onClick={() => trackAction("Add Student")}
-            label="New Student"
-            icon={UserPlus}
-            to="/admin/students/add"
-            colorClass="bg-blue-50 text-blue-600"
-          />
-          <QuickActionButton
-            onClick={() => trackAction("Collect Fee")}
-            label="Collect Fee"
-            icon={CreditCard}
-            to="/admin/finance"
-            colorClass="bg-emerald-50 text-emerald-600"
-          />
-          <QuickActionButton
-            onClick={() => trackAction("New Batch")}
-            label="New Batch"
-            icon={Layers}
-            to="/admin/batches/add"
-            colorClass="bg-indigo-50 text-indigo-600"
-          />
-          <QuickActionButton
-            onClick={() => trackAction("Manage Classes")}
-            label="Classes"
-            icon={ClipboardList}
-            to="/admin/manage-batches"
-            colorClass="bg-amber-50 text-amber-600"
-          />
-          <QuickActionButton
-            onClick={() => trackAction("Instructors")}
-            label="Staff"
-            icon={GraduationCap}
-            to="/admin/employees"
-            colorClass="bg-purple-50 text-purple-600"
-          />
-          <QuickActionButton
-            onClick={() => trackAction("Settings")}
-            label="Settings"
-            icon={Settings}
-            to="/admin/settings"
-            colorClass="bg-slate-100 text-slate-600"
-          />
-        </div>
-      </div>
-
-      {/* 3. EXECUTIVE KPI CARDS */}
+      {/* 2. EXECUTIVE KPI CARDS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
         <KPICard
           title="Total Revenue"
@@ -262,8 +230,29 @@ const Dashboard = () => {
         />
       </div>
 
+      {/* 3. QUICK ACCESS GRID (Mapped from array) */}
+      <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
+        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-5 pl-2">
+          System Shortcuts
+        </h3>
+        {/* Adjusted grid for better responsiveness when array is larger */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-10 gap-3">
+          {QUICK_ACTIONS.map((action, index) => (
+            <QuickActionButton
+              key={index}
+              label={action.label}
+              icon={action.icon}
+              to={action.to}
+              colorClass={action.color}
+              onClick={() => trackAction(action.label)}
+            />
+          ))}
+        </div>
+      </div>
+
       {/* 4. MAIN ANALYTICS GRAPHS */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        
         {/* CHART 1: REVENUE GROWTH (Clean Area Chart) */}
         <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 p-6 md:p-8 flex flex-col min-h-[450px]">
           <div className="mb-8">
@@ -331,7 +320,7 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* CHART 2: DIGITAL BATCH DISTRIBUTION (Properly Aligned Vertical Bar Chart) */}
+        {/* CHART 2: DIGITAL BATCH DISTRIBUTION */}
         <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 p-6 md:p-8 flex flex-col min-h-[450px]">
           <div className="mb-8">
             <h3 className="text-lg font-black text-slate-800 tracking-tight">
@@ -343,7 +332,6 @@ const Dashboard = () => {
           </div>
           <div className="flex-1 w-full min-h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
-              {/* 🚀 LAYOUT="VERTICAL" ensures perfect readability for Batch Names */}
               <BarChart
                 data={charts?.batchDistribution}
                 layout="vertical"
@@ -377,7 +365,6 @@ const Dashboard = () => {
                   radius={[0, 8, 8, 0]}
                   barSize={24}
                 >
-                  {/* 🚀 DIGITAL COUNT DISPLAY AT THE END OF EACH BAR */}
                   <LabelList
                     dataKey="count"
                     position="right"
@@ -391,6 +378,7 @@ const Dashboard = () => {
             </ResponsiveContainer>
           </div>
         </div>
+        
       </div>
     </div>
   );

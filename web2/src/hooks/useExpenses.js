@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { API } from "../api/axios";
+import { fetchExpenseByClass } from "../api/expense.api";
 
 // Fetch function
 const fetchExpenses = async (filters) => {
@@ -20,5 +21,17 @@ export const useExpenses = (filters) => {
     queryFn: () => fetchExpenses(filters),
     enabled: !!(filters?.branchId || filters?.batchId || filters?.classId),
     staleTime: 5 * 60 * 1000, 
+  });
+};
+
+
+
+
+export const useExpenseByClass = (branchId) => {
+  return useQuery({
+    queryKey: ["expenses-by-class", branchId],
+    queryFn: () => fetchExpenseByClass(branchId),
+    enabled: !!branchId, 
+    staleTime: 5 * 60 * 1000,
   });
 };

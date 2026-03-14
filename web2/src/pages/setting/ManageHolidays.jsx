@@ -21,20 +21,17 @@ const holidays = Array.isArray(holidaysRes)
   ? holidaysRes.data.data 
   : [];
 
-console.log("Holiday API Response:", holidaysRes);
+// console.log("Holiday API Response:", holidaysRes);
 
   const handleAdd = (e) => {
     e.preventDefault();
     if (!title || !selectedDate) return;
 
-    // 🚀 `<input type="date">` থেকে সবসময় "YYYY-MM-DD" ফরম্যাটে ডেটা আসে।
-    // যদি Recurring হয়, তাহলে আমরা প্রথম ৫ ক্যারেক্টার (YYYY-) কেটে ফেলবো।
     let finalDateString = selectedDate;
     if (isRecurring) {
       finalDateString = selectedDate.substring(5); // "2026-03-26" -> "03-26"
     }
 
-    // ব্যাকএন্ডে পাঠানোর আগে সেফটি চেক
     const regex = /^(?:\d{4}-)?(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
     if (!regex.test(finalDateString)) {
       Swal.fire({ icon: "error", title: "Invalid Format", text: "Something went wrong with the selected date." });
@@ -45,7 +42,7 @@ console.log("Holiday API Response:", holidaysRes);
       onSuccess: () => {
         setTitle("");
         setSelectedDate("");
-        setIsRecurring(true); // ফর্ম রিসেট
+        setIsRecurring(true); 
       }
     });
   };
@@ -95,7 +92,6 @@ console.log("Holiday API Response:", holidaysRes);
 
           <div className="flex-1 w-full">
             <label className="text-[10px] font-black text-gray-400 uppercase mb-1 block">Select Date</label>
-            {/* 🚀 Date Picker Add করা হলো */}
             <input
               type="date"
               required
@@ -103,7 +99,6 @@ console.log("Holiday API Response:", holidaysRes);
               onChange={(e) => setSelectedDate(e.target.value)}
               className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:bg-white focus:border-teal-500 outline-none transition-all cursor-pointer"
             />
-            {/* 🚀 Recurring Checkbox */}
             <div className="flex items-center gap-2 mt-2 ml-1">
               <input 
                 type="checkbox" 
@@ -146,7 +141,6 @@ console.log("Holiday API Response:", holidaysRes);
           <tbody>
             {holidays.length > 0 ? (
               holidays.map((h) => {
-                // 🚀 চেক করা হচ্ছে এটা কি রিপিটিং নাকি এককালীন
                 const isYearly = h.date_string.length === 5; // length 5 means "MM-dd"
                 
                 return (

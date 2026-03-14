@@ -43,10 +43,19 @@ export default function BatchWorkspace({
 
   const updateMutation = useUpdateClassAttendance();
 
-  // 🚀 গ্র্যানুলার ট্যাব পারমিশন চেক
   const canViewCalendar = hasPermission(PERMISSIONS.VIEW_BATCH_CALENDAR);
   const canViewCurriculum = hasPermission(PERMISSIONS.CURRICULUM_MATRIX);
   const canViewAttendanceBook = hasPermission(PERMISSIONS.VIEW_ATTENDANCE_BOOK);
+
+  // 🚀 THE FIX: Sync local `selectedClass` state when React Query fetches fresh data
+  useEffect(() => {
+    if (selectedClass && allClasses?.length > 0) {
+      const freshClassData = allClasses.find((c) => c._id === selectedClass._id);
+      if (freshClassData) {
+        setSelectedClass(freshClassData); // Automatically updates details & attendance panels!
+      }
+    }
+  }, [allClasses]);
 
   // Tab auto-correction if current tab is not allowed
   useEffect(() => {
@@ -77,10 +86,12 @@ export default function BatchWorkspace({
   }, [allClasses, selectedDate]);
 
   return (
-    <div className="h-full flex flex-col lg:flex-row gap-6">
-      <div className="flex-1 flex flex-col min-w-0 bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
+    // 🚀 FIXED: Removed strict h-full for mobile, kept for lg screens
+    <div className="flex flex-col lg:flex-row gap-6 lg:h-full">
+      {/* 🚀 FIXED: Added min-h-[500px] for mobile so calendar doesn't collapse */}
+      <div className="flex-1 flex flex-col min-w-0 bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden min-h-[500px] lg:min-h-0">
         <div className="flex items-center gap-2 p-4 bg-slate-50 border-b border-slate-100 shrink-0 overflow-x-auto custom-scrollbar">
-          {/* 📅 ক্যালেন্ডার ট্যাব */}
+          {/* Tabs */}
           {canViewCalendar && (
             <button
               onClick={() => setActiveTab("calendar")}
@@ -90,7 +101,6 @@ export default function BatchWorkspace({
             </button>
           )}
 
-          {/* 📋 কারিকুলাম ট্যাব */}
           {canViewCurriculum && (
             <button
               onClick={() => setActiveTab("curriculum")}
@@ -100,7 +110,6 @@ export default function BatchWorkspace({
             </button>
           )}
 
-          {/* 📊 এটেনডেন্স লেজার ট্যাব */}
           {canViewAttendanceBook && (
             <button
               onClick={() => setActiveTab("attendance")}
@@ -141,7 +150,8 @@ export default function BatchWorkspace({
         </div>
       </div>
 
-      <div className="w-full lg:w-[400px] flex flex-col gap-6 shrink-0 h-full">
+      {/* 🚀 FIXED: Added lg:h-full to prevent overlapping on mobile */}
+      <div className="w-full lg:w-[400px] flex flex-col gap-6 shrink-0 lg:h-full">
         <div className="flex-1 bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-[300px]">
           <div className="p-5 bg-slate-50 border-b border-slate-100 flex items-center justify-between shrink-0">
             <h3 className="font-black text-slate-800 uppercase tracking-widest text-[10px] flex items-center gap-2">

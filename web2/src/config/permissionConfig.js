@@ -5,7 +5,7 @@ export const PERMISSIONS = {
 
   // 🎓 Student Page Permissions
   VIEW_STUDENTS: "view_students",
-  ADD_STUDENT: "add_student", // 🆕 Added
+  ADD_STUDENT: "add_student", 
   STUDENT_PAYMENTS: "student_payments",
   STUDENT_PROFILE: "student_profile",
   STUDENT_COMMENT: "student_comment",
@@ -17,7 +17,7 @@ export const PERMISSIONS = {
 
   // 💼 Employee Page Permissions
   VIEW_EMPLOYEES: "view_employees",
-  ADD_EMPLOYEE: "add_employee", // 🆕 Added
+  ADD_EMPLOYEE: "add_employee",
   EMPLOYEE_ROLE_CONTROL: "employee_role_control",
   EMPLOYEE_IDCARD: "employee_idcard",
   EMPLOYEE_QRCODE: "employee_qrcode",

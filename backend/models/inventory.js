@@ -31,6 +31,11 @@ const inventorySchema = new mongoose.Schema(
       default: 0,
       min: [0, "Stock cannot go below zero"],
     },
+    unit_price: {
+      type: Number,
+      default: 0,
+      min: [0, "Price cannot be negative"],
+    },
     reorder_threshold: { type: Number, default: 5 },
   },
   { timestamps: true },

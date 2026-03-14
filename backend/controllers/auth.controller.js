@@ -46,7 +46,6 @@ export const register = catchAsync(async (req, res) => {
 // 🐳 [Controller: Logout]
 // ==========================================
 export const logout = catchAsync(async (req, res) => {
-  // 🚀 কুকি ক্লিয়ার করে দেওয়া হচ্ছে
   res.cookie("jwt", "", {
     maxAge: 0,
     httpOnly: true,
